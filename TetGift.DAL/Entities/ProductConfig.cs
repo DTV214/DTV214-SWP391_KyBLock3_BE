@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace TetGift.DAL.Entities;
+﻿namespace TetGift.DAL.Entities;
 
 public partial class ProductConfig
 {
@@ -17,7 +14,7 @@ public partial class ProductConfig
 
     public string? Imageurl { get; set; }
 
-    public virtual ICollection<ConfigDetail> ConfigDetails { get; set; } = new List<ConfigDetail>();
+    public virtual ICollection<ConfigDetail> ConfigDetails { get; set; } = [];
 
-    public virtual ICollection<Product> Products { get; set; } = new List<Product>();
+    public virtual ICollection<Product> Products { get; set; } = [];
 }

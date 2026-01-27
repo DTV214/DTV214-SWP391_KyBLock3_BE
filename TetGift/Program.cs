@@ -1,5 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using TetGift.BackgroundJobs;
 using TetGift.BLL.Interfaces;
 using TetGift.BLL.Services;
@@ -8,9 +11,6 @@ using TetGift.DAL.Interfaces;
 using TetGift.DAL.Repositories;
 using TetGift.DAL.UnitOfWork;
 using TetGift.Middlewares;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using System.Text;
 
 namespace TetGift
 {
@@ -78,6 +78,7 @@ namespace TetGift
 
             // Đăng ký các Service
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IProductConfigService, ProductConfigService>();
 
             var app = builder.Build();
 
