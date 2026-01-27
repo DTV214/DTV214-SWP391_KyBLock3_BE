@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace TetGift.DAL.Entities;
+﻿namespace TetGift.DAL.Entities;
 
 public partial class ProductCategory
 {
@@ -11,7 +8,7 @@ public partial class ProductCategory
 
     public bool? Isdeleted { get; set; }
 
-    public virtual ICollection<ConfigDetail> ConfigDetails { get; set; } = new List<ConfigDetail>();
+    public virtual ICollection<ConfigDetail> ConfigDetails { get; set; } = [];
 
-    public virtual ICollection<Product> Products { get; set; } = new List<Product>();
+    public virtual ICollection<Product> Products { get; set; } = [];
 }

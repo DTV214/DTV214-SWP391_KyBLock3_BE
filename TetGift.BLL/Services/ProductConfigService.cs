@@ -65,7 +65,7 @@ namespace TetGift.BLL.Services
 
             var repo = _uow.GetRepository<ProductConfig>();
             var entity = await repo.GetByIdAsync(dto.Configid);
-            if (entity != null)
+            if (entity != null && entity.Isdeleted == false)
             {
                 entity.Configname = dto.Configname;
                 entity.Suitablesuggestion = dto.Suitablesuggestion;

@@ -79,6 +79,7 @@ namespace TetGift
             // Đăng ký các Service
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IProductConfigService, ProductConfigService>();
+            builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
 
             var app = builder.Build();
 
