@@ -39,4 +39,79 @@ public partial class Product
     public virtual ICollection<QuotationItem> QuotationItems { get; set; } = [];
 
     public virtual ICollection<Stock> Stocks { get; set; } = [];
+
+    public void CalculateUnit()
+    {
+        if (ProductDetailProductparents != null && ProductDetailProductparents.Count != 0)
+        {
+            decimal total = 0;
+            foreach (var detail in ProductDetailProductparents)
+            {
+                if (detail.Product != null)
+                {
+                    total += (detail.Quantity ?? 0) * (detail.Product.Unit ?? 0);
+                }
+            }
+            this.Unit = total;
+        }
+    }
+
+    public void ValidateDetailAgainstConfig(int? categoryId, int? requestedQuantity)
+    {
+        if (Config == null) return;
+
+        if (categoryId == null || requestedQuantity == null) throw new Exception("Sản phẩm thiếu danh mục hoặc số lượng.");
+
+        if (!Config.ConfigDetails.Any()) return;
+
+        // Kiểm tra danh mục
+        var configDetail = Config.ConfigDetails
+            .FirstOrDefault(cd => cd.Categoryid == categoryId)
+            ?? throw new Exception("Sản phẩm thuộc danh mục này không hợp lệ với cấu hình hiện tại.");
+
+        // Kiểm tra giới hạn số lượng cho phép
+        int currentCategoryCount = ProductDetailProductparents
+            .Where(pd => pd.Product?.Categoryid == categoryId)
+            .Sum(pd => pd.Quantity ?? 0);
+
+        if (currentCategoryCount + requestedQuantity > configDetail.Quantity)
+        {
+            throw new Exception($"Số lượng vượt quá giới hạn cấu hình. Tối đa cho phép: {configDetail.Quantity}, hiện tại nếu cộng thêm: {currentCategoryCount + requestedQuantity}.");
+        }
+    }
+
+    public void ValidateUpdateDetailAgainstConfig(int? categoryId, int? requestedQuantity, int excludeDetailId)
+    {
+        if (Config == null) return;
+
+        if (categoryId == null || requestedQuantity == null) throw new Exception("Sản phẩm thiếu danh mục hoặc số lượng.");
+
+        if (Config.ConfigDetails.Count == 0) return;
+
+        // Kiểm tra danh mục
+        var configDetail = Config.ConfigDetails
+            .FirstOrDefault(cd => cd.Categoryid == categoryId)
+            ?? throw new Exception("Sản phẩm thuộc danh mục này không hợp lệ với cấu hình hiện tại.");
+
+        // Kiểm tra giới hạn số lượng cho phép
+        int currentCategoryCount = ProductDetailProductparents
+            .Where(pd => pd.Product?.Categoryid == categoryId && pd.Productdetailid != excludeDetailId)
+            .Sum(pd => pd.Quantity ?? 0);
+
+        if (currentCategoryCount + requestedQuantity > configDetail.Quantity)
+        {
+            throw new Exception($"Số lượng vượt quá giới hạn cấu hình. Tối đa cho phép: {configDetail.Quantity}, hiện tại nếu cộng thêm: {currentCategoryCount + requestedQuantity}.");
+        }
+    }
+
+    public void EnsureProductNotDuplicate(int childProductId)
+    {
+        bool isAlreadyExisted = ProductDetailProductparents
+            .Any(pd => pd.Productid == childProductId);
+
+        if (isAlreadyExisted)
+        {
+            throw new Exception("Sản phẩm này đã tồn tại trong danh sách chi tiết của sản phẩm cha.");
+        }
+    }
 }

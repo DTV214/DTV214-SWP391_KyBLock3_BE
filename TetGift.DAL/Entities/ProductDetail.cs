@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace TetGift.DAL.Entities;
+﻿namespace TetGift.DAL.Entities;
 
 public partial class ProductDetail
 {

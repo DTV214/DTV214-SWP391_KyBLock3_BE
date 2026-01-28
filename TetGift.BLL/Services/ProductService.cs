@@ -30,8 +30,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
 
     public async Task CreateCustomAsync(ProductDto dto)
     {
-        if (dto.Configid == null || !dto.Configid.HasValue
-            || dto.Accountid == null || !dto.Accountid.HasValue
+        if (dto.Accountid == null || !dto.Accountid.HasValue
             || string.IsNullOrWhiteSpace(dto.Productname))
         {
             throw new Exception("Thiếu thông tin bắt buộc cho sản phẩm tùy chỉnh (ConfigId, AccountId, ProductName).");
@@ -73,6 +72,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
             );
         if (!p.Any()) return null;
         var product = p.First();
+        product.CalculateUnit();
 
         return new ProductDto
         {
@@ -94,18 +94,22 @@ public class ProductService(IUnitOfWork uow) : IProductService
         var products = await _uow.GetRepository<Product>()
             .FindAsync(p => p.Accountid == accountId && !p.Status.Equals("DELETED"));
 
-        return products.Select(p => new ProductDto
+        return products.Select(p =>
         {
-            Productid = p.Productid,
-            Categoryid = p.Categoryid,
-            Configid = p.Configid,
-            Accountid = p.Accountid,
-            Sku = p.Sku,
-            Productname = p.Productname,
-            Description = p.Description,
-            Price = p.Price,
-            Status = p.Status,
-            Unit = p.Unit
+            p.CalculateUnit();
+            return new ProductDto
+            {
+                Productid = p.Productid,
+                Categoryid = p.Categoryid,
+                Configid = p.Configid,
+                Accountid = p.Accountid,
+                Sku = p.Sku,
+                Productname = p.Productname,
+                Description = p.Description,
+                Price = p.Price,
+                Status = p.Status,
+                Unit = p.Unit
+            };
         });
     }
 

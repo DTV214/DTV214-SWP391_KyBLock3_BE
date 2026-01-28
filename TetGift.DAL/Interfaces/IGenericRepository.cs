@@ -135,6 +135,22 @@ namespace TetGift.DAL.Interfaces
         Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate);
 
         /// <summary>
+        /// Finds record that match the specified condition asynchronously.
+        /// </summary>
+        /// <param name="predicate">The condition to filter records.</param>
+        /// <param name="includes">The tables want to be connected</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains a list of records that match the condition.</returns>
+        Task<T?> FindAsync(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IQueryable<T>>? include = null);
+
+        /// <summary>
+        /// Finds record that match the specified condition asynchronously.
+        /// </summary>
+        /// <param name="predicate">The condition to filter records.</param>
+        /// <param name="includes">The tables want to be connected</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains a list of records that match the condition.</returns>
+        Task<IEnumerable<T>> GetAllAsync(Expression<Func<T, bool>>? predicate = null, Func<IQueryable<T>, IQueryable<T>>? include = null);
+
+        /// <summary>
         /// Finds records that match the specified condition and sorts them asynchronously.
         /// </summary>
         /// <param name="predicate">The condition to filter records.</param>

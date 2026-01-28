@@ -82,6 +82,7 @@ namespace TetGift
             builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
             builder.Services.AddScoped<IConfigDetailService, ConfigDetailService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<IProductDetailService, ProductDetailService>();
 
             var app = builder.Build();
 
