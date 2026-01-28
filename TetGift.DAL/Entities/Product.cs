@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace TetGift.DAL.Entities;
+﻿namespace TetGift.DAL.Entities;
 
 public partial class Product
 {
@@ -27,19 +24,19 @@ public partial class Product
 
     public virtual Account? Account { get; set; }
 
-    public virtual ICollection<CartDetail> CartDetails { get; set; } = new List<CartDetail>();
+    public virtual ICollection<CartDetail> CartDetails { get; set; } = [];
 
     public virtual ProductCategory? Category { get; set; }
 
     public virtual ProductConfig? Config { get; set; }
 
-    public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
+    public virtual ICollection<OrderDetail> OrderDetails { get; set; } = [];
 
-    public virtual ICollection<ProductDetail> ProductDetailProductparents { get; set; } = new List<ProductDetail>();
+    public virtual ICollection<ProductDetail> ProductDetailProductparents { get; set; } = [];
 
-    public virtual ICollection<ProductDetail> ProductDetailProducts { get; set; } = new List<ProductDetail>();
+    public virtual ICollection<ProductDetail> ProductDetailProducts { get; set; } = [];
 
-    public virtual ICollection<QuotationItem> QuotationItems { get; set; } = new List<QuotationItem>();
+    public virtual ICollection<QuotationItem> QuotationItems { get; set; } = [];
 
-    public virtual ICollection<Stock> Stocks { get; set; } = new List<Stock>();
+    public virtual ICollection<Stock> Stocks { get; set; } = [];
 }
