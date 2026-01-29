@@ -32,7 +32,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "image.tar.gz,docker-compose.yml"
+          source: "image.tar.gz,docker-compose.prod.yml"
           target: "~/tetgift-api"
 
       - name: Deploy on VPS
@@ -59,7 +59,7 @@ jobs:
             EOF
             
             # Run new container
-            docker-compose up -d
+            docker-compose -f docker-compose.prod.yml up -d
             
             # Cleanup
             rm -f image.tar.gz

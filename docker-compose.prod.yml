@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  tetgift-api:
+    image: tetgift-api:latest
+    container_name: tetgift-api
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=TetGift
+      - Jwt__Audience=TetGiftUsers
+      - Jwt__ExpireMinutes=60
+      - Resend__ApiKey=${RESEND_API_KEY}
+      - Resend__From=TetGift <noreply@fitupco.fit>
+      - Otp__Secret=${OTP_SECRET:-SuperPowerOfGodSecretADIDACHUA}
+      - Otp__ExpireMinutes=5
+      - Otp__DeletePendingAfterMinutes=30
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: tetgift-network
