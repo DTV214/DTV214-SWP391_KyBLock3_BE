@@ -87,18 +87,19 @@ namespace TetGift
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.UseSwagger();
-                app.UseSwaggerUI();
-            }
+            // Enable Swagger for all environments
+            app.UseSwagger();
+            app.UseSwaggerUI();
 
-            app.UseHttpsRedirection();
+            // Only redirect to HTTPS in production with SSL configured
+            if (!app.Environment.IsProduction())
+            {
+                app.UseHttpsRedirection();
+            }
 
             //Middleware
             app.UseMiddleware<ExceptionMiddleware>();
 
-            app.UseAuthorization();
             app.UseAuthorization();
 
             app.MapControllers();
