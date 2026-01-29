@@ -10,6 +10,7 @@ using TetGift.DAL.Context;
 using TetGift.DAL.Interfaces;
 using TetGift.DAL.Repositories;
 using TetGift.DAL.UnitOfWork;
+using TetGift.Filters;
 using TetGift.Middlewares;
 
 namespace TetGift
@@ -23,6 +24,11 @@ namespace TetGift
             // ConnectionString
             builder.Services.AddDbContext<DatabaseContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            builder.Services.AddControllers(options =>
+            {
+                options.Filters.Add<ApiResponseWrapperFilter>();
+            });
 
             // Cấu hình Jwt
             var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new Exception("Missing config: Jwt:Key");
@@ -96,6 +102,7 @@ namespace TetGift
             {
                 app.UseHttpsRedirection();
             }
+
 
             //Middleware
             app.UseMiddleware<ExceptionMiddleware>();
