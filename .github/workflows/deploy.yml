@@ -1,0 +1,89 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKER_IMAGE: tetgift-api
+  CONTAINER_NAME: tetgift-api
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.DOCKER_IMAGE }}:latest .
+          docker save ${{ env.DOCKER_IMAGE }}:latest | gzip > image.tar.gz
+
+      - name: Copy image to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "image.tar.gz,docker-compose.yml"
+          target: "~/tetgift-api"
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ~/tetgift-api
+            
+            # Load new image
+            gunzip -c image.tar.gz | docker load
+            
+            # Stop old container if exists
+            docker stop ${{ env.CONTAINER_NAME }} 2>/dev/null || true
+            docker rm ${{ env.CONTAINER_NAME }} 2>/dev/null || true
+            
+            # Create .env file with secrets
+            cat > .env << EOF
+            DB_CONNECTION_STRING=${{ secrets.DB_CONNECTION_STRING }}
+            JWT_KEY=${{ secrets.JWT_KEY }}
+            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+            EOF
+            
+            # Run new container
+            docker-compose up -d
+            
+            # Cleanup
+            rm -f image.tar.gz
+            docker image prune -f
+            
+            # Show status
+            docker ps | grep ${{ env.CONTAINER_NAME }}
+
+      - name: Health check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "Waiting for container to start..."
+            sleep 10
+            
+            # Check if container is running
+            if docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
+              echo "✅ Container is running!"
+              docker logs --tail 20 ${{ env.CONTAINER_NAME }}
+            else
+              echo "❌ Container failed to start!"
+              docker logs ${{ env.CONTAINER_NAME }}
+              exit 1
+            fi

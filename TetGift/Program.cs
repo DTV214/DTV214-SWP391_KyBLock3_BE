@@ -10,6 +10,7 @@ using TetGift.DAL.Context;
 using TetGift.DAL.Interfaces;
 using TetGift.DAL.Repositories;
 using TetGift.DAL.UnitOfWork;
+using TetGift.Filters;
 using TetGift.Middlewares;
 
 namespace TetGift
@@ -23,6 +24,11 @@ namespace TetGift
             // ConnectionString
             builder.Services.AddDbContext<DatabaseContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+            builder.Services.AddControllers(options =>
+            {
+                options.Filters.Add<ApiResponseWrapperFilter>();
+            });
 
             // Cấu hình Jwt
             var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new Exception("Missing config: Jwt:Key");
@@ -87,18 +93,20 @@ namespace TetGift
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            // Enable Swagger for all environments
+            app.UseSwagger();
+            app.UseSwaggerUI();
+
+            // Only redirect to HTTPS in production with SSL configured
+            if (!app.Environment.IsProduction())
             {
-                app.UseSwagger();
-                app.UseSwaggerUI();
+                app.UseHttpsRedirection();
             }
 
-            app.UseHttpsRedirection();
 
             //Middleware
             app.UseMiddleware<ExceptionMiddleware>();
 
-            app.UseAuthorization();
             app.UseAuthorization();
 
             app.MapControllers();

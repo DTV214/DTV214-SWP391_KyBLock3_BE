@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Text.Json;
+using TetGift.BLL.Common;
 
 namespace TetGift.Middlewares
 {
@@ -23,7 +24,7 @@ namespace TetGift.Middlewares
             }
             catch (Exception ex)
             {
-                var (status, message) = Map(ex);
+                var (status, msg) = Map(ex);
 
                 if (status >= 500) _logger.LogError(ex, "Unhandled exception");
                 else _logger.LogWarning(ex, "Handled exception");
@@ -31,7 +32,18 @@ namespace TetGift.Middlewares
                 context.Response.StatusCode = status;
                 context.Response.ContentType = "application/json";
 
-                var json = JsonSerializer.Serialize(new { message });
+                var payload = new ApiResponse<object?>
+                {
+                    Status = status,
+                    Msg = msg,
+                    Data = null
+                };
+
+                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+
                 await context.Response.WriteAsync(json);
             }
         }
@@ -59,7 +71,9 @@ namespace TetGift.Middlewares
             if (root is FileNotFoundException || root is DirectoryNotFoundException)
                 return (500, root.Message);
 
+            // default: bạn throw new Exception("...") => 400
             return (400, ex.Message);
         }
     }
+
 }
