@@ -19,6 +19,7 @@ public partial class Product
     public decimal? Price { get; set; }
 
     public string? Status { get; set; }
+    public string? ImageUrl { get; set; }
 
     public decimal? Unit { get; set; }
 
