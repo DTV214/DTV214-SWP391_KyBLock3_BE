@@ -56,6 +56,10 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<StockMovement> StockMovements { get; set; }
 
+    public virtual DbSet<QuotationMessage> QuotationMessages { get; set; }
+
+    public virtual DbSet<QuotationCategoryRequest> QuotationCategoryRequests { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -482,6 +486,43 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.Totalprice)
                 .HasPrecision(18, 2)
                 .HasColumnName("totalprice");
+            entity.Property(e => e.Quotationtype)
+                .HasMaxLength(50)
+                .HasColumnName("quotationtype");
+
+            entity.Property(e => e.Desiredbudget)
+                .HasPrecision(18, 2)
+                .HasColumnName("desiredbudget");
+
+            entity.Property(e => e.Desiredpricenote)
+                .HasColumnName("desiredpricenote");
+
+            entity.Property(e => e.Revision)
+                .HasDefaultValue(1)
+                .HasColumnName("revision");
+
+            entity.Property(e => e.Submittedat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("submittedat");
+
+            entity.Property(e => e.Staffreviewedat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("staffreviewedat");
+
+            entity.Property(e => e.Adminreviewedat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("adminreviewedat");
+
+            entity.Property(e => e.Customerrespondedat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("customerrespondedat");
+
+            entity.Property(e => e.Staffreviewerid)
+                .HasColumnName("staffreviewerid");
+
+            entity.Property(e => e.Adminreviewerid)
+                .HasColumnName("adminreviewerid");
+
 
             entity.HasOne(d => d.Account).WithMany(p => p.Quotations)
                 .HasForeignKey(d => d.Accountid)
@@ -582,6 +623,69 @@ public partial class DatabaseContext : DbContext
                 .HasForeignKey(d => d.Stockid)
                 .HasConstraintName("stock_movement_stockid_fkey");
         });
+
+        modelBuilder.Entity<QuotationMessage>(entity =>
+        {
+            entity.HasKey(e => e.Quotationmessageid).HasName("quotation_message_pkey");
+            entity.ToTable("quotation_message");
+
+            entity.Property(e => e.Quotationmessageid).HasColumnName("quotationmessageid");
+            entity.Property(e => e.Quotationid).HasColumnName("quotationid");
+
+            entity.Property(e => e.Fromrole)
+                .HasMaxLength(50)
+                .HasColumnName("fromrole");
+
+            entity.Property(e => e.Fromaccountid).HasColumnName("fromaccountid");
+
+            entity.Property(e => e.Torole)
+                .HasMaxLength(50)
+                .HasColumnName("torole");
+
+            entity.Property(e => e.Actiontype)
+                .HasMaxLength(50)
+                .HasColumnName("actiontype");
+
+            entity.Property(e => e.Message).HasColumnName("message");
+            entity.Property(e => e.Metajson).HasColumnName("metajson");
+
+            entity.Property(e => e.Createdat)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("createdat");
+
+            entity.HasOne(d => d.Quotation).WithMany(p => p.QuotationMessages)
+                .HasForeignKey(d => d.Quotationid)
+                .HasConstraintName("quotation_message_quotationid_fkey");
+        });
+
+        modelBuilder.Entity<QuotationCategoryRequest>(entity =>
+        {
+            entity.HasKey(e => e.Quotationcategoryrequestid).HasName("quotation_category_request_pkey");
+            entity.ToTable("quotation_category_request");
+
+            entity.Property(e => e.Quotationcategoryrequestid).HasColumnName("quotationcategoryrequestid");
+            entity.Property(e => e.Quotationid).HasColumnName("quotationid");
+            entity.Property(e => e.Categoryid).HasColumnName("categoryid");
+
+            entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.Note).HasColumnName("note");
+
+            entity.Property(e => e.Createdat)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("createdat");
+
+            entity.HasOne(d => d.Quotation).WithMany(p => p.QuotationCategoryRequests)
+                .HasForeignKey(d => d.Quotationid)
+                .HasConstraintName("quotation_category_request_quotationid_fkey");
+
+            entity.HasOne(d => d.Category).WithMany()
+                .HasForeignKey(d => d.Categoryid)
+                .HasConstraintName("quotation_category_request_categoryid_fkey");
+        });
+
+
 
         OnModelCreatingPartial(modelBuilder);
     }

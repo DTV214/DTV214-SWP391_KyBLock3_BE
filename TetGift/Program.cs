@@ -1,9 +1,12 @@
-﻿using System.Net.Http.Headers;
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using TetGift.BackgroundJobs;
+using TetGift.BLL.Common;
 using TetGift.BLL.Interfaces;
 using TetGift.BLL.Services;
 using TetGift.DAL.Context;
@@ -52,14 +55,104 @@ namespace TetGift
                         ValidateLifetime = true,
                         ClockSkew = TimeSpan.FromSeconds(30)
                     };
+
+                    options.Events = new JwtBearerEvents
+                    {
+                        // 401
+                        OnChallenge = async context =>
+                        {
+                            context.HandleResponse();
+
+                            if (!context.Response.HasStarted)
+                            {
+                                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                                context.Response.ContentType = "application/json";
+
+                                var payload = new ApiResponse<object?>
+                                {
+                                    Status = 401,
+                                    Msg = "Unauthorized.",
+                                    Data = null
+                                };
+
+                                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                                {
+                                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                                });
+
+                                await context.Response.WriteAsync(json);
+                            }
+                        },
+
+                        // 403
+                        OnForbidden = async context =>
+                        {
+                            if (!context.Response.HasStarted)
+                            {
+                                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                                context.Response.ContentType = "application/json";
+
+                                var payload = new ApiResponse<object?>
+                                {
+                                    Status = 403,
+                                    Msg = "Forbidden.",
+                                    Data = null
+                                };
+
+                                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                                {
+                                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                                });
+
+                                await context.Response.WriteAsync(json);
+                            }
+                        },
+
+                        OnAuthenticationFailed = context =>
+                        {
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
+
 
             builder.Services.AddAuthorization();
 
             // Add services to the container.
-            builder.Services.AddControllers();
+            //builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "TetGift API", Version = "v1" });
+
+                // 1) Khai báo Bearer scheme
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Nhập: Bearer {your_jwt_token}"
+                });
+
+                // 2) Áp dụng scheme cho toàn bộ API (global)
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
+            });
+
 
             // Đăng ký Background Services
             builder.Services.AddHostedService<PendingAccountCleanupService>();
@@ -92,6 +185,8 @@ namespace TetGift
             //Khuyen mai, ton kho
             builder.Services.AddScoped<IPromotionService, PromotionService>();
             builder.Services.AddScoped<IInventoryService, InventoryService>();
+            builder.Services.AddScoped<IQuotationService, QuotationService>();
+            builder.Services.AddScoped<IOrderFromQuotationService, OrderFromQuotationService>();
 
             var app = builder.Build();
 
@@ -110,6 +205,7 @@ namespace TetGift
             //Middleware
             app.UseMiddleware<ExceptionMiddleware>();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllers();
