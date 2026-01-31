@@ -148,6 +148,7 @@ namespace TetGift
             //Middleware
             app.UseMiddleware<ExceptionMiddleware>();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllers();
