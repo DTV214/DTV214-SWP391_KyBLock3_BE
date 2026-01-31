@@ -92,6 +92,8 @@ namespace TetGift
             //Khuyen mai, ton kho
             builder.Services.AddScoped<IPromotionService, PromotionService>();
             builder.Services.AddScoped<IInventoryService, InventoryService>();
+            //Gio hang
+            builder.Services.AddScoped<ICartService, CartService>();
 
             var app = builder.Build();
 
