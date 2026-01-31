@@ -96,6 +96,8 @@ namespace TetGift
             builder.Services.AddScoped<ICartService, CartService>();
             //Don hang
             builder.Services.AddScoped<IOrderService, OrderService>();
+            //Thanh toan
+            builder.Services.AddScoped<IPaymentService, PaymentService>();
 
             var app = builder.Build();
 
