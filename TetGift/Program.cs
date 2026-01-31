@@ -94,6 +94,8 @@ namespace TetGift
             builder.Services.AddScoped<IInventoryService, InventoryService>();
             //Gio hang
             builder.Services.AddScoped<ICartService, CartService>();
+            //Don hang
+            builder.Services.AddScoped<IOrderService, OrderService>();
 
             var app = builder.Build();
 
