@@ -241,7 +241,7 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Lấy Payment (chỉ để hiển thị, không cập nhật - IPN đã xử lý)
+        // Lấy Payment và cập nhật status (nếu chưa được cập nhật bởi IPN)
         if (!int.TryParse(vnpTxnRef, out var paymentId))
         {
             return new PaymentResultDto
@@ -255,7 +255,56 @@ public class PaymentService : IPaymentService
         var paymentRepo = _uow.GetRepository<Payment>();
         var payment = await paymentRepo.GetByIdAsync(paymentId);
 
+        if (payment == null)
+        {
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "Không tìm thấy giao dịch",
+                ResponseCode = "01"
+            };
+        }
+
+        // Validate amount
+        if (payment.Amount != vnpAmount)
+        {
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "invalid amount",
+                ResponseCode = "04"
+            };
+        }
+
         var success = vnpResponseCode == "00" && vnpTransactionStatus == "00";
+        
+        // Cập nhật Payment status nếu chưa được cập nhật (idempotent)
+        if (payment.Status != "SUCCESS" && success)
+        {
+            payment.Status = "SUCCESS";
+            paymentRepo.Update(payment);
+
+            // Cập nhật Order status nếu payment thành công
+            if (payment.Order != null)
+            {
+                var orderRepo = _uow.GetRepository<Order>();
+                var order = payment.Order;
+                if (order.Status == "PENDING")
+                {
+                    order.Status = "CONFIRMED";
+                    orderRepo.Update(order);
+                }
+            }
+
+            await _uow.SaveAsync();
+        }
+        else if (!success && payment.Status != "FAILED")
+        {
+            payment.Status = "FAILED";
+            paymentRepo.Update(payment);
+            await _uow.SaveAsync();
+        }
+
         var message = success
             ? "Giao dịch được thực hiện thành công. Cảm ơn quý khách đã sử dụng dịch vụ"
             : $"Có lỗi xảy ra trong quá trình xử lý. Mã lỗi: {vnpResponseCode}";
@@ -264,7 +313,7 @@ public class PaymentService : IPaymentService
         {
             Success = success,
             PaymentId = paymentId,
-            OrderId = payment?.Orderid ?? 0,
+            OrderId = payment.Orderid ?? 0,
             TransactionNo = vnpTransactionNo,
             Message = message,
             Amount = vnpAmount,
