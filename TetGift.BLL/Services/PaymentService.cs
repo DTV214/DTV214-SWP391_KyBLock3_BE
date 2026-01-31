@@ -59,8 +59,12 @@ public class PaymentService : IPaymentService
         vnpay.AddRequestData("vnp_Version", VnPayLibrary.VERSION);
         vnpay.AddRequestData("vnp_Command", "pay");
         vnpay.AddRequestData("vnp_TmnCode", vnpTmnCode);
+        // VNPay yêu cầu timezone GMT+7 (Vietnam time)
+        // Convert UTC to GMT+7
+        var vietnamTime = DateTime.UtcNow.AddHours(7);
+        
         vnpay.AddRequestData("vnp_Amount", ((long)(order.FinalPrice * 100)).ToString()); // Nhân 100 để khử phần thập phân
-        vnpay.AddRequestData("vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss"));
+        vnpay.AddRequestData("vnp_CreateDate", vietnamTime.ToString("yyyyMMddHHmmss"));
         vnpay.AddRequestData("vnp_CurrCode", "VND");
         vnpay.AddRequestData("vnp_IpAddr", clientIp ?? "127.0.0.1");
         vnpay.AddRequestData("vnp_Locale", "vn");
@@ -68,7 +72,7 @@ public class PaymentService : IPaymentService
         vnpay.AddRequestData("vnp_OrderType", "other");
         vnpay.AddRequestData("vnp_ReturnUrl", vnpReturnUrl);
         vnpay.AddRequestData("vnp_TxnRef", payment.Paymentid.ToString());
-        vnpay.AddRequestData("vnp_ExpireDate", DateTime.Now.AddMinutes(30).ToString("yyyyMMddHHmmss"));
+        vnpay.AddRequestData("vnp_ExpireDate", vietnamTime.AddMinutes(60).ToString("yyyyMMddHHmmss")); // 60 phút để đảm bảo đủ thời gian test
 
         var paymentUrl = vnpay.CreateRequestUrl(vnpUrl, vnpHashSecret);
 
