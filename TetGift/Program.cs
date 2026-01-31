@@ -89,6 +89,9 @@ namespace TetGift
             builder.Services.AddScoped<IConfigDetailService, ConfigDetailService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IProductDetailService, ProductDetailService>();
+            //Khuyen mai, ton kho
+            builder.Services.AddScoped<IPromotionService, PromotionService>();
+            builder.Services.AddScoped<IInventoryService, InventoryService>();
 
             var app = builder.Build();
 
