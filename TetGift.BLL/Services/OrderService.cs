@@ -190,7 +190,7 @@ public class OrderService : IOrderService
         IEnumerable<Order> orders;
         if (!string.IsNullOrWhiteSpace(status))
         {
-            orders = await orderRepo.FindAsync(
+            orders = await orderRepo.GetAllAsync(
                 o => o.Status == status,
                 include: q => q
                     .Include(o => o.OrderDetails)

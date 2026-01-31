@@ -87,7 +87,8 @@ public class CartService : ICartService
         // Kiểm tra sản phẩm đã có trong cart chưa
         var cartDetailRepo = _uow.GetRepository<CartDetail>();
         var existingDetail = await cartDetailRepo.FindAsync(
-            cd => cd.Cartid == cart.Cartid && cd.Productid == request.ProductId
+            cd => cd.Cartid == cart.Cartid && cd.Productid == request.ProductId,
+            include: null
         );
 
         if (existingDetail != null)
