@@ -131,6 +131,8 @@ namespace TetGift
             builder.Services.AddScoped<IOrderService, OrderService>();
             //Thanh toan
             builder.Services.AddScoped<IPaymentService, PaymentService>();
+            //Dashboard
+            builder.Services.AddScoped<IDashboardService, DashboardService>();
 
             var app = builder.Build();
 
