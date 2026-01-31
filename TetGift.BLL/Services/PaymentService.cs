@@ -253,7 +253,10 @@ public class PaymentService : IPaymentService
         }
 
         var paymentRepo = _uow.GetRepository<Payment>();
-        var payment = await paymentRepo.GetByIdAsync(paymentId);
+        var payment = await paymentRepo.FindAsync(
+            p => p.Paymentid == paymentId,
+            include: q => q.Include(p => p.Order)
+        );
 
         if (payment == null)
         {
