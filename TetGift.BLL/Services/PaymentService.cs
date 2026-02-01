@@ -148,7 +148,14 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Lấy Payment
+        // Kiểm tra nếu là WALLET_DEPOSIT (vnpTxnRef có format: WALLET_{WalletId}_{PaymentId}_{Timestamp})
+        if (!string.IsNullOrEmpty(vnpTxnRef) && vnpTxnRef.StartsWith("WALLET_"))
+        {
+            // Nạp tiền vào ví - gọi WalletService để xử lý
+            return await _walletService.ProcessDepositCallbackAsync(queryParams);
+        }
+
+        // ORDER_PAYMENT - parse paymentId trực tiếp từ vnpTxnRef
         if (!int.TryParse(vnpTxnRef, out var paymentId))
         {
             return new PaymentResultDto
@@ -185,13 +192,6 @@ public class PaymentService : IPaymentService
                 Message = "invalid amount",
                 ResponseCode = "04"
             };
-        }
-
-        // Xử lý theo Type của Payment
-        if (payment.Type == "WALLET_DEPOSIT")
-        {
-            // Nạp tiền vào ví - gọi WalletService
-            return await _walletService.ProcessDepositCallbackAsync(queryParams);
         }
 
         // ORDER_PAYMENT - xử lý như cũ
@@ -280,7 +280,14 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Lấy Payment và cập nhật status (nếu chưa được cập nhật bởi IPN)
+        // Kiểm tra nếu là WALLET_DEPOSIT (vnpTxnRef có format: WALLET_{WalletId}_{PaymentId}_{Timestamp})
+        if (!string.IsNullOrEmpty(vnpTxnRef) && vnpTxnRef.StartsWith("WALLET_"))
+        {
+            // Nạp tiền vào ví - gọi WalletService để xử lý
+            return await _walletService.ProcessDepositReturnAsync(queryParams);
+        }
+
+        // ORDER_PAYMENT - parse paymentId trực tiếp từ vnpTxnRef
         if (!int.TryParse(vnpTxnRef, out var paymentId))
         {
             return new PaymentResultDto
@@ -316,13 +323,6 @@ public class PaymentService : IPaymentService
                 Message = "invalid amount",
                 ResponseCode = "04"
             };
-        }
-
-        // Xử lý theo Type của Payment
-        if (payment.Type == "WALLET_DEPOSIT")
-        {
-            // Nạp tiền vào ví - gọi WalletService
-            return await _walletService.ProcessDepositReturnAsync(queryParams);
         }
 
         // ORDER_PAYMENT - xử lý như cũ
