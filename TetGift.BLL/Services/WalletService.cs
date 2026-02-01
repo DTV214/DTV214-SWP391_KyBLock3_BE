@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Net;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Common.VnPay;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -40,7 +41,7 @@ public class WalletService : IWalletService
             WalletId = wallet.Walletid,
             AccountId = wallet.Accountid,
             Balance = wallet.Balance,
-            Status = wallet.Status ?? "ACTIVE",
+            Status = wallet.Status ?? WalletStatus.ACTIVE,
             CreatedAt = wallet.Createdat,
             UpdatedAt = wallet.Updatedat
         };
@@ -90,7 +91,7 @@ public class WalletService : IWalletService
                 Amount = t.Amount,
                 BalanceBefore = t.Balancebefore,
                 BalanceAfter = t.Balanceafter,
-                Status = t.Status ?? "SUCCESS",
+                Status = t.Status ?? WalletTransactionStatus.SUCCESS,
                 Description = t.Description,
                 CreatedAt = t.Createdat
             }).ToList(),
@@ -113,7 +114,7 @@ public class WalletService : IWalletService
                 WalletId = existingWallet.Walletid,
                 AccountId = existingWallet.Accountid,
                 Balance = existingWallet.Balance,
-                Status = existingWallet.Status ?? "ACTIVE",
+                Status = existingWallet.Status ?? WalletStatus.ACTIVE,
                 CreatedAt = existingWallet.Createdat,
                 UpdatedAt = existingWallet.Updatedat
             };
@@ -124,7 +125,7 @@ public class WalletService : IWalletService
         {
             Accountid = accountId,
             Balance = 0,
-            Status = "ACTIVE",
+            Status = WalletStatus.ACTIVE,
             Createdat = DateTime.Now
         };
 
@@ -152,7 +153,7 @@ public class WalletService : IWalletService
 
         // Đảm bảo có ví
         var wallet = await GetWalletByAccountIdAsync(accountId);
-        if (wallet.Status != "ACTIVE")
+        if (wallet.Status != WalletStatus.ACTIVE)
             throw new Exception("Ví của bạn đang bị khóa, không thể nạp tiền.");
 
         // Tạo Payment record với Type = WALLET_DEPOSIT
@@ -161,7 +162,7 @@ public class WalletService : IWalletService
         {
             Walletid = wallet.WalletId,
             Amount = amount,
-            Status = "PENDING",
+            Status = PaymentStatus.PENDING,
             Type = "WALLET_DEPOSIT",
             Paymentmethod = "VNPAY",
             Ispayonline = true
@@ -304,9 +305,9 @@ public class WalletService : IWalletService
         }
 
         // Cập nhật Payment status nếu chưa được cập nhật (idempotent)
-        if (payment.Status != "SUCCESS" && success)
+        if (payment.Status != PaymentStatus.SUCCESS && success)
         {
-            payment.Status = "SUCCESS";
+            payment.Status = PaymentStatus.SUCCESS;
             payment.Transactionno = vnpTransactionNo;
             paymentRepo.Update(payment);
 
@@ -330,7 +331,7 @@ public class WalletService : IWalletService
                     Amount = payment.Amount ?? 0,
                     Balancebefore = balanceBefore,
                     Balanceafter = wallet.Balance,
-                    Status = "SUCCESS",
+                    Status = WalletTransactionStatus.SUCCESS,
                     Description = $"Nạp tiền vào ví qua VNPay - Payment #{payment.Paymentid}",
                     Createdat = DateTime.Now
                 };
@@ -339,9 +340,9 @@ public class WalletService : IWalletService
 
             await _uow.SaveAsync();
         }
-        else if (!success && payment.Status != "FAILED")
+        else if (!success && payment.Status != PaymentStatus.FAILED)
         {
-            payment.Status = "FAILED";
+            payment.Status = PaymentStatus.FAILED;
             paymentRepo.Update(payment);
             await _uow.SaveAsync();
         }
@@ -368,13 +369,13 @@ public class WalletService : IWalletService
     {
         // 1. Validate Order
         var order = await _orderService.GetOrderByIdAsync(orderId, accountId);
-        if (order.Status != "PENDING")
+        if (order.Status != OrderStatus.PENDING)
             throw new Exception("Chỉ có thể thanh toán cho đơn hàng đang chờ xác nhận.");
 
         // 2. Kiểm tra đã có payment thành công chưa
         var paymentRepo = _uow.GetRepository<Payment>();
         var existingPayments = await paymentRepo.GetAllAsync(
-            p => p.Orderid == orderId && p.Status == "SUCCESS"
+            p => p.Orderid == orderId && p.Status == PaymentStatus.SUCCESS
         );
         if (existingPayments.Any())
             throw new Exception("Đơn hàng này đã được thanh toán thành công.");
@@ -392,7 +393,7 @@ public class WalletService : IWalletService
                 throw new Exception("Không thể tạo ví cho tài khoản này.");
         }
 
-        if (wallet.Status != "ACTIVE")
+        if (wallet.Status != WalletStatus.ACTIVE)
             throw new Exception("Ví của bạn đang bị khóa, không thể thanh toán.");
 
         if (wallet.Balance < order.FinalPrice)
@@ -412,7 +413,7 @@ public class WalletService : IWalletService
             Orderid = orderId,
             Walletid = wallet.Walletid,
             Amount = order.FinalPrice,
-            Status = "SUCCESS",
+            Status = PaymentStatus.SUCCESS,
             Type = "ORDER_PAYMENT",
             Paymentmethod = "WALLET",
             Ispayonline = false
@@ -441,7 +442,7 @@ public class WalletService : IWalletService
         var orderEntity = await orderRepo.FindAsync(o => o.Orderid == orderId, include: null);
         if (orderEntity != null)
         {
-            orderEntity.Status = "CONFIRMED";
+            orderEntity.Status = OrderStatus.CONFIRMED;
             orderRepo.Update(orderEntity);
         }
 
@@ -461,7 +462,7 @@ public class WalletService : IWalletService
     {
         var paymentRepo = _uow.GetRepository<Payment>();
         var payment = await paymentRepo.FindAsync(
-            p => p.Orderid == orderId && p.Paymentmethod == "WALLET" && p.Status == "SUCCESS",
+            p => p.Orderid == orderId && p.Paymentmethod == "WALLET" && p.Status == PaymentStatus.SUCCESS,
             include: q => q.Include(p => p.Wallet)
         );
 
@@ -502,7 +503,7 @@ public class WalletService : IWalletService
         await transactionRepo.AddAsync(transaction);
 
         // Cập nhật Payment status
-        payment.Status = "REFUNDED";
+        payment.Status = PaymentStatus.REFUNDED;
         paymentRepo.Update(payment);
 
         await _uow.SaveAsync();

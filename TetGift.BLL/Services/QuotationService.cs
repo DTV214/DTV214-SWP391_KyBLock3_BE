@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Common.Enums;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -768,7 +769,7 @@ namespace TetGift.BLL.Services
             // NOTE: repo.Entities is IQueryable<Product> (DAL has EF). This is okay.
             var candidates = productRepo.Entities
                 .Where(p => p.Categoryid != null && categoryIds.Contains(p.Categoryid.Value))
-                .Where(p => p.Status == null || p.Status == "Active") // optional
+                .Where(p => p.Status == null || p.Status == ProductStatus.ACTIVE) // optional
                 .ToList();
 
             // order by price

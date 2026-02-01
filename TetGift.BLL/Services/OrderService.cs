@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
@@ -59,7 +60,7 @@ public class OrderService : IOrderService
         foreach (var item in cart.Items)
         {
             var stocks = await stockRepo.FindAsync(
-                s => s.Productid == item.ProductId && s.Status == "ACTIVE"
+                s => s.Productid == item.ProductId && s.Status == StockStatus.ACTIVE
             );
 
             var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
@@ -76,7 +77,7 @@ public class OrderService : IOrderService
             Accountid = accountId,
             Promotionid = promotionId,
             Totalprice = cart.TotalPrice - discountValue,
-            Status = "PENDING",
+            Status = OrderStatus.PENDING,
             Customername = request.CustomerName,
             Customerphone = request.CustomerPhone,
             Customeremail = request.CustomerEmail,
@@ -106,7 +107,7 @@ public class OrderService : IOrderService
             // Cập nhật Stock (FIFO - First In First Out)
             var remainingQuantity = cartItem.Quantity ?? 0;
             var availableStocks = await stockRepo.FindAsync(
-                s => s.Productid == cartItem.ProductId && s.Status == "ACTIVE"
+                s => s.Productid == cartItem.ProductId && s.Status == StockStatus.ACTIVE
             );
 
             foreach (var stock in availableStocks.OrderBy(s => s.Productiondate))
@@ -118,7 +119,7 @@ public class OrderService : IOrderService
 
                 stock.Stockquantity = stockQuantity - quantityToDeduct;
                 if (stock.Stockquantity <= 0)
-                    stock.Status = "OUT_OF_STOCK";
+                    stock.Status = StockStatus.OUT_OF_STOCK;
 
                 stockRepo.Update(stock);
 
@@ -247,7 +248,7 @@ public class OrderService : IOrderService
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng.");
 
-        var currentStatus = order.Status ?? "PENDING";
+        var currentStatus = order.Status ?? OrderStatus.PENDING;
         var newStatus = request.Status.ToUpper();
 
         // Validate status transition
@@ -257,7 +258,7 @@ public class OrderService : IOrderService
         }
 
         // Nếu hủy đơn, hoàn lại stock và hoàn tiền vào ví (nếu thanh toán bằng ví)
-        if (newStatus == "CANCELLED" && currentStatus != "CANCELLED")
+        if (newStatus == OrderStatus.CANCELLED && currentStatus != OrderStatus.CANCELLED)
         {
             await RestoreStockAsync(order);
             
@@ -285,12 +286,12 @@ public class OrderService : IOrderService
     {
         var validTransitions = new Dictionary<string, List<string>>
         {
-            { "PENDING", new List<string> { "CONFIRMED", "CANCELLED" } },
-            { "CONFIRMED", new List<string> { "PROCESSING", "CANCELLED" } },
-            { "PROCESSING", new List<string> { "SHIPPED", "CANCELLED" } },
-            { "SHIPPED", new List<string> { "DELIVERED", "CANCELLED" } },
-            { "DELIVERED", new List<string> { } }, // Không thể chuyển từ DELIVERED
-            { "CANCELLED", new List<string> { } } // Không thể chuyển từ CANCELLED
+            { OrderStatus.PENDING, new List<string> { OrderStatus.CONFIRMED, OrderStatus.CANCELLED } },
+            { OrderStatus.CONFIRMED, new List<string> { OrderStatus.PROCESSING, OrderStatus.CANCELLED } },
+            { OrderStatus.PROCESSING, new List<string> { OrderStatus.SHIPPED, OrderStatus.CANCELLED } },
+            { OrderStatus.SHIPPED, new List<string> { OrderStatus.DELIVERED, OrderStatus.CANCELLED } },
+            { OrderStatus.DELIVERED, new List<string> { } }, // Không thể chuyển từ DELIVERED
+            { OrderStatus.CANCELLED, new List<string> { } } // Không thể chuyển từ CANCELLED
         };
 
         if (!validTransitions.ContainsKey(currentStatus))
@@ -328,8 +329,8 @@ public class OrderService : IOrderService
                 stock.Stockquantity = (stock.Stockquantity ?? 0) + quantityToRestore;
                 
                 // Nếu stock đang OUT_OF_STOCK và sau khi hoàn lại có số lượng > 0, chuyển về ACTIVE
-                if (stock.Status == "OUT_OF_STOCK" && stock.Stockquantity > 0)
-                    stock.Status = "ACTIVE";
+                if (stock.Status == StockStatus.OUT_OF_STOCK && stock.Stockquantity > 0)
+                    stock.Status = StockStatus.ACTIVE;
                 
                 stockRepo.Update(stock);
 

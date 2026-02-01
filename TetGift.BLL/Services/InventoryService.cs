@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
@@ -23,7 +24,7 @@ namespace TetGift.BLL.Services
         {
             var stockRepo = _unitOfWork.GetRepository<Stock>();
             var stocks = await stockRepo.GetAllAsync(
-                predicate: s => s.Status != "DELETED",
+                predicate: s => s.Status != StockStatus.DELETED,
                 include: q => q.Include(s => s.Product)
             );
             return MapToDto(stocks);
@@ -45,7 +46,7 @@ namespace TetGift.BLL.Services
 
             // Lấy tất cả lô hàng của ProductId này mà chưa bị xóa
             var stocks = await stockRepo.GetAllAsync(
-                predicate: s => s.Productid == productId && s.Status != "DELETED",
+                predicate: s => s.Productid == productId && s.Status != StockStatus.DELETED,
                 include: q => q.Include(s => s.Product)
             );
 
@@ -67,7 +68,7 @@ namespace TetGift.BLL.Services
                 // Convert DateTime? -> DateOnly?
                 Productiondate = req.ProductionDate.HasValue ? DateOnly.FromDateTime(req.ProductionDate.Value) : null,
                 Expirydate = req.ExpiryDate.HasValue ? DateOnly.FromDateTime(req.ExpiryDate.Value) : null,
-                Status = "ACTIVE",
+                Status = StockStatus.ACTIVE,
                 Lastupdated = DateTime.Now
             };
 
@@ -117,7 +118,7 @@ namespace TetGift.BLL.Services
             var stockRepo = _unitOfWork.GetRepository<Stock>();
             var stock = await stockRepo.GetByIdAsync(id);
             if (stock == null) throw new Exception("Lô hàng không tồn tại.");
-            stock.Status = "DELETED";
+            stock.Status = StockStatus.DELETED;
             await stockRepo.UpdateAsync(stock);
         }
 
@@ -125,7 +126,7 @@ namespace TetGift.BLL.Services
         public async Task<IEnumerable<LowStockReportDto>> GetLowStockReportAsync(int threshold)
         {
             var stockRepo = _unitOfWork.GetRepository<Stock>();
-            var stocks = await stockRepo.GetAllAsync(predicate: s => s.Status != "EXPIRED", include: q => q.Include(s => s.Product));
+            var stocks = await stockRepo.GetAllAsync(predicate: s => s.Status != StockStatus.EXPIRED, include: q => q.Include(s => s.Product));
 
             return stocks
                 .Where(s => s.Product != null)
@@ -155,7 +156,7 @@ namespace TetGift.BLL.Services
                 // Convert DateOnly -> DateTime
                 ExpiryDate = s.Expirydate.HasValue ? s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) : null,
                 ProductionDate = s.Productiondate.HasValue ? s.Productiondate.Value.ToDateTime(TimeOnly.MinValue) : null, // Trả về thêm ProductionDate nếu DTO có trường này
-                Status = s.Status ?? "ACTIVE"
+                Status = s.Status ?? StockStatus.ACTIVE
             });
         }
 
@@ -168,7 +169,7 @@ namespace TetGift.BLL.Services
                 ProductName = productName ?? s.Product?.Productname ?? "Unknown",
                 Quantity = s.Stockquantity ?? 0,
                 ExpiryDate = s.Expirydate.HasValue ? s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) : null,
-                Status = s.Status ?? "ACTIVE"
+                Status = s.Status ?? StockStatus.ACTIVE
             };
         }
     }

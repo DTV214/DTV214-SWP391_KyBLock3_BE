@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Net;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Common.VnPay;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -28,13 +29,13 @@ public class PaymentService : IPaymentService
     {
         // 1. Validate Order (sử dụng IOrderService - kế thừa code cũ)
         var order = await _orderService.GetOrderByIdAsync(orderId, accountId);
-        if (order.Status != "PENDING")
+        if (order.Status != OrderStatus.PENDING)
             throw new Exception("Chỉ có thể thanh toán cho đơn hàng đang chờ xác nhận.");
 
         // 2. Kiểm tra đã có payment thành công chưa
         var paymentRepo = _uow.GetRepository<Payment>();
         var existingPayments = await paymentRepo.FindAsync(
-            p => p.Orderid == orderId && p.Status == "SUCCESS"
+            p => p.Orderid == orderId && p.Status == PaymentStatus.SUCCESS
         );
         if (existingPayments.Any())
             throw new Exception("Đơn hàng này đã được thanh toán thành công.");
@@ -60,7 +61,7 @@ public class PaymentService : IPaymentService
         {
             Orderid = orderId,
             Amount = order.FinalPrice,
-            Status = "PENDING",
+            Status = PaymentStatus.PENDING,
             Type = "ORDER_PAYMENT",
             Paymentmethod = "VNPAY",
             Ispayonline = true
@@ -183,7 +184,7 @@ public class PaymentService : IPaymentService
 
         // ORDER_PAYMENT - xử lý như cũ
         // Kiểm tra payment đã được xử lý chưa
-        if (payment.Status == "SUCCESS")
+        if (payment.Status == PaymentStatus.SUCCESS)
         {
             return new PaymentResultDto
             {
@@ -199,24 +200,24 @@ public class PaymentService : IPaymentService
         // Cập nhật Payment status
         if (vnpResponseCode == "00" && vnpTransactionStatus == "00")
         {
-            payment.Status = "SUCCESS";
+            payment.Status = PaymentStatus.SUCCESS;
             payment.Transactionno = vnpTransactionNo;
         }
         else
         {
-            payment.Status = "FAILED";
+            payment.Status = PaymentStatus.FAILED;
         }
 
         paymentRepo.Update(payment);
 
         // Cập nhật Order status nếu payment thành công
-        if (payment.Status == "SUCCESS" && payment.Order != null)
+        if (payment.Status == PaymentStatus.SUCCESS && payment.Order != null)
         {
             var orderRepo = _uow.GetRepository<Order>();
             var order = payment.Order;
-            if (order.Status == "PENDING")
+            if (order.Status == OrderStatus.PENDING)
             {
-                order.Status = "CONFIRMED";
+                order.Status = OrderStatus.CONFIRMED;
                 orderRepo.Update(order);
             }
         }
@@ -225,7 +226,7 @@ public class PaymentService : IPaymentService
 
         return new PaymentResultDto
         {
-            Success = payment.Status == "SUCCESS",
+            Success = payment.Status == PaymentStatus.SUCCESS,
             PaymentId = payment.Paymentid,
             OrderId = payment.Orderid ?? 0,
             TransactionNo = vnpTransactionNo,
@@ -316,9 +317,9 @@ public class PaymentService : IPaymentService
         var success = vnpResponseCode == "00" && vnpTransactionStatus == "00";
         
         // Cập nhật Payment status nếu chưa được cập nhật (idempotent)
-        if (payment.Status != "SUCCESS" && success)
+        if (payment.Status != PaymentStatus.SUCCESS && success)
         {
-            payment.Status = "SUCCESS";
+            payment.Status = PaymentStatus.SUCCESS;
             payment.Transactionno = vnpTransactionNo;
             paymentRepo.Update(payment);
 
@@ -327,18 +328,18 @@ public class PaymentService : IPaymentService
             {
                 var orderRepo = _uow.GetRepository<Order>();
                 var order = payment.Order;
-                if (order.Status == "PENDING")
+                if (order.Status == OrderStatus.PENDING)
                 {
-                    order.Status = "CONFIRMED";
+                    order.Status = OrderStatus.CONFIRMED;
                     orderRepo.Update(order);
                 }
             }
 
             await _uow.SaveAsync();
         }
-        else if (!success && payment.Status != "FAILED")
+        else if (!success && payment.Status != PaymentStatus.FAILED)
         {
-            payment.Status = "FAILED";
+            payment.Status = PaymentStatus.FAILED;
             paymentRepo.Update(payment);
             await _uow.SaveAsync();
         }
@@ -371,7 +372,7 @@ public class PaymentService : IPaymentService
             OrderId = p.Orderid ?? 0,
             WalletId = p.Walletid,
             Amount = p.Amount ?? 0,
-            Status = p.Status ?? "PENDING",
+            Status = p.Status ?? PaymentStatus.PENDING,
             Type = p.Type,
             PaymentMethod = p.Paymentmethod,
             IsPayOnline = p.Ispayonline ?? false,
@@ -397,7 +398,7 @@ public class PaymentService : IPaymentService
             OrderId = p.Orderid ?? 0,
             WalletId = p.Walletid,
             Amount = p.Amount ?? 0,
-            Status = p.Status ?? "PENDING",
+            Status = p.Status ?? PaymentStatus.PENDING,
             Type = p.Type,
             PaymentMethod = p.Paymentmethod,
             IsPayOnline = p.Ispayonline ?? false,

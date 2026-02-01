@@ -1,4 +1,5 @@
-﻿using TetGift.BLL.Common.Enums;
+﻿using TetGift.BLL.Common.Constraint;
+using TetGift.BLL.Common.Enums;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
 using TetGift.DAL.Interfaces;
@@ -51,7 +52,7 @@ namespace TetGift.BLL.Services
             {
                 Accountid = accountId,
                 Orderdatetime = DateTime.Now,
-                Status = "Pending",
+                Status = OrderStatus.PENDING,
                 Totalprice = 0,
 
                 Customername = q.Company,
