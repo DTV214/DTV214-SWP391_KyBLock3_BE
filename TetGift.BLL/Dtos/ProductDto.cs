@@ -12,12 +12,13 @@ namespace TetGift.BLL.Dtos
         public string? Sku { get; set; }
         public string? Productname { get; set; }
         public string? Description { get; set; }
+        public string? ImageUrl { get; set; }
         public decimal? Price { get; set; }
         public string? Status { get; set; }
         public decimal? Unit { get; set; }
         public bool IsCustom { get; set; } = false;
     }
-     //DTO tạo sản phẩm đơn lẻ
+    //DTO tạo sản phẩm đơn lẻ
     public class CreateSingleProductRequest
     {
         [Required]
