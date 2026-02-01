@@ -37,7 +37,7 @@ public class ConfigDetailService(IUnitOfWork uow) : IConfigDetailService
         if (dto.Quantity == null || dto.Quantity <= 0)
             throw new Exception("Số lượng phải là số nguyên dương.");
 
-        if (!dto.Configid.HasValue)
+        if ((string.IsNullOrEmpty(dto.Configid.ToString())))
             throw new Exception("Config Id không được thiếu.");
 
         // 2. Check tồn tại của Config và Category
@@ -61,13 +61,13 @@ public class ConfigDetailService(IUnitOfWork uow) : IConfigDetailService
 
         if (entity != null)
         {
-            if (dto.Quantity.HasValue)
+            if (string.IsNullOrEmpty(dto.Configid.ToString()))
             {
                 if (dto.Quantity <= 0) throw new Exception("Số lượng cập nhật phải lớn hơn 0.");
                 entity.Quantity = dto.Quantity;
             }
 
-            if (dto.Categoryid.HasValue)
+            if (string.IsNullOrEmpty(dto.Configid.ToString()))
             {
                 await ValidateForeignKeys(null, dto.Categoryid);
                 entity.Categoryid = dto.Categoryid;
@@ -86,9 +86,9 @@ public class ConfigDetailService(IUnitOfWork uow) : IConfigDetailService
         return data.Select(x => new ConfigDetailDto
         {
             Configdetailid = x.Configdetailid,
-            Configid = x.Configid,
-            Categoryid = x.Categoryid,
-            Quantity = x.Quantity
+            Configid = (int)x.Configid,
+            Categoryid = (int)x.Categoryid,
+            Quantity = (int)x.Quantity
         });
     }
 
