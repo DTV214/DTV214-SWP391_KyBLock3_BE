@@ -30,7 +30,7 @@ public class OrderController : ControllerBase
 
     private string GetCurrentUserRole()
     {
-        var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "CUSTOMER";
+        var role = User.FindFirst(ClaimTypes.Role)?.Value ?? TetGift.BLL.Common.Constraint.UserRole.CUSTOMER;
         return role.ToUpper(); // Normalize to uppercase
     }
 

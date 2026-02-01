@@ -50,7 +50,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
     public async Task<IEnumerable<ProductDto>> GetAllAsync()
     {
         var products = await _uow.GetRepository<Product>().GetAllAsync(
-            p => !p.Account.Role.Equals("CUSTOMER") && !p.Status.Equals(ProductStatus.DELETED),
+            p => !p.Account.Role.Equals(UserRole.CUSTOMER) && !p.Status.Equals(ProductStatus.DELETED),
             include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
         return products.Select(p =>

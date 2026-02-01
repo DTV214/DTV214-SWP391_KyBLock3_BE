@@ -780,4 +780,30 @@ public partial class DatabaseContext : DbContext
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+
+    public override int SaveChanges()
+    {
+        NormalizeRoleValues();
+        return base.SaveChanges();
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        NormalizeRoleValues();
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void NormalizeRoleValues()
+    {
+        var entries = ChangeTracker.Entries<Account>()
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified);
+
+        foreach (var entry in entries)
+        {
+            if (entry.Entity.Role != null)
+            {
+                entry.Entity.Role = entry.Entity.Role.ToUpper();
+            }
+        }
+    }
 }

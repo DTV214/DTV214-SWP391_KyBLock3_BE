@@ -61,7 +61,7 @@ namespace TetGift.BLL.Services
                     Email = email,
                     Fullname = req.Fullname,
                     Phone = req.Phone,
-                    Role = "Customer",
+                    Role = UserRole.CUSTOMER,
                     Status = AccountStatus.PENDING
                 };
 
@@ -146,7 +146,7 @@ namespace TetGift.BLL.Services
                 AccountId = acc.Accountid,
                 Username = acc.Username,
                 Email = acc.Email,
-                Role = acc.Role
+                Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper()
             };
         }
 
@@ -176,7 +176,7 @@ namespace TetGift.BLL.Services
                 AccountId = acc.Accountid,
                 Username = acc.Username,
                 Email = acc.Email,
-                Role = acc.Role
+                Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper()
             };
         }
     }
