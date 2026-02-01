@@ -27,7 +27,7 @@ public class WalletService : IWalletService
     public async Task<WalletResponseDto> GetWalletByAccountIdAsync(int accountId)
     {
         var walletRepo = _uow.GetRepository<Wallet>();
-        var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId);
+        var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
 
         if (wallet == null)
         {
@@ -49,7 +49,7 @@ public class WalletService : IWalletService
     public async Task<WalletTransactionHistoryDto> GetWalletTransactionsAsync(int accountId, int? page = 1, int? limit = 20)
     {
         var walletRepo = _uow.GetRepository<Wallet>();
-        var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId);
+        var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
 
         if (wallet == null)
         {
@@ -92,7 +92,7 @@ public class WalletService : IWalletService
                 BalanceAfter = t.Balanceafter,
                 Status = t.Status ?? "SUCCESS",
                 Description = t.Description,
-                CreatedAt = t.Createdat ?? DateTime.Now
+                CreatedAt = t.Createdat
             }).ToList(),
             TotalCount = totalCount,
             Page = pageNumber,
@@ -105,7 +105,7 @@ public class WalletService : IWalletService
         var walletRepo = _uow.GetRepository<Wallet>();
         
         // Kiểm tra đã có ví chưa
-        var existingWallet = await walletRepo.FindAsync(w => w.Accountid == accountId);
+        var existingWallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
         if (existingWallet != null)
         {
             return new WalletResponseDto
@@ -381,13 +381,15 @@ public class WalletService : IWalletService
 
         // 3. Lấy ví và kiểm tra số dư
         var walletRepo = _uow.GetRepository<Wallet>();
-        var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId);
+        var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
         
         if (wallet == null)
         {
             // Tự động tạo ví nếu chưa có
             await CreateWalletForAccountAsync(accountId);
-            wallet = await walletRepo.FindAsync(w => w.Accountid == accountId);
+            wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
+            if (wallet == null)
+                throw new Exception("Không thể tạo ví cho tài khoản này.");
         }
 
         if (wallet.Status != "ACTIVE")
@@ -436,7 +438,7 @@ public class WalletService : IWalletService
 
         // 5. Cập nhật Order status
         var orderRepo = _uow.GetRepository<Order>();
-        var orderEntity = await orderRepo.FindAsync(o => o.Orderid == orderId);
+        var orderEntity = await orderRepo.FindAsync(o => o.Orderid == orderId, include: null);
         if (orderEntity != null)
         {
             orderEntity.Status = "CONFIRMED";
