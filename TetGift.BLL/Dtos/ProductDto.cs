@@ -12,4 +12,5 @@ public class ProductDto
     public decimal? Price { get; set; }
     public string? Status { get; set; }
     public decimal? Unit { get; set; }
+    public bool IsCustom { get; set; } = false;
 }

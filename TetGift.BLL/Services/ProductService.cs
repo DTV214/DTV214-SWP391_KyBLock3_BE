@@ -1,4 +1,5 @@
-﻿using TetGift.BLL.Dtos;
+﻿using Microsoft.EntityFrameworkCore;
+using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
 using TetGift.DAL.Interfaces;
@@ -47,32 +48,40 @@ public class ProductService(IUnitOfWork uow) : IProductService
 
     public async Task<IEnumerable<ProductDto>> GetAllAsync()
     {
-        var products = await _uow.GetRepository<Product>().FindAsync(
-            p => !p.Account.Role.Equals("CUSTOMER") && !p.Status.Equals("DELETED")
+        var products = await _uow.GetRepository<Product>().GetAllAsync(
+            p => !p.Account.Role.Equals("CUSTOMER") && !p.Status.Equals("DELETED"),
+            include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
-        return products.Select(p => new ProductDto
+        return products.Select(p =>
         {
-            Productid = p.Productid,
-            Categoryid = p.Categoryid,
-            Configid = p.Configid,
-            Accountid = p.Accountid,
-            Sku = p.Sku,
-            Productname = p.Productname,
-            Description = p.Description,
-            Price = p.Price,
-            Status = p.Status,
-            Unit = p.Unit
+            p.CalculateUnit();
+            p.CalculateTotalPrice();
+
+            return new ProductDto()
+            {
+                Productid = p.Productid,
+                Categoryid = p.Categoryid,
+                Configid = p.Configid,
+                Accountid = p.Accountid,
+                Sku = p.Sku,
+                Productname = p.Productname,
+                Description = p.Description,
+                Price = p.Price,
+                Status = p.Status,
+                Unit = p.Unit
+            };
         });
     }
 
     public async Task<ProductDto?> GetByIdAsync(int id)
     {
-        var p = await _uow.GetRepository<Product>().FindAsync(
-            p => p.Productid == id && !p.Status.Equals("DELETED")
+        var product = await _uow.GetRepository<Product>().FindAsync(
+            p => p.Productid == id && !p.Status.Equals("DELETED"),
+            include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
-        if (!p.Any()) return null;
-        var product = p.First();
+        if (product == null) return null;
         product.CalculateUnit();
+        product.CalculateTotalPrice();
 
         return new ProductDto
         {
@@ -92,11 +101,14 @@ public class ProductService(IUnitOfWork uow) : IProductService
     public async Task<IEnumerable<ProductDto>> GetByAccountIdAsync(int accountId)
     {
         var products = await _uow.GetRepository<Product>()
-            .FindAsync(p => p.Accountid == accountId && !p.Status.Equals("DELETED"));
+            .GetAllAsync(p => p.Accountid == accountId && !p.Status.Equals("DELETED"),
+            include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
+            );
 
         return products.Select(p =>
         {
             p.CalculateUnit();
+            p.CalculateTotalPrice();
             return new ProductDto
             {
                 Productid = p.Productid,
