@@ -13,24 +13,36 @@ namespace TetGift.BLL.Services;
 public class PaymentService : IPaymentService
 {
     private readonly IUnitOfWork _uow;
-    private readonly IOrderService _orderService;
     private readonly IWalletService _walletService;
     private readonly IConfiguration _configuration;
 
-    public PaymentService(IUnitOfWork uow, IOrderService orderService, IWalletService walletService, IConfiguration configuration)
+    public PaymentService(IUnitOfWork uow, IWalletService walletService, IConfiguration configuration)
     {
         _uow = uow;
-        _orderService = orderService;
         _walletService = walletService;
         _configuration = configuration;
     }
 
     public async Task<PaymentResponseDto> CreatePaymentAsync(int orderId, int accountId, string? clientIp = null, string? paymentMethod = null)
     {
-        // 1. Validate Order (sử dụng IOrderService - kế thừa code cũ)
-        var order = await _orderService.GetOrderByIdAsync(orderId, accountId);
+        // 1. Validate Order (query trực tiếp để tránh circular dependency)
+        var orderRepo = _uow.GetRepository<Order>();
+        var order = await orderRepo.FindAsync(
+            o => o.Orderid == orderId && o.Accountid == accountId,
+            include: q => q
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .Include(o => o.Promotion)
+        );
+        
+        if (order == null)
+            throw new Exception("Không tìm thấy đơn hàng hoặc bạn không có quyền thanh toán đơn hàng này.");
+        
         if (order.Status != OrderStatus.PENDING)
             throw new Exception("Chỉ có thể thanh toán cho đơn hàng đang chờ xác nhận.");
+        
+        // Calculate FinalPrice từ Order
+        decimal finalPrice = order.Totalprice ?? 0;
 
         // 2. Kiểm tra đã có payment thành công chưa
         var paymentRepo = _uow.GetRepository<Payment>();
@@ -60,7 +72,7 @@ public class PaymentService : IPaymentService
         var payment = new Payment
         {
             Orderid = orderId,
-            Amount = order.FinalPrice,
+            Amount = finalPrice,
             Status = PaymentStatus.PENDING,
             Type = "ORDER_PAYMENT",
             Paymentmethod = "VNPAY",
@@ -83,7 +95,7 @@ public class PaymentService : IPaymentService
         // Convert UTC to GMT+7
         var vietnamTime = DateTime.UtcNow.AddHours(7);
         
-        vnpay.AddRequestData("vnp_Amount", ((long)(order.FinalPrice * 100)).ToString()); // Nhân 100 để khử phần thập phân
+        vnpay.AddRequestData("vnp_Amount", ((long)(finalPrice * 100)).ToString()); // Nhân 100 để khử phần thập phân
         vnpay.AddRequestData("vnp_CreateDate", vietnamTime.ToString("yyyyMMddHHmmss"));
         vnpay.AddRequestData("vnp_CurrCode", "VND");
         vnpay.AddRequestData("vnp_IpAddr", clientIp ?? "127.0.0.1");
@@ -100,7 +112,7 @@ public class PaymentService : IPaymentService
         {
             PaymentId = payment.Paymentid,
             OrderId = orderId,
-            Amount = order.FinalPrice,
+            Amount = finalPrice,
             PaymentUrl = paymentUrl,
             Status = "PENDING"
         };

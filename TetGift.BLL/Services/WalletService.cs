@@ -14,14 +14,12 @@ public class WalletService : IWalletService
 {
     private readonly IUnitOfWork _uow;
     private readonly IPaymentService _paymentService;
-    private readonly IOrderService _orderService;
     private readonly IConfiguration _configuration;
 
-    public WalletService(IUnitOfWork uow, IPaymentService paymentService, IOrderService orderService, IConfiguration configuration)
+    public WalletService(IUnitOfWork uow, IPaymentService paymentService, IConfiguration configuration)
     {
         _uow = uow;
         _paymentService = paymentService;
-        _orderService = orderService;
         _configuration = configuration;
     }
 
@@ -367,10 +365,24 @@ public class WalletService : IWalletService
 
     public async Task<WalletPaymentResponseDto> PayWithWalletAsync(int accountId, int orderId)
     {
-        // 1. Validate Order
-        var order = await _orderService.GetOrderByIdAsync(orderId, accountId);
+        // 1. Validate Order (query trực tiếp để tránh circular dependency)
+        var orderRepo = _uow.GetRepository<Order>();
+        var order = await orderRepo.FindAsync(
+            o => o.Orderid == orderId && o.Accountid == accountId,
+            include: q => q
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .Include(o => o.Promotion)
+        );
+        
+        if (order == null)
+            throw new Exception("Không tìm thấy đơn hàng hoặc bạn không có quyền thanh toán đơn hàng này.");
+        
         if (order.Status != OrderStatus.PENDING)
             throw new Exception("Chỉ có thể thanh toán cho đơn hàng đang chờ xác nhận.");
+        
+        // Calculate FinalPrice từ Order (Totalprice đã được tính với discount khi tạo order)
+        decimal finalPrice = order.Totalprice ?? 0;
 
         // 2. Kiểm tra đã có payment thành công chưa
         var paymentRepo = _uow.GetRepository<Payment>();
@@ -396,14 +408,14 @@ public class WalletService : IWalletService
         if (wallet.Status != WalletStatus.ACTIVE)
             throw new Exception("Ví của bạn đang bị khóa, không thể thanh toán.");
 
-        if (wallet.Balance < order.FinalPrice)
+        if (wallet.Balance < finalPrice)
         {
-            throw new Exception($"Số dư ví không đủ để thanh toán đơn hàng này. Số dư hiện tại: {wallet.Balance:N0} VNĐ, Cần thanh toán: {order.FinalPrice:N0} VNĐ, Thiếu: {order.FinalPrice - wallet.Balance:N0} VNĐ");
+            throw new Exception($"Số dư ví không đủ để thanh toán đơn hàng này. Số dư hiện tại: {wallet.Balance:N0} VNĐ, Cần thanh toán: {finalPrice:N0} VNĐ, Thiếu: {finalPrice - wallet.Balance:N0} VNĐ");
         }
 
         // 4. Trừ tiền từ ví và tạo Payment (trong transaction)
         var balanceBefore = wallet.Balance;
-        wallet.Balance -= order.FinalPrice;
+        wallet.Balance -= finalPrice;
         wallet.Updatedat = DateTime.Now;
         walletRepo.Update(wallet);
 
@@ -412,7 +424,7 @@ public class WalletService : IWalletService
         {
             Orderid = orderId,
             Walletid = wallet.Walletid,
-            Amount = order.FinalPrice,
+            Amount = finalPrice,
             Status = PaymentStatus.SUCCESS,
             Type = "ORDER_PAYMENT",
             Paymentmethod = "WALLET",
@@ -428,7 +440,7 @@ public class WalletService : IWalletService
             Walletid = wallet.Walletid,
             Orderid = orderId,
             Transactiontype = "PAYMENT",
-            Amount = -order.FinalPrice, // Số âm để thể hiện trừ tiền
+            Amount = -finalPrice, // Số âm để thể hiện trừ tiền
             Balancebefore = balanceBefore,
             Balanceafter = wallet.Balance,
             Status = "SUCCESS",
@@ -437,22 +449,16 @@ public class WalletService : IWalletService
         };
         await transactionRepo.AddAsync(transaction);
 
-        // 5. Cập nhật Order status
-        var orderRepo = _uow.GetRepository<Order>();
-        var orderEntity = await orderRepo.FindAsync(o => o.Orderid == orderId, include: null);
-        if (orderEntity != null)
-        {
-            orderEntity.Status = OrderStatus.CONFIRMED;
-            orderRepo.Update(orderEntity);
-        }
-
+        // 5. Cập nhật Order status (order đã được load ở trên)
+        order.Status = OrderStatus.CONFIRMED;
+        orderRepo.Update(order);
         await _uow.SaveAsync();
 
         return new WalletPaymentResponseDto
         {
             PaymentId = payment.Paymentid,
             OrderId = orderId,
-            Amount = order.FinalPrice,
+            Amount = finalPrice,
             Status = "SUCCESS",
             Message = "Thanh toán bằng ví thành công"
         };
