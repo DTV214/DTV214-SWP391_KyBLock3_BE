@@ -282,6 +282,68 @@ public class OrderService : IOrderService
         return MapToOrderResponseDto(updatedOrder!);
     }
 
+    public async Task<OrderResponseDto> CancelOrderAsync(int orderId, int accountId, string userRole)
+    {
+        var orderRepo = _uow.GetRepository<Order>();
+        var order = await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .Include(o => o.Account)
+        );
+
+        if (order == null)
+            throw new Exception("Không tìm thấy đơn hàng.");
+
+        var currentStatus = order.Status ?? OrderStatus.PENDING;
+
+        // Validate: Không thể hủy nếu đã DELIVERED hoặc CANCELLED
+        if (currentStatus == OrderStatus.DELIVERED)
+            throw new Exception("Không thể hủy đơn hàng đã được giao.");
+
+        if (currentStatus == OrderStatus.CANCELLED)
+            throw new Exception("Đơn hàng đã được hủy trước đó.");
+
+        // Validate ownership: Customer chỉ được hủy order của chính mình
+        var normalizedRole = userRole.ToUpper();
+        if (normalizedRole != "ADMIN")
+        {
+            if (order.Accountid != accountId)
+                throw new Exception("Bạn không có quyền hủy đơn hàng này.");
+
+            // Validate time limit: 15 phút cho Customer
+            if (order.Orderdatetime.HasValue)
+            {
+                var timeElapsed = DateTime.Now - order.Orderdatetime.Value;
+                if (timeElapsed.TotalMinutes > 15)
+                    throw new Exception("Chỉ có thể hủy đơn hàng trong vòng 15 phút kể từ khi đặt hàng.");
+            }
+        }
+
+        // Process cancellation
+        await RestoreStockAsync(order);
+        
+        // Hoàn tiền vào ví (nếu đã thanh toán)
+        await _walletService.RefundToWalletAsync(orderId);
+
+        // Update order status
+        order.Status = OrderStatus.CANCELLED;
+        orderRepo.Update(order);
+        await _uow.SaveAsync();
+
+        // Load lại với đầy đủ thông tin
+        var updatedOrder = await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .Include(o => o.Promotion)
+        );
+
+        return MapToOrderResponseDto(updatedOrder!);
+    }
+
     private bool IsValidStatusTransition(string currentStatus, string newStatus)
     {
         var validTransitions = new Dictionary<string, List<string>>

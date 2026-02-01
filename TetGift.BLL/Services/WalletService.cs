@@ -461,13 +461,18 @@ public class WalletService : IWalletService
     public async Task RefundToWalletAsync(int orderId)
     {
         var paymentRepo = _uow.GetRepository<Payment>();
+        var orderRepo = _uow.GetRepository<Order>();
+        
+        // Tìm payment thành công (WALLET hoặc VNPAY)
         var payment = await paymentRepo.FindAsync(
-            p => p.Orderid == orderId && p.Paymentmethod == "WALLET" && p.Status == PaymentStatus.SUCCESS,
+            p => p.Orderid == orderId && 
+                 (p.Paymentmethod == "WALLET" || p.Paymentmethod == "VNPAY") && 
+                 p.Status == PaymentStatus.SUCCESS,
             include: q => q.Include(p => p.Wallet)
         );
 
-        if (payment == null || payment.Wallet == null)
-            return; // Không phải thanh toán bằng ví hoặc đã được hoàn lại
+        if (payment == null)
+            return; // Chưa thanh toán hoặc thanh toán thất bại
 
         // Kiểm tra đã được hoàn lại chưa
         var transactionRepo = _uow.GetRepository<WalletTransaction>();
@@ -477,7 +482,30 @@ public class WalletService : IWalletService
         if (existingRefunds.Any())
             return; // Đã được hoàn lại rồi
 
-        var wallet = payment.Wallet;
+        Wallet? wallet = null;
+
+        // Nếu thanh toán bằng WALLET, dùng wallet từ payment
+        if (payment.Paymentmethod == "WALLET" && payment.Wallet != null)
+        {
+            wallet = payment.Wallet;
+        }
+        // Nếu thanh toán bằng VNPAY, lấy wallet từ account của order
+        else if (payment.Paymentmethod == "VNPAY")
+        {
+            var order = await orderRepo.FindAsync(
+                o => o.Orderid == orderId,
+                include: q => q.Include(o => o.Account).ThenInclude(a => a.Wallet)
+            );
+
+            if (order?.Account?.Wallet == null)
+                return; // Không tìm thấy ví của customer
+
+            wallet = order.Account.Wallet;
+        }
+
+        if (wallet == null)
+            return; // Không tìm thấy ví
+
         var balanceBefore = wallet.Balance;
         var refundAmount = payment.Amount ?? 0;
 
@@ -496,8 +524,8 @@ public class WalletService : IWalletService
             Amount = refundAmount, // Số dương để thể hiện cộng tiền
             Balancebefore = balanceBefore,
             Balanceafter = wallet.Balance,
-            Status = "SUCCESS",
-            Description = $"Hoàn tiền do hủy đơn hàng #{orderId}",
+            Status = WalletTransactionStatus.SUCCESS,
+            Description = $"Hoàn tiền do hủy đơn hàng #{orderId} (Thanh toán bằng {payment.Paymentmethod ?? "UNKNOWN"})",
             Createdat = DateTime.Now
         };
         await transactionRepo.AddAsync(transaction);

@@ -28,6 +28,12 @@ public class OrderController : ControllerBase
         return accountId;
     }
 
+    private string GetCurrentUserRole()
+    {
+        var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "CUSTOMER";
+        return role.ToUpper(); // Normalize to uppercase
+    }
+
     // ========== CUSTOMER ENDPOINTS ==========
 
     [HttpPost("create-from-cart")]
@@ -67,6 +73,22 @@ public class OrderController : ControllerBase
         {
             var accountId = GetCurrentAccountId();
             var result = await _orderService.GetOrderByIdAsync(orderId, accountId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{orderId}/cancel")]
+    public async Task<IActionResult> CancelOrder(int orderId)
+    {
+        try
+        {
+            var accountId = GetCurrentAccountId();
+            var userRole = GetCurrentUserRole();
+            var result = await _orderService.CancelOrderAsync(orderId, accountId, userRole);
             return Ok(result);
         }
         catch (Exception ex)

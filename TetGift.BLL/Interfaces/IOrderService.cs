@@ -8,6 +8,7 @@ public interface IOrderService
     Task<OrderResponseDto> CreateOrderFromCartAsync(int accountId, CreateOrderRequest request);
     Task<IEnumerable<OrderResponseDto>> GetOrdersByAccountIdAsync(int accountId);
     Task<OrderResponseDto> GetOrderByIdAsync(int orderId, int accountId);
+    Task<OrderResponseDto> CancelOrderAsync(int orderId, int accountId, string userRole);
 
     // Admin endpoints
     Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync(string? status = null);
