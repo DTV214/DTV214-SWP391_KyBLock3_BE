@@ -262,7 +262,7 @@ public class OrderService : IOrderService
 
         order.Status = newStatus;
         orderRepo.Update(order);
-        await _uow.SaveAsync();
+        await _uow.SaveAsync(); // Save tất cả thay đổi (bao gồm cả stock đã được restore)
 
         // Load lại với đầy đủ thông tin
         var updatedOrder = await orderRepo.FindAsync(
@@ -299,19 +299,33 @@ public class OrderService : IOrderService
         var stockRepo = _uow.GetRepository<Stock>();
         var stockMovementRepo = _uow.GetRepository<StockMovement>();
 
-        // Lấy các StockMovement liên quan đến đơn hàng này
+        // Lấy các StockMovement liên quan đến đơn hàng này (chỉ lấy những record xuất kho - Quantity < 0)
         var movements = await stockMovementRepo.GetAllAsync(
-            sm => sm.Orderid == order.Orderid && sm.Quantity < 0
+            sm => sm.Orderid == order.Orderid && sm.Quantity.HasValue && sm.Quantity < 0
         );
+
+        if (movements == null || !movements.Any())
+        {
+            // Nếu không tìm thấy StockMovement, có thể đơn hàng này chưa có stock được trừ
+            // Hoặc đã được hoàn lại rồi - không cần làm gì
+            return;
+        }
 
         foreach (var movement in movements)
         {
+            if (movement.Stockid == null)
+                continue;
+
             var stock = await stockRepo.GetByIdAsync(movement.Stockid);
             if (stock != null)
             {
-                stock.Stockquantity = (stock.Stockquantity ?? 0) + Math.Abs(movement.Quantity ?? 0);
+                var quantityToRestore = Math.Abs(movement.Quantity ?? 0);
+                stock.Stockquantity = (stock.Stockquantity ?? 0) + quantityToRestore;
+                
+                // Nếu stock đang OUT_OF_STOCK và sau khi hoàn lại có số lượng > 0, chuyển về ACTIVE
                 if (stock.Status == "OUT_OF_STOCK" && stock.Stockquantity > 0)
                     stock.Status = "ACTIVE";
+                
                 stockRepo.Update(stock);
 
                 // Tạo StockMovement mới để ghi log hoàn lại
@@ -319,7 +333,7 @@ public class OrderService : IOrderService
                 {
                     Stockid = stock.Stockid,
                     Orderid = order.Orderid,
-                    Quantity = Math.Abs(movement.Quantity ?? 0), // Số dương để thể hiện nhập lại
+                    Quantity = quantityToRestore, // Số dương để thể hiện nhập lại
                     Movementdate = DateTime.Now,
                     Note = $"Hoàn lại kho do hủy đơn hàng #{order.Orderid}"
                 };
