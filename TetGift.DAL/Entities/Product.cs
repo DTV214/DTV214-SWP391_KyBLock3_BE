@@ -57,6 +57,22 @@ public partial class Product
         }
     }
 
+    public void CalculateTotalPrice()
+    {
+        if (ProductDetailProductparents != null && ProductDetailProductparents.Count != 0)
+        {
+            decimal total = 0;
+            foreach (var detail in ProductDetailProductparents)
+            {
+                if (detail.Product != null)
+                {
+                    total += (detail.Quantity ?? 0) * (detail.Product.Price ?? 0);
+                }
+            }
+            this.Price = total;
+        }
+    }
+
     public void ValidateDetailAgainstConfig(int? categoryId, int? requestedQuantity)
     {
         if (Config == null) return;

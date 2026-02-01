@@ -6,10 +6,9 @@ namespace TetGift.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class ProductsController : ControllerBase
+public class ProductsController(IProductService service) : ControllerBase
 {
-    private readonly IProductService _service;
-    public ProductsController(IProductService service) => _service = service;
+    private readonly IProductService _service = service;
 
     [HttpGet]
     public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
@@ -24,59 +23,41 @@ public class ProductsController : ControllerBase
     [HttpGet("account/{accountId}")]
     public async Task<IActionResult> GetByAccount(int accountId)
     {
-        try
-        {
-            var products = await _service.GetByAccountIdAsync(accountId);
-            return Ok(products);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var products = await _service.GetByAccountIdAsync(accountId);
+        return Ok(products);
     }
 
-    [HttpPost("normal")]
-    public async Task<IActionResult> CreateNormal(ProductDto dto)
+    [HttpPost]
+    public async Task<IActionResult> Create(ProductDto dto)
     {
-        try
-        {
-            await _service.CreateNormalAsync(dto);
-            return Ok(new { message = "Tạo sản phẩm thường thành công" });
-        }
-        catch (Exception ex) { return BadRequest(ex.Message); }
-    }
-
-    [HttpPost("custom")]
-    public async Task<IActionResult> CreateCustom(ProductDto dto)
-    {
-        try
+        if (dto.IsCustom)
         {
             await _service.CreateCustomAsync(dto);
             return Ok(new { message = "Tạo sản phẩm tùy chỉnh thành công" });
         }
-        catch (Exception ex) { return BadRequest(ex.Message); }
-    }
-
-    [HttpPut("normal")]
-    public async Task<IActionResult> UpdateNormal(ProductDto dto)
-    {
-        try
+        else
         {
-            var result = await _service.UpdateNormalAsync(dto);
-            return Ok(result);
+            await _service.CreateNormalAsync(dto);
+            return Ok(new { message = "Tạo sản phẩm thường thành công" });
         }
-        catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
     }
 
-    [HttpPut("custom")]
-    public async Task<IActionResult> UpdateCustom(ProductDto dto)
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(ProductDto dto, int id)
     {
-        try
+        dto.Productid = id;
+
+        if (dto.IsCustom)
         {
             var result = await _service.UpdateCustomAsync(dto);
             return Ok(result);
         }
-        catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
+        else
+        {
+            var result = await _service.UpdateNormalAsync(dto);
+            return Ok(result);
+        }
+
     }
 
     [HttpDelete("{id}")]
