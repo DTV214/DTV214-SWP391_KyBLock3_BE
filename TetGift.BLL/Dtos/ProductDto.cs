@@ -9,6 +9,7 @@ public class ProductDto
     public string? Sku { get; set; }
     public string? Productname { get; set; }
     public string? Description { get; set; }
+    public string? ImageUrl { get; set; }
     public decimal? Price { get; set; }
     public string? Status { get; set; }
     public decimal? Unit { get; set; }

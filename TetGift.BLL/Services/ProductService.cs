@@ -68,7 +68,8 @@ public class ProductService(IUnitOfWork uow) : IProductService
                 Description = p.Description,
                 Price = p.Price,
                 Status = p.Status,
-                Unit = p.Unit
+                Unit = p.Unit,
+                ImageUrl = p.ImageUrl
             };
         });
     }
@@ -94,7 +95,8 @@ public class ProductService(IUnitOfWork uow) : IProductService
             Description = product.Description,
             Price = product.Price,
             Status = product.Status,
-            Unit = product.Unit
+            Unit = product.Unit,
+            ImageUrl = product.ImageUrl
         };
     }
 
@@ -120,7 +122,8 @@ public class ProductService(IUnitOfWork uow) : IProductService
                 Description = p.Description,
                 Price = p.Price,
                 Status = p.Status,
-                Unit = p.Unit
+                Unit = p.Unit,
+                ImageUrl = p.ImageUrl
             };
         });
     }
@@ -137,7 +140,8 @@ public class ProductService(IUnitOfWork uow) : IProductService
             Description = dto.Description,
             Price = dto.Price,
             Status = dto.Status ?? "ACTIVE",
-            Unit = dto.Unit
+            Unit = dto.Unit,
+            ImageUrl = dto.ImageUrl
         };
     }
 
