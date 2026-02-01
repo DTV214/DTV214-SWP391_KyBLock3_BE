@@ -60,6 +60,10 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<QuotationCategoryRequest> QuotationCategoryRequests { get; set; }
 
+    public virtual DbSet<Wallet> Wallets { get; set; }
+
+    public virtual DbSet<WalletTransaction> WalletTransactions { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -332,10 +336,21 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.Type)
                 .HasMaxLength(50)
                 .HasColumnName("type");
+            entity.Property(e => e.Walletid).HasColumnName("walletid");
+            entity.Property(e => e.Paymentmethod)
+                .HasMaxLength(50)
+                .HasColumnName("paymentmethod");
+            entity.Property(e => e.Transactionno)
+                .HasMaxLength(255)
+                .HasColumnName("transactionno");
 
             entity.HasOne(d => d.Order).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.Orderid)
                 .HasConstraintName("payment_orderid_fkey");
+
+            entity.HasOne(d => d.Wallet).WithMany(p => p.Payments)
+                .HasForeignKey(d => d.Walletid)
+                .HasConstraintName("payment_walletid_fkey");
         });
 
         modelBuilder.Entity<Product>(entity =>
@@ -685,7 +700,81 @@ public partial class DatabaseContext : DbContext
                 .HasConstraintName("quotation_category_request_categoryid_fkey");
         });
 
+        modelBuilder.Entity<Wallet>(entity =>
+        {
+            entity.HasKey(e => e.Walletid).HasName("wallet_pkey");
 
+            entity.ToTable("wallet");
+
+            entity.HasIndex(e => e.Accountid, "wallet_accountid_key").IsUnique();
+
+            entity.Property(e => e.Walletid).HasColumnName("walletid");
+            entity.Property(e => e.Accountid).HasColumnName("accountid");
+            entity.Property(e => e.Balance)
+                .HasPrecision(18, 2)
+                .HasDefaultValue(0m)
+                .HasColumnName("balance");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasDefaultValue("ACTIVE")
+                .HasColumnName("status");
+            entity.Property(e => e.Createdat)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("createdat");
+            entity.Property(e => e.Updatedat)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updatedat");
+
+            entity.HasOne(d => d.Account)
+                .WithOne(a => a.Wallet)
+                .HasForeignKey<Wallet>(d => d.Accountid)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("wallet_accountid_fkey");
+        });
+
+        modelBuilder.Entity<WalletTransaction>(entity =>
+        {
+            entity.HasKey(e => e.Transactionid).HasName("wallet_transaction_pkey");
+
+            entity.ToTable("wallet_transaction");
+
+            entity.Property(e => e.Transactionid).HasColumnName("transactionid");
+            entity.Property(e => e.Walletid).HasColumnName("walletid");
+            entity.Property(e => e.Orderid).HasColumnName("orderid");
+            entity.Property(e => e.Transactiontype)
+                .HasMaxLength(50)
+                .HasColumnName("transactiontype");
+            entity.Property(e => e.Amount)
+                .HasPrecision(18, 2)
+                .HasColumnName("amount");
+            entity.Property(e => e.Balancebefore)
+                .HasPrecision(18, 2)
+                .HasColumnName("balancebefore");
+            entity.Property(e => e.Balanceafter)
+                .HasPrecision(18, 2)
+                .HasColumnName("balanceafter");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasDefaultValue("SUCCESS")
+                .HasColumnName("status");
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.Createdat)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("createdat");
+
+            entity.HasOne(d => d.Wallet).WithMany(p => p.WalletTransactions)
+                .HasForeignKey(d => d.Walletid)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("wallet_transaction_walletid_fkey");
+
+            entity.HasOne(d => d.Order)
+                .WithMany(o => o.WalletTransactions)
+                .HasForeignKey(d => d.Orderid)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("wallet_transaction_orderid_fkey");
+        });
 
         OnModelCreatingPartial(modelBuilder);
     }

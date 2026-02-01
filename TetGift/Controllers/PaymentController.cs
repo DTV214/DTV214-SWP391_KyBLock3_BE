@@ -11,10 +11,12 @@ namespace TetGift.Controllers;
 public class PaymentController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
+    private readonly IWalletService _walletService;
 
-    public PaymentController(IPaymentService paymentService)
+    public PaymentController(IPaymentService paymentService, IWalletService walletService)
     {
         _paymentService = paymentService;
+        _walletService = walletService;
     }
 
     private int GetCurrentAccountId()
@@ -52,7 +54,30 @@ public class PaymentController : ControllerBase
         {
             var accountId = GetCurrentAccountId();
             var clientIp = GetClientIpAddress();
-            var result = await _paymentService.CreatePaymentAsync(request.OrderId, accountId, clientIp);
+            var paymentMethod = request.PaymentMethod ?? "VNPAY";
+            var result = await _paymentService.CreatePaymentAsync(request.OrderId, accountId, clientIp, paymentMethod);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Thanh toán đơn hàng bằng ví
+    /// </summary>
+    /// <summary>
+    /// Thanh toán đơn hàng bằng ví
+    /// </summary>
+    [HttpPost("wallet/pay")]
+    [Authorize]
+    public async Task<IActionResult> PayWithWallet([FromBody] WalletPaymentRequest request)
+    {
+        try
+        {
+            var accountId = GetCurrentAccountId();
+            var result = await _walletService.PayWithWalletAsync(accountId, request.OrderId);
             return Ok(result);
         }
         catch (Exception ex)
@@ -139,6 +164,66 @@ public class PaymentController : ControllerBase
         {
             var queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
             var result = await _paymentService.ProcessReturnUrlAsync(queryParams);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // ========== WALLET DEPOSIT CALLBACK ENDPOINTS (Không cần [Authorize]) ==========
+
+    /// <summary>
+    /// IPN callback từ VNPay khi nạp tiền vào ví
+    /// </summary>
+    [HttpGet("wallet/deposit-ipn")]
+    [HttpPost("wallet/deposit-ipn")]
+    public async Task<IActionResult> WalletDepositIpn()
+    {
+        try
+        {
+            var queryParams = new Dictionary<string, string>();
+            
+            if (Request.Method == "POST" && Request.HasFormContentType)
+            {
+                foreach (var key in Request.Form.Keys)
+                {
+                    queryParams[key] = Request.Form[key].ToString();
+                }
+            }
+            else
+            {
+                queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
+            }
+
+            var result = await _paymentService.ProcessWalletDepositIpnAsync(queryParams);
+
+            var response = new
+            {
+                RspCode = result.ResponseCode ?? "99",
+                Message = result.Message
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { RspCode = "99", Message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Return URL từ VNPay khi nạp tiền vào ví
+    /// </summary>
+    [HttpGet("wallet/deposit-return")]
+    public async Task<IActionResult> WalletDepositReturn()
+    {
+        try
+        {
+            var queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
+            var result = await _paymentService.ProcessWalletDepositReturnAsync(queryParams);
 
             return Ok(result);
         }

@@ -11,12 +11,14 @@ public class OrderService : IOrderService
     private readonly IUnitOfWork _uow;
     private readonly ICartService _cartService;
     private readonly IPromotionService _promotionService;
+    private readonly IWalletService _walletService;
 
-    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService)
+    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IWalletService walletService)
     {
         _uow = uow;
         _cartService = cartService;
         _promotionService = promotionService;
+        _walletService = walletService;
     }
 
     public async Task<OrderResponseDto> CreateOrderFromCartAsync(int accountId, CreateOrderRequest request)
@@ -254,10 +256,13 @@ public class OrderService : IOrderService
             throw new Exception($"Không thể chuyển trạng thái từ '{currentStatus}' sang '{newStatus}'.");
         }
 
-        // Nếu hủy đơn, hoàn lại stock
+        // Nếu hủy đơn, hoàn lại stock và hoàn tiền vào ví (nếu thanh toán bằng ví)
         if (newStatus == "CANCELLED" && currentStatus != "CANCELLED")
         {
             await RestoreStockAsync(order);
+            
+            // Hoàn tiền vào ví nếu thanh toán bằng ví
+            await _walletService.RefundToWalletAsync(orderId);
         }
 
         order.Status = newStatus;

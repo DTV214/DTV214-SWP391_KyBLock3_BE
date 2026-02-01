@@ -40,4 +40,6 @@ public partial class Order
     public virtual ICollection<Quotation> Quotations { get; set; } = new List<Quotation>();
 
     public virtual ICollection<StockMovement> StockMovements { get; set; } = new List<StockMovement>();
+
+    public virtual ICollection<WalletTransaction> WalletTransactions { get; set; } = new List<WalletTransaction>();
 }

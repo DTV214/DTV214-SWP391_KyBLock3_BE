@@ -42,4 +42,6 @@ public partial class Account
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 
     public virtual ICollection<Quotation> Quotations { get; set; } = new List<Quotation>();
+
+    public virtual Wallet? Wallet { get; set; }
 }
