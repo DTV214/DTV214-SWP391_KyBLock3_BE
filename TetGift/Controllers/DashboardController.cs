@@ -7,7 +7,7 @@ namespace TetGift.Controllers;
 
 [ApiController]
 [Route("api/dashboard")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "ADMIN")]
 public class DashboardController : ControllerBase
 {
     private readonly IDashboardService _dashboardService;
