@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -40,8 +40,7 @@ namespace TetGift.DAL.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // Không cần rollback vì đây là data migration, không thay đổi schema
-            // Nếu cần rollback, có thể convert ngược lại nhưng không khuyến khích
+
         }
     }
 }

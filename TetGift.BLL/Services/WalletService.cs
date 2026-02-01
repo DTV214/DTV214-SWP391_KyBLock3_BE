@@ -13,13 +13,11 @@ namespace TetGift.BLL.Services;
 public class WalletService : IWalletService
 {
     private readonly IUnitOfWork _uow;
-    private readonly IPaymentService _paymentService;
     private readonly IConfiguration _configuration;
 
-    public WalletService(IUnitOfWork uow, IPaymentService paymentService, IConfiguration configuration)
+    public WalletService(IUnitOfWork uow, IConfiguration configuration)
     {
         _uow = uow;
-        _paymentService = paymentService;
         _configuration = configuration;
     }
 
