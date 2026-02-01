@@ -290,4 +290,60 @@ public class ProductService(IUnitOfWork uow) : IProductService
         await _uow.SaveAsync();
         return response;
     }
+
+    public async Task<ProductValidationDto> GetProductValidationStatus(int productId)
+    {
+        var repo = _uow.GetRepository<Product>();
+        var product = await repo.FindAsync(
+            p => p.Productid == productId && !p.Status.Equals("DELETED"),
+            include: q => q
+                .Include(p => p.Config)
+                    .ThenInclude(c => c.ConfigDetails)
+                    .ThenInclude(cd => cd.Category)
+                .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+                    .ThenInclude(p => p.Category)
+        );
+
+        if (product == null)
+            throw new Exception("Không tìm thấy sản phẩm.");
+
+        // Recalculate to ensure up-to-date values
+        product.CalculateUnit();
+        product.CalculateTotalPrice();
+
+        var result = new ProductValidationDto
+        {
+            Productid = product.Productid,
+            Productname = product.Productname,
+            CurrentWeight = product.Unit,
+            MaxWeight = product.Config?.Totalunit,
+            WeightExceeded = product.Config?.Totalunit != null && product.Unit > product.Config.Totalunit
+        };
+
+        // Get warnings
+        result.Warnings = product.GetConfigValidationWarnings();
+
+        // Get category status
+        var configStatus = product.GetConfigDetailStatus();
+        foreach (var kvp in configStatus)
+        {
+            var configDetail = product.Config?.ConfigDetails.FirstOrDefault(cd => cd.Categoryid == kvp.Key);
+            var categoryName = configDetail?.Category?.Categoryname ?? $"Category {kvp.Key}";
+
+            result.CategoryStatus[categoryName] = new CategoryRequirementDto
+            {
+                CategoryId = kvp.Key,
+                CategoryName = categoryName,
+                CurrentCount = kvp.Value.Current,
+                RequiredCount = kvp.Value.Required
+            };
+        }
+
+        // Determine if valid (all requirements met and weight not exceeded)
+        result.IsValid = !result.WeightExceeded 
+            && result.CategoryStatus.Values.All(cs => cs.IsSatisfied);
+
+        return result;
+    }
 }

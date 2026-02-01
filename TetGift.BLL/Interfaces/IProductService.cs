@@ -12,4 +12,5 @@ public interface IProductService
     Task<UpdateProductDto> UpdateNormalAsync(ProductDto dto);
     Task<UpdateProductDto> UpdateCustomAsync(ProductDto dto);
     Task DeleteAsync(int id);
+    Task<ProductValidationDto> GetProductValidationStatus(int productId);
 }

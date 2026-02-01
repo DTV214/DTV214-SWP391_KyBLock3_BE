@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TetGift.BLL.Dtos;
-using TetGift.BLL.Dtos.TetGift.BLL.Dtos;
 
 namespace TetGift.BLL.Interfaces
 {
