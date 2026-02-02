@@ -4,7 +4,7 @@ using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/productCategories")]
 [ApiController]
 public class ProductCategoriesController(IProductCategoryService service) : ControllerBase
 {

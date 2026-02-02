@@ -230,6 +230,8 @@ namespace TetGift
             builder.Services.AddScoped<IDashboardService, DashboardService>();
             //Blog
             builder.Services.AddScoped<IBlogService, BlogService>();
+            //account Profile
+            builder.Services.AddScoped<IAccountService, AccountService>();
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
