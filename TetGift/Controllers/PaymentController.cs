@@ -1,6 +1,6 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -46,7 +46,7 @@ public class PaymentController : ControllerBase
 
     // ========== CUSTOMER ENDPOINTS ==========
 
-    [HttpPost("create")]
+    [HttpPost()]
     [Authorize]
     public async Task<IActionResult> CreatePayment([FromBody] CreatePaymentRequest request)
     {
@@ -127,7 +127,7 @@ public class PaymentController : ControllerBase
         {
             // VNPay có thể gửi GET hoặc POST, lấy từ Query hoặc Form
             var queryParams = new Dictionary<string, string>();
-            
+
             if (Request.Method == "POST" && Request.HasFormContentType)
             {
                 foreach (var key in Request.Form.Keys)
@@ -185,7 +185,7 @@ public class PaymentController : ControllerBase
         try
         {
             var queryParams = new Dictionary<string, string>();
-            
+
             if (Request.Method == "POST" && Request.HasFormContentType)
             {
                 foreach (var key in Request.Form.Keys)

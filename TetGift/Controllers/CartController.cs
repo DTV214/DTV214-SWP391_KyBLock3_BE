@@ -1,13 +1,13 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers;
 
 [ApiController]
-[Route("api/cart")]
+[Route("api/carts")]
 [Authorize]
 public class CartController : ControllerBase
 {

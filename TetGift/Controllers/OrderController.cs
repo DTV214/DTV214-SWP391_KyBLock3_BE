@@ -1,6 +1,6 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -36,7 +36,7 @@ public class OrderController : ControllerBase
 
     // ========== CUSTOMER ENDPOINTS ==========
 
-    [HttpPost("create-from-cart")]
+    [HttpPost()]
     public async Task<IActionResult> CreateOrderFromCart([FromBody] CreateOrderRequest request)
     {
         try
@@ -99,7 +99,7 @@ public class OrderController : ControllerBase
 
     // ========== ADMIN ENDPOINTS ==========
 
-    [HttpGet("admin/all")]
+    [HttpGet()]
     [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> GetAllOrders([FromQuery] string? status = null)
     {
@@ -114,7 +114,7 @@ public class OrderController : ControllerBase
         }
     }
 
-    [HttpGet("admin/{orderId}")]
+    [HttpGet("/{orderId}")]
     [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> GetOrderByIdForAdmin(int orderId)
     {
@@ -129,7 +129,7 @@ public class OrderController : ControllerBase
         }
     }
 
-    [HttpPut("admin/{orderId}/status")]
+    [HttpPut("/{orderId}/status")]
     [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> UpdateOrderStatus(int orderId, [FromBody] UpdateOrderStatusRequest request)
     {
