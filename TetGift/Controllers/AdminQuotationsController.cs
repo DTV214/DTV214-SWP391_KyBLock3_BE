@@ -6,7 +6,7 @@ using TetGift.BLL.Interfaces;
 namespace TetGift.Controllers
 {
     [Authorize(Roles = "ADMIN")]
-    [Route("api/quotations")]
+    [Route("api/admin/quotations")]
     public class AdminQuotationsController : BaseApiController
     {
         private readonly IQuotationService _svc;
