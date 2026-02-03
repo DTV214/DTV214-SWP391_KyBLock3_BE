@@ -151,4 +151,10 @@ namespace TetGift.BLL.Dtos
         public int CurrentQuantity { get; set; }
         public bool IsSatisfied { get; set; }
     }
+
+    // DTO cho clone basket request
+    public class CloneBasketRequest
+    {
+        public string? CustomName { get; set; }
+    }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -28,6 +29,19 @@ public class ProductsController(IProductService service) : BaseApiController
         int accountId = GetAccountId();
         var products = await _service.GetByAccountIdAsync(accountId);
         return Ok(products);
+    }
+
+    /// <summary>
+    /// Get customer's draft baskets (work in progress)
+    /// </summary>
+    [HttpGet("drafts")]
+    [Authorize]
+    public async Task<IActionResult> GetDrafts()
+    {
+        int accountId = GetAccountId();
+        var products = await _service.GetByAccountIdAsync(accountId);
+        var drafts = products.Where(p => p.Status == ProductStatus.DRAFT);
+        return Ok(drafts);
     }
 
     [HttpPost]
@@ -85,5 +99,54 @@ public class ProductsController(IProductService service) : BaseApiController
     {
         var status = await _service.GetProductValidationStatus(id);
         return Ok(status);
+    }
+
+    /// <summary>
+    /// Get all template baskets (pre-made by admin)
+    /// For customer to choose and clone
+    /// </summary>
+    [HttpGet("templates")]
+    public async Task<IActionResult> GetTemplates()
+    {
+        var templates = await _service.GetTemplatesAsync();
+        return Ok(templates);
+    }
+
+    /// <summary>
+    /// Clone a template basket to customer's account
+    /// Creates a copy of Product + all ProductDetails
+    /// </summary>
+    [HttpPost("templates/{templateId}/clone")]
+    [Authorize]
+    public async Task<IActionResult> CloneTemplate(int templateId, [FromBody] CloneBasketRequest request)
+    {
+        int customerId = GetAccountId();
+        var newBasket = await _service.CloneBasketAsync(templateId, customerId, request.CustomName);
+        return Ok(new { 
+            message = "Giỏ quà đã được sao chép. Bạn có thể chỉnh sửa trước khi đặt hàng.",
+            basketId = newBasket.Productid 
+        });
+    }
+
+    /// <summary>
+    /// Admin: Set a basket product as template for customers to clone
+    /// </summary>
+    [HttpPost("{id}/set-as-template")]
+    [Authorize(Roles = "ADMIN,STAFF")]
+    public async Task<IActionResult> SetAsTemplate(int id)
+    {
+        await _service.SetAsTemplateAsync(id);
+        return Ok(new { message = "Giỏ quà đã được đặt làm template." });
+    }
+
+    /// <summary>
+    /// Admin: Remove template status from a product
+    /// </summary>
+    [HttpDelete("{id}/remove-template")]
+    [Authorize(Roles = "ADMIN,STAFF")]
+    public async Task<IActionResult> RemoveTemplate(int id)
+    {
+        await _service.RemoveTemplateAsync(id);
+        return Ok(new { message = "Đã xóa trạng thái template." });
     }
 }
