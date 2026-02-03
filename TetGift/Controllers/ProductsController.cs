@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -6,7 +7,7 @@ namespace TetGift.Controllers;
 
 [Route("api/products")]
 [ApiController]
-public class ProductsController(IProductService service) : ControllerBase
+public class ProductsController(IProductService service) : BaseApiController
 {
     private readonly IProductService _service = service;
 
@@ -20,16 +21,21 @@ public class ProductsController(IProductService service) : ControllerBase
         return result == null ? NotFound() : Ok(result);
     }
 
-    [HttpGet("account/{accountId}")]
-    public async Task<IActionResult> GetByAccount(int accountId)
+    [HttpGet("account")]
+    [Authorize]
+    public async Task<IActionResult> GetByAccount()
     {
+        int accountId = GetAccountId();
         var products = await _service.GetByAccountIdAsync(accountId);
         return Ok(products);
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Create(ProductDto dto)
     {
+        int accountId = GetAccountId();
+        dto.Accountid = accountId;
         if (dto.IsCustom)
         {
             await _service.CreateCustomAsync(dto);
@@ -43,13 +49,15 @@ public class ProductsController(IProductService service) : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize]
     public async Task<IActionResult> Update(ProductDto dto, int id)
     {
         dto.Productid = id;
+        dto.Accountid = GetAccountId();
 
         if (dto.IsCustom)
         {
-            var result = await _service.UpdateCustomAsync(dto);
+            var result = await _service.UpdateCustomAsync(dto, GetRole().Equals("Customer"));
             return Ok(result);
         }
         else
@@ -61,6 +69,7 @@ public class ProductsController(IProductService service) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> Delete(int id)
     {
         await _service.DeleteAsync(id);

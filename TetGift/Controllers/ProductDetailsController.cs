@@ -1,55 +1,38 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers;
 
-[Route("api/productDetails")]
+[Route("api/product/details")]
 [ApiController]
 public class ProductDetailsController(IProductDetailService service) : ControllerBase
 {
     private readonly IProductDetailService _service = service;
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Create(ProductDetailRequest dto)
     {
-        try
-        {
-            await _service.CreateAsync(dto);
-            return Ok(new { message = "Thêm chi tiết thành công và đã cập nhật Unit cho Parent" });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        await _service.CreateAsync(dto);
+        return Ok(new { message = "Thêm chi tiết thành công và đã cập nhật Unit cho Parent" });
     }
 
     [HttpPut]
+    [Authorize]
     public async Task<IActionResult> Update(ProductDetailRequest dto)
     {
-        try
-        {
-            await _service.UpdateAsync(dto);
-            return Ok(new { message = "Cập nhật thành công và đã cập nhật Unit cho Parent" });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        await _service.UpdateAsync(dto);
+        return Ok(new { message = "Cập nhật thành công và đã cập nhật Unit cho Parent" });
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> Delete(int id)
     {
-        try
-        {
-            await _service.DeleteAsync(id);
-            return Ok(new { message = "Xóa chi tiết thành công và đã cập nhật Unit cho Parent" });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        await _service.DeleteAsync(id);
+        return Ok(new { message = "Xóa chi tiết thành công và đã cập nhật Unit cho Parent" });
     }
 
     [HttpGet("parent/{parentId}")]

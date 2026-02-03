@@ -10,7 +10,7 @@ public interface IProductService
     Task CreateNormalAsync(ProductDto dto);
     Task CreateCustomAsync(ProductDto dto);
     Task<UpdateProductDto> UpdateNormalAsync(ProductDto dto);
-    Task<UpdateProductDto> UpdateCustomAsync(ProductDto dto);
+    Task<UpdateProductDto> UpdateCustomAsync(ProductDto dto, bool isCustomer);
     Task DeleteAsync(int id);
     Task<ProductValidationDto> GetProductValidationStatus(int productId);
 }

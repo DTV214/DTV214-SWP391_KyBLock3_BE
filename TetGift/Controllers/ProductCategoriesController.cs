@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers;
 
-[Route("api/productCategories")]
+[Route("api/categories")]
 [ApiController]
 public class ProductCategoriesController(IProductCategoryService service) : ControllerBase
 {
@@ -14,6 +15,7 @@ public class ProductCategoriesController(IProductCategoryService service) : Cont
     public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Create(ProductCategoryDto dto)
     {
         try
@@ -28,6 +30,7 @@ public class ProductCategoriesController(IProductCategoryService service) : Cont
     }
 
     [HttpPut]
+    [Authorize]
     public async Task<IActionResult> Update(ProductCategoryDto dto)
     {
         try
@@ -42,6 +45,7 @@ public class ProductCategoriesController(IProductCategoryService service) : Cont
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> Delete(int id)
     {
         await _service.DeleteAsync(id);

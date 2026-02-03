@@ -6,7 +6,7 @@ using TetGift.BLL.Interfaces;
 namespace TetGift.Controllers;
 
 [ApiController]
-[Route("api/dashboard")]
+[Route("api/dashboards")]
 [Authorize(Roles = "ADMIN")]
 public class DashboardController : ControllerBase
 {

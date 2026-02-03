@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/config/details")]
 [ApiController]
 public class ConfigDetailsController(IConfigDetailService service) : ControllerBase
 {
@@ -18,6 +19,7 @@ public class ConfigDetailsController(IConfigDetailService service) : ControllerB
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Create(ConfigDetailDto dto)
     {
         try
@@ -32,6 +34,7 @@ public class ConfigDetailsController(IConfigDetailService service) : ControllerB
     }
 
     [HttpPut]
+    [Authorize]
     public async Task<IActionResult> Update(ConfigDetailDto dto)
     {
         try
@@ -46,6 +49,7 @@ public class ConfigDetailsController(IConfigDetailService service) : ControllerB
     }
 
     [HttpDelete("{id}")]
+    [Authorize]
     public async Task<IActionResult> Delete(int id)
     {
         await _service.DeleteAsync(id);
