@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
 
@@ -26,7 +27,7 @@ namespace TetGift.BLL.Services
                 new Claim(ClaimTypes.NameIdentifier, acc.Accountid.ToString()),
                 new Claim(ClaimTypes.Name, acc.Username),
                 new Claim(ClaimTypes.Email, acc.Email ?? ""),
-                new Claim(ClaimTypes.Role, acc.Role ?? "Customer")
+                new Claim(ClaimTypes.Role, (acc.Role ?? UserRole.CUSTOMER).ToUpper())
             };
 
             var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));

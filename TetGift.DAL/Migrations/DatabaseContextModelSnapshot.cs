@@ -454,20 +454,36 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("orderid");
 
+                    b.Property<string>("Paymentmethod")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("paymentmethod");
+
                     b.Property<string>("Status")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("status");
+
+                    b.Property<string>("Transactionno")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("transactionno");
 
                     b.Property<string>("Type")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("type");
 
+                    b.Property<int?>("Walletid")
+                        .HasColumnType("integer")
+                        .HasColumnName("walletid");
+
                     b.HasKey("Paymentid")
                         .HasName("payment_pkey");
 
                     b.HasIndex("Orderid");
+
+                    b.HasIndex("Walletid");
 
                     b.ToTable("payment", (string)null);
                 });
@@ -1037,6 +1053,119 @@ namespace TetGift.DAL.Migrations
                     b.ToTable("stock_movement", (string)null);
                 });
 
+            modelBuilder.Entity("TetGift.DAL.Entities.Wallet", b =>
+                {
+                    b.Property<int>("Walletid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("walletid");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Walletid"));
+
+                    b.Property<int>("Accountid")
+                        .HasColumnType("integer")
+                        .HasColumnName("accountid");
+
+                    b.Property<decimal>("Balance")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("balance");
+
+                    b.Property<DateTime>("Createdat")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("createdat")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("ACTIVE")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("Updatedat")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updatedat");
+
+                    b.HasKey("Walletid")
+                        .HasName("wallet_pkey");
+
+                    b.HasIndex(new[] { "Accountid" }, "wallet_accountid_key")
+                        .IsUnique();
+
+                    b.ToTable("wallet", (string)null);
+                });
+
+            modelBuilder.Entity("TetGift.DAL.Entities.WalletTransaction", b =>
+                {
+                    b.Property<int>("Transactionid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("transactionid");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Transactionid"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<decimal>("Balanceafter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balanceafter");
+
+                    b.Property<decimal>("Balancebefore")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balancebefore");
+
+                    b.Property<DateTime>("Createdat")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("createdat")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<int?>("Orderid")
+                        .HasColumnType("integer")
+                        .HasColumnName("orderid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("SUCCESS")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Transactiontype")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("transactiontype");
+
+                    b.Property<int>("Walletid")
+                        .HasColumnType("integer")
+                        .HasColumnName("walletid");
+
+                    b.HasKey("Transactionid")
+                        .HasName("wallet_transaction_pkey");
+
+                    b.HasIndex("Orderid");
+
+                    b.HasIndex("Walletid");
+
+                    b.ToTable("wallet_transaction", (string)null);
+                });
+
             modelBuilder.Entity("TetGift.DAL.Entities.Blog", b =>
                 {
                     b.HasOne("TetGift.DAL.Entities.Account", "Account")
@@ -1159,7 +1288,14 @@ namespace TetGift.DAL.Migrations
                         .HasForeignKey("Orderid")
                         .HasConstraintName("payment_orderid_fkey");
 
+                    b.HasOne("TetGift.DAL.Entities.Wallet", "Wallet")
+                        .WithMany("Payments")
+                        .HasForeignKey("Walletid")
+                        .HasConstraintName("payment_walletid_fkey");
+
                     b.Navigation("Order");
+
+                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Product", b =>
@@ -1311,6 +1447,38 @@ namespace TetGift.DAL.Migrations
                     b.Navigation("Stock");
                 });
 
+            modelBuilder.Entity("TetGift.DAL.Entities.Wallet", b =>
+                {
+                    b.HasOne("TetGift.DAL.Entities.Account", "Account")
+                        .WithOne("Wallet")
+                        .HasForeignKey("TetGift.DAL.Entities.Wallet", "Accountid")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("wallet_accountid_fkey");
+
+                    b.Navigation("Account");
+                });
+
+            modelBuilder.Entity("TetGift.DAL.Entities.WalletTransaction", b =>
+                {
+                    b.HasOne("TetGift.DAL.Entities.Order", "Order")
+                        .WithMany("WalletTransactions")
+                        .HasForeignKey("Orderid")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("wallet_transaction_orderid_fkey");
+
+                    b.HasOne("TetGift.DAL.Entities.Wallet", "Wallet")
+                        .WithMany("WalletTransactions")
+                        .HasForeignKey("Walletid")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("wallet_transaction_walletid_fkey");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Wallet");
+                });
+
             modelBuilder.Entity("TetGift.DAL.Entities.Account", b =>
                 {
                     b.Navigation("Blogs");
@@ -1324,6 +1492,8 @@ namespace TetGift.DAL.Migrations
                     b.Navigation("Products");
 
                     b.Navigation("Quotations");
+
+                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Cart", b =>
@@ -1342,6 +1512,8 @@ namespace TetGift.DAL.Migrations
                     b.Navigation("Quotations");
 
                     b.Navigation("StockMovements");
+
+                    b.Navigation("WalletTransactions");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.OrderDetail", b =>
@@ -1402,6 +1574,13 @@ namespace TetGift.DAL.Migrations
             modelBuilder.Entity("TetGift.DAL.Entities.Stock", b =>
                 {
                     b.Navigation("StockMovements");
+                });
+
+            modelBuilder.Entity("TetGift.DAL.Entities.Wallet", b =>
+                {
+                    b.Navigation("Payments");
+
+                    b.Navigation("WalletTransactions");
                 });
 #pragma warning restore 612, 618
         }

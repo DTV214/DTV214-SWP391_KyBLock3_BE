@@ -38,8 +38,8 @@ public class ProductDetailService(IUnitOfWork uow) : IProductDetailService
         // Dulicate validation
         parent.EnsureProductNotDuplicate(product.Productid);
 
-        // Config logic validation
-        parent.ValidateDetailAgainstConfig(product.Categoryid, dto.Quantity);
+        // Config logic validation - Use enhanced method with better error messages
+        parent.ValidateCanAddProduct(product.Categoryid, dto.Quantity);
 
         // Create Entity
         var entity = new ProductDetail
@@ -53,11 +53,10 @@ public class ProductDetailService(IUnitOfWork uow) : IProductDetailService
 
         // Update Parent
         parent.Unit += (product.Unit * entity.Quantity);
-
-        if (parent.Config != null && parent.Config.Totalunit < parent.Unit)
-            throw new Exception("Số lượng vượt quá cấu hình");
-
         parent.Price += (product.Price * entity.Quantity);
+
+        // Validate weight against config
+        parent.ValidateWeightAgainstConfig();
         _uow.GetRepository<Product>().Update(parent);
 
         await _uow.SaveAsync();
@@ -96,12 +95,10 @@ public class ProductDetailService(IUnitOfWork uow) : IProductDetailService
 
         // Update Parent
         parent.Unit += (entity?.Product?.Unit * entity?.Quantity);
-
-        // Validate Unit Total From Config
-        if (parent.Config != null && parent.Config.Totalunit < parent.Unit)
-            throw new Exception("Số lượng vượt quá cấu hình");
-
         parent.Price += (entity?.Product?.Price * entity?.Quantity);
+
+        // Validate weight against config
+        parent.ValidateWeightAgainstConfig();
         _uow.GetRepository<Product>().Update(parent);
 
         await _uow.SaveAsync();

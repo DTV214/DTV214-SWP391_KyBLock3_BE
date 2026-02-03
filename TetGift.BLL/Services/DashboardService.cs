@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
@@ -40,8 +41,8 @@ public class DashboardService : IDashboardService
         // Chỉ tính orders đã thanh toán thành công
         // Orders có Payment với Status = "SUCCESS" hoặc Order Status = "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"
         var paidOrders = await ordersQuery
-            .Where(o => o.Payments.Any(p => p.Status == "SUCCESS") ||
-                       (o.Status != null && new[] { "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED" }.Contains(o.Status)))
+            .Where(o => o.Payments.Any(p => p.Status == PaymentStatus.SUCCESS) ||
+                       (o.Status != null && new[] { OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED }.Contains(o.Status)))
             .ToListAsync();
 
         // Tính revenue theo period
@@ -137,7 +138,7 @@ public class DashboardService : IDashboardService
         // Lấy payments thành công
         var paymentsQuery = paymentRepo.Entities
             .Include(p => p.Order)
-            .Where(p => p.Status == "SUCCESS" && p.Type != null)
+            .Where(p => p.Status == PaymentStatus.SUCCESS && p.Type != null)
             .AsQueryable();
 
         // Filter theo thời gian từ Order

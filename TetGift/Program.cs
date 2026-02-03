@@ -224,9 +224,14 @@ namespace TetGift
             builder.Services.AddScoped<IOrderService, OrderService>();
             //Thanh toan
             builder.Services.AddScoped<IPaymentService, PaymentService>();
+            //Vi dien tu
+            builder.Services.AddScoped<IWalletService, WalletService>();
             //Dashboard
             builder.Services.AddScoped<IDashboardService, DashboardService>();
-
+            //Blog
+            builder.Services.AddScoped<IBlogService, BlogService>();
+            //account Profile
+            builder.Services.AddScoped<IAccountService, AccountService>();
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.

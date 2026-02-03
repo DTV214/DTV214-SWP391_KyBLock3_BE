@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using TetGift.BLL.Dtos.TetGift.BLL.Dtos;
+using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers
 {
     [ApiController]
-    [Route("api/inventory")]
+    [Route("api/inventories")]
     public class InventoryController : ControllerBase
     {
         private readonly IInventoryService _inventoryService;

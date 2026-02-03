@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
@@ -49,7 +50,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
     public async Task<IEnumerable<ProductDto>> GetAllAsync()
     {
         var products = await _uow.GetRepository<Product>().GetAllAsync(
-            p => !p.Account.Role.Equals("CUSTOMER") && !p.Status.Equals("DELETED"),
+            p => !p.Account.Role.Equals(UserRole.CUSTOMER) && !p.Status.Equals(ProductStatus.DELETED),
             include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
         return products.Select(p =>
@@ -77,7 +78,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
     public async Task<ProductDto?> GetByIdAsync(int id)
     {
         var product = await _uow.GetRepository<Product>().FindAsync(
-            p => p.Productid == id && !p.Status.Equals("DELETED"),
+            p => p.Productid == id && !p.Status.Equals(ProductStatus.DELETED),
             include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
         if (product == null) return null;
@@ -103,7 +104,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
     public async Task<IEnumerable<ProductDto>> GetByAccountIdAsync(int accountId)
     {
         var products = await _uow.GetRepository<Product>()
-            .GetAllAsync(p => p.Accountid == accountId && !p.Status.Equals("DELETED"),
+            .GetAllAsync(p => p.Accountid == accountId && !p.Status.Equals(ProductStatus.DELETED),
             include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
 
@@ -139,7 +140,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
             Productname = dto.Productname,
             Description = dto.Description,
             Price = dto.Price,
-            Status = dto.Status ?? "ACTIVE",
+            Status = dto.Status ?? ProductStatus.ACTIVE,
             Unit = dto.Unit,
             ImageUrl = dto.ImageUrl
         };
@@ -151,7 +152,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         var entity = await repo.GetByIdAsync(id);
         if (entity != null)
         {
-            entity.Status = "DELETED";
+            entity.Status = ProductStatus.DELETED;
             repo.Update(entity);
             await _uow.SaveAsync();
         }
@@ -162,7 +163,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         if (accountId.HasValue)
         {
             var account = await _uow.GetRepository<Account>().FindAsync(
-                a => a.Accountid == accountId.Value && a.Status.Equals("ACTIVE")
+                a => a.Accountid == accountId.Value && a.Status.Equals(ProductStatus.ACTIVE)
                 );
             if (!account.Any()) throw new Exception($"AccountId {accountId} không tồn tại.");
         }
@@ -188,7 +189,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
     {
         var repo = _uow.GetRepository<Product>();
         var result = await repo.FindAsync(
-            e => e.Productid == dto.Productid && !e.Status.Equals("DELETED")
+            e => e.Productid == dto.Productid && !e.Status.Equals(ProductStatus.DELETED)
             );
         if (!result.Any()) throw new Exception("Không tìm thấy sản phẩm.");
         var entity = result.First();
@@ -216,7 +217,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         if (dto.Status != null)
         {
             if (string.IsNullOrWhiteSpace(dto.Status)
-                || (!dto.Status.Equals("ACTIVE") && !dto.Status.Equals("INACTIVE")
+                || (!dto.Status.Equals(ProductStatus.ACTIVE) && !dto.Status.Equals(ProductStatus.INACTIVE)
                 && !dto.Status.Equals("OUT_OF_STOCK")
                 )) throw new Exception("Trạng thái không được để trống hoặc sai syntax.");
             entity.Status = dto.Status;
@@ -245,7 +246,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
     {
         var repo = _uow.GetRepository<Product>();
         var result = await repo.FindAsync(
-            e => e.Productid == dto.Productid && !e.Status.Equals("DELETED")
+            e => e.Productid == dto.Productid && !e.Status.Equals(ProductStatus.DELETED)
             );
         if (!result.Any()) throw new Exception("Không tìm thấy sản phẩm.");
         var entity = result.First();
@@ -286,7 +287,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         if (dto.Status != null)
         {
             if (string.IsNullOrWhiteSpace(dto.Status)
-                || (!dto.Status.Equals("ACTIVE") && !dto.Status.Equals("INACTIVE")
+                || (!dto.Status.Equals(ProductStatus.ACTIVE) && !dto.Status.Equals(ProductStatus.INACTIVE)
                 && !dto.Status.Equals("OUT_OF_STOCK")
                 )) throw new Exception("Trạng thái không được để trống hoặc sai syntax.");
             entity.Status = dto.Status;
@@ -297,5 +298,61 @@ public class ProductService(IUnitOfWork uow) : IProductService
         repo.Update(entity);
         await _uow.SaveAsync();
         return response;
+    }
+
+    public async Task<ProductValidationDto> GetProductValidationStatus(int productId)
+    {
+        var repo = _uow.GetRepository<Product>();
+        var product = await repo.FindAsync(
+            p => p.Productid == productId && !p.Status.Equals(ProductStatus.DELETED),
+            include: q => q
+                .Include(p => p.Config)
+                    .ThenInclude(c => c.ConfigDetails)
+                    .ThenInclude(cd => cd.Category)
+                .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+                    .ThenInclude(p => p.Category)
+        );
+
+        if (product == null)
+            throw new Exception("Không tìm thấy sản phẩm.");
+
+        // Recalculate to ensure up-to-date values
+        product.CalculateUnit();
+        product.CalculateTotalPrice();
+
+        var result = new ProductValidationDto
+        {
+            Productid = product.Productid,
+            Productname = product.Productname,
+            CurrentWeight = product.Unit,
+            MaxWeight = product.Config?.Totalunit,
+            WeightExceeded = product.Config?.Totalunit != null && product.Unit > product.Config.Totalunit
+        };
+
+        // Get warnings
+        result.Warnings = product.GetConfigValidationWarnings();
+
+        // Get category status
+        var configStatus = product.GetConfigDetailStatus();
+        foreach (var kvp in configStatus)
+        {
+            var configDetail = product.Config?.ConfigDetails.FirstOrDefault(cd => cd.Categoryid == kvp.Key);
+            var categoryName = configDetail?.Category?.Categoryname ?? $"Category {kvp.Key}";
+
+            result.CategoryStatus[categoryName] = new CategoryRequirementDto
+            {
+                CategoryId = kvp.Key,
+                CategoryName = categoryName,
+                CurrentCount = kvp.Value.Current,
+                RequiredCount = kvp.Value.Required
+            };
+        }
+
+        // Determine if valid (all requirements met and weight not exceeded)
+        result.IsValid = !result.WeightExceeded
+            && result.CategoryStatus.Values.All(cs => cs.IsSatisfied);
+
+        return result;
     }
 }

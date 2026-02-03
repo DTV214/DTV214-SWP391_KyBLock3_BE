@@ -5,7 +5,7 @@ using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers
 {
-    [Authorize(Roles = "Staff,Admin")]
+    [Authorize(Roles = "STAFF,ADMIN")]
     [Route("api/staff/quotations")]
     public class StaffQuotationsController : BaseApiController
     {

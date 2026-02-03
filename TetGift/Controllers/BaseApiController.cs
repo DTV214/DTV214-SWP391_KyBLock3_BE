@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using TetGift.BLL.Common.Constraint;
 
 namespace TetGift.Controllers
 {
@@ -17,7 +18,8 @@ namespace TetGift.Controllers
 
         protected string GetRole()
         {
-            return User.FindFirstValue(ClaimTypes.Role) ?? "Customer";
+            var role = User.FindFirstValue(ClaimTypes.Role) ?? UserRole.CUSTOMER;
+            return role.ToUpper(); // Normalize to uppercase
         }
     }
 }

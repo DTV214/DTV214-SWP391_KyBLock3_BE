@@ -5,7 +5,7 @@ using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/products")]
 [ApiController]
 public class ProductsController(IProductService service) : BaseApiController
 {
@@ -74,5 +74,16 @@ public class ProductsController(IProductService service) : BaseApiController
     {
         await _service.DeleteAsync(id);
         return Ok(new { message = "Sản phẩm đã được xóa" });
+    }
+
+    /// <summary>
+    /// Get validation status for a product (basket) against its ConfigDetail requirements
+    /// Returns warnings if requirements are not met, category status, and weight validation
+    /// </summary>
+    [HttpGet("{id}/validation-status")]
+    public async Task<IActionResult> GetValidationStatus(int id)
+    {
+        var status = await _service.GetProductValidationStatus(id);
+        return Ok(status);
     }
 }

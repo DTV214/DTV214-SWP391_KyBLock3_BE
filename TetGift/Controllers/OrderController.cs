@@ -1,6 +1,6 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -28,9 +28,15 @@ public class OrderController : ControllerBase
         return accountId;
     }
 
+    private string GetCurrentUserRole()
+    {
+        var role = User.FindFirst(ClaimTypes.Role)?.Value ?? TetGift.BLL.Common.Constraint.UserRole.CUSTOMER;
+        return role.ToUpper(); // Normalize to uppercase
+    }
+
     // ========== CUSTOMER ENDPOINTS ==========
 
-    [HttpPost("create-from-cart")]
+    [HttpPost()]
     public async Task<IActionResult> CreateOrderFromCart([FromBody] CreateOrderRequest request)
     {
         try
@@ -75,9 +81,26 @@ public class OrderController : ControllerBase
         }
     }
 
+    [HttpPost("{orderId}/cancel")]
+    public async Task<IActionResult> CancelOrder(int orderId)
+    {
+        try
+        {
+            var accountId = GetCurrentAccountId();
+            var userRole = GetCurrentUserRole();
+            var result = await _orderService.CancelOrderAsync(orderId, accountId, userRole);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     // ========== ADMIN ENDPOINTS ==========
 
-    [HttpGet("admin/all")]
+    [HttpGet()]
+    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> GetAllOrders([FromQuery] string? status = null)
     {
         try
@@ -91,7 +114,8 @@ public class OrderController : ControllerBase
         }
     }
 
-    [HttpGet("admin/{orderId}")]
+    [HttpGet("/{orderId}")]
+    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> GetOrderByIdForAdmin(int orderId)
     {
         try
@@ -105,7 +129,8 @@ public class OrderController : ControllerBase
         }
     }
 
-    [HttpPut("admin/{orderId}/status")]
+    [HttpPut("/{orderId}/status")]
+    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> UpdateOrderStatus(int orderId, [FromBody] UpdateOrderStatusRequest request)
     {
         try

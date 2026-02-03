@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
@@ -11,12 +12,14 @@ public class OrderService : IOrderService
     private readonly IUnitOfWork _uow;
     private readonly ICartService _cartService;
     private readonly IPromotionService _promotionService;
+    private readonly IWalletService _walletService;
 
-    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService)
+    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IWalletService walletService)
     {
         _uow = uow;
         _cartService = cartService;
         _promotionService = promotionService;
+        _walletService = walletService;
     }
 
     public async Task<OrderResponseDto> CreateOrderFromCartAsync(int accountId, CreateOrderRequest request)
@@ -57,7 +60,7 @@ public class OrderService : IOrderService
         foreach (var item in cart.Items)
         {
             var stocks = await stockRepo.FindAsync(
-                s => s.Productid == item.ProductId && s.Status == "ACTIVE"
+                s => s.Productid == item.ProductId && s.Status == StockStatus.ACTIVE
             );
 
             var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
@@ -74,7 +77,7 @@ public class OrderService : IOrderService
             Accountid = accountId,
             Promotionid = promotionId,
             Totalprice = cart.TotalPrice - discountValue,
-            Status = "PENDING",
+            Status = OrderStatus.PENDING,
             Customername = request.CustomerName,
             Customerphone = request.CustomerPhone,
             Customeremail = request.CustomerEmail,
@@ -104,7 +107,7 @@ public class OrderService : IOrderService
             // Cập nhật Stock (FIFO - First In First Out)
             var remainingQuantity = cartItem.Quantity ?? 0;
             var availableStocks = await stockRepo.FindAsync(
-                s => s.Productid == cartItem.ProductId && s.Status == "ACTIVE"
+                s => s.Productid == cartItem.ProductId && s.Status == StockStatus.ACTIVE
             );
 
             foreach (var stock in availableStocks.OrderBy(s => s.Productiondate))
@@ -116,7 +119,7 @@ public class OrderService : IOrderService
 
                 stock.Stockquantity = stockQuantity - quantityToDeduct;
                 if (stock.Stockquantity <= 0)
-                    stock.Status = "OUT_OF_STOCK";
+                    stock.Status = StockStatus.OUT_OF_STOCK;
 
                 stockRepo.Update(stock);
 
@@ -245,7 +248,7 @@ public class OrderService : IOrderService
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng.");
 
-        var currentStatus = order.Status ?? "PENDING";
+        var currentStatus = order.Status ?? OrderStatus.PENDING;
         var newStatus = request.Status.ToUpper();
 
         // Validate status transition
@@ -254,13 +257,78 @@ public class OrderService : IOrderService
             throw new Exception($"Không thể chuyển trạng thái từ '{currentStatus}' sang '{newStatus}'.");
         }
 
-        // Nếu hủy đơn, hoàn lại stock
-        if (newStatus == "CANCELLED" && currentStatus != "CANCELLED")
+        // Nếu hủy đơn, hoàn lại stock và hoàn tiền vào ví (nếu thanh toán bằng ví)
+        if (newStatus == OrderStatus.CANCELLED && currentStatus != OrderStatus.CANCELLED)
         {
             await RestoreStockAsync(order);
+            
+            // Hoàn tiền vào ví nếu thanh toán bằng ví
+            await _walletService.RefundToWalletAsync(orderId);
         }
 
         order.Status = newStatus;
+        orderRepo.Update(order);
+        await _uow.SaveAsync(); // Save tất cả thay đổi (bao gồm cả stock đã được restore)
+
+        // Load lại với đầy đủ thông tin
+        var updatedOrder = await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .Include(o => o.Promotion)
+        );
+
+        return MapToOrderResponseDto(updatedOrder!);
+    }
+
+    public async Task<OrderResponseDto> CancelOrderAsync(int orderId, int accountId, string userRole)
+    {
+        var orderRepo = _uow.GetRepository<Order>();
+        var order = await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .Include(o => o.Account)
+        );
+
+        if (order == null)
+            throw new Exception("Không tìm thấy đơn hàng.");
+
+        var currentStatus = order.Status ?? OrderStatus.PENDING;
+
+        // Validate: Không thể hủy nếu đã DELIVERED hoặc CANCELLED
+        if (currentStatus == OrderStatus.DELIVERED)
+            throw new Exception("Không thể hủy đơn hàng đã được giao.");
+
+        if (currentStatus == OrderStatus.CANCELLED)
+            throw new Exception("Đơn hàng đã được hủy trước đó.");
+
+        // Validate ownership: Customer chỉ được hủy order của chính mình
+        var normalizedRole = userRole.ToUpper();
+        if (normalizedRole != "ADMIN")
+        {
+            if (order.Accountid != accountId)
+                throw new Exception("Bạn không có quyền hủy đơn hàng này.");
+
+            // Validate time limit: 15 phút cho Customer
+            if (order.Orderdatetime.HasValue)
+            {
+                var timeElapsed = DateTime.Now - order.Orderdatetime.Value;
+                if (timeElapsed.TotalMinutes > 15)
+                    throw new Exception("Chỉ có thể hủy đơn hàng trong vòng 15 phút kể từ khi đặt hàng.");
+            }
+        }
+
+        // Process cancellation
+        await RestoreStockAsync(order);
+        
+        // Hoàn tiền vào ví (nếu đã thanh toán)
+        await _walletService.RefundToWalletAsync(orderId);
+
+        // Update order status
+        order.Status = OrderStatus.CANCELLED;
         orderRepo.Update(order);
         await _uow.SaveAsync();
 
@@ -280,12 +348,12 @@ public class OrderService : IOrderService
     {
         var validTransitions = new Dictionary<string, List<string>>
         {
-            { "PENDING", new List<string> { "CONFIRMED", "CANCELLED" } },
-            { "CONFIRMED", new List<string> { "PROCESSING", "CANCELLED" } },
-            { "PROCESSING", new List<string> { "SHIPPED", "CANCELLED" } },
-            { "SHIPPED", new List<string> { "DELIVERED", "CANCELLED" } },
-            { "DELIVERED", new List<string> { } }, // Không thể chuyển từ DELIVERED
-            { "CANCELLED", new List<string> { } } // Không thể chuyển từ CANCELLED
+            { OrderStatus.PENDING, new List<string> { OrderStatus.CONFIRMED, OrderStatus.CANCELLED } },
+            { OrderStatus.CONFIRMED, new List<string> { OrderStatus.PROCESSING, OrderStatus.CANCELLED } },
+            { OrderStatus.PROCESSING, new List<string> { OrderStatus.SHIPPED, OrderStatus.CANCELLED } },
+            { OrderStatus.SHIPPED, new List<string> { OrderStatus.DELIVERED, OrderStatus.CANCELLED } },
+            { OrderStatus.DELIVERED, new List<string> { } }, // Không thể chuyển từ DELIVERED
+            { OrderStatus.CANCELLED, new List<string> { } } // Không thể chuyển từ CANCELLED
         };
 
         if (!validTransitions.ContainsKey(currentStatus))
@@ -299,19 +367,33 @@ public class OrderService : IOrderService
         var stockRepo = _uow.GetRepository<Stock>();
         var stockMovementRepo = _uow.GetRepository<StockMovement>();
 
-        // Lấy các StockMovement liên quan đến đơn hàng này
+        // Lấy các StockMovement liên quan đến đơn hàng này (chỉ lấy những record xuất kho - Quantity < 0)
         var movements = await stockMovementRepo.GetAllAsync(
-            sm => sm.Orderid == order.Orderid && sm.Quantity < 0
+            sm => sm.Orderid == order.Orderid && sm.Quantity.HasValue && sm.Quantity < 0
         );
+
+        if (movements == null || !movements.Any())
+        {
+            // Nếu không tìm thấy StockMovement, có thể đơn hàng này chưa có stock được trừ
+            // Hoặc đã được hoàn lại rồi - không cần làm gì
+            return;
+        }
 
         foreach (var movement in movements)
         {
+            if (movement.Stockid == null)
+                continue;
+
             var stock = await stockRepo.GetByIdAsync(movement.Stockid);
             if (stock != null)
             {
-                stock.Stockquantity = (stock.Stockquantity ?? 0) + Math.Abs(movement.Quantity ?? 0);
-                if (stock.Status == "OUT_OF_STOCK" && stock.Stockquantity > 0)
-                    stock.Status = "ACTIVE";
+                var quantityToRestore = Math.Abs(movement.Quantity ?? 0);
+                stock.Stockquantity = (stock.Stockquantity ?? 0) + quantityToRestore;
+                
+                // Nếu stock đang OUT_OF_STOCK và sau khi hoàn lại có số lượng > 0, chuyển về ACTIVE
+                if (stock.Status == StockStatus.OUT_OF_STOCK && stock.Stockquantity > 0)
+                    stock.Status = StockStatus.ACTIVE;
+                
                 stockRepo.Update(stock);
 
                 // Tạo StockMovement mới để ghi log hoàn lại
@@ -319,7 +401,7 @@ public class OrderService : IOrderService
                 {
                     Stockid = stock.Stockid,
                     Orderid = order.Orderid,
-                    Quantity = Math.Abs(movement.Quantity ?? 0), // Số dương để thể hiện nhập lại
+                    Quantity = quantityToRestore, // Số dương để thể hiện nhập lại
                     Movementdate = DateTime.Now,
                     Note = $"Hoàn lại kho do hủy đơn hàng #{order.Orderid}"
                 };

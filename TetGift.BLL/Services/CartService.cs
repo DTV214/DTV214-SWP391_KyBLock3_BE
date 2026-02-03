@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
@@ -60,7 +61,7 @@ public class CartService : ICartService
         if (product == null)
             throw new Exception("Sản phẩm không tồn tại.");
 
-        if (product.Status != "ACTIVE")
+        if (product.Status != ProductStatus.ACTIVE)
             throw new Exception("Sản phẩm không khả dụng.");
 
         if (product.Price == null || product.Price <= 0)

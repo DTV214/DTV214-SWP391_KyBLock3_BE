@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Net;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Common.VnPay;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -12,44 +13,75 @@ namespace TetGift.BLL.Services;
 public class PaymentService : IPaymentService
 {
     private readonly IUnitOfWork _uow;
-    private readonly IOrderService _orderService;
+    private readonly IWalletService _walletService;
     private readonly IConfiguration _configuration;
 
-    public PaymentService(IUnitOfWork uow, IOrderService orderService, IConfiguration configuration)
+    public PaymentService(IUnitOfWork uow, IWalletService walletService, IConfiguration configuration)
     {
         _uow = uow;
-        _orderService = orderService;
+        _walletService = walletService;
         _configuration = configuration;
     }
 
-    public async Task<PaymentResponseDto> CreatePaymentAsync(int orderId, int accountId, string? clientIp = null)
+    public async Task<PaymentResponseDto> CreatePaymentAsync(int orderId, int accountId, string? clientIp = null, string? paymentMethod = null)
     {
-        // 1. Validate Order (sử dụng IOrderService - kế thừa code cũ)
-        var order = await _orderService.GetOrderByIdAsync(orderId, accountId);
-        if (order.Status != "PENDING")
+        // 1. Validate Order (query trực tiếp để tránh circular dependency)
+        var orderRepo = _uow.GetRepository<Order>();
+        var order = await orderRepo.FindAsync(
+            o => o.Orderid == orderId && o.Accountid == accountId,
+            include: q => q
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .Include(o => o.Promotion)
+        );
+        
+        if (order == null)
+            throw new Exception("Không tìm thấy đơn hàng hoặc bạn không có quyền thanh toán đơn hàng này.");
+        
+        if (order.Status != OrderStatus.PENDING)
             throw new Exception("Chỉ có thể thanh toán cho đơn hàng đang chờ xác nhận.");
+        
+        // Calculate FinalPrice từ Order
+        decimal finalPrice = order.Totalprice ?? 0;
 
         // 2. Kiểm tra đã có payment thành công chưa
         var paymentRepo = _uow.GetRepository<Payment>();
         var existingPayments = await paymentRepo.FindAsync(
-            p => p.Orderid == orderId && p.Status == "SUCCESS"
+            p => p.Orderid == orderId && p.Status == PaymentStatus.SUCCESS
         );
         if (existingPayments.Any())
             throw new Exception("Đơn hàng này đã được thanh toán thành công.");
 
-        // 3. Tạo Payment record
+        // 3. Kiểm tra payment method
+        var method = (paymentMethod ?? "VNPAY").ToUpper();
+        if (method == "WALLET")
+        {
+            // Thanh toán bằng ví - gọi WalletService
+            var walletPayment = await _walletService.PayWithWalletAsync(accountId, orderId);
+            return new PaymentResponseDto
+            {
+                PaymentId = walletPayment.PaymentId,
+                OrderId = orderId,
+                Amount = walletPayment.Amount,
+                PaymentUrl = "", // Không cần URL vì đã thanh toán trực tiếp
+                Status = walletPayment.Status
+            };
+        }
+
+        // 4. Tạo Payment record cho VNPay
         var payment = new Payment
         {
             Orderid = orderId,
-            Amount = order.FinalPrice,
-            Status = "PENDING",
-            Type = "VNPAY",
+            Amount = finalPrice,
+            Status = PaymentStatus.PENDING,
+            Type = "ORDER_PAYMENT",
+            Paymentmethod = "VNPAY",
             Ispayonline = true
         };
         await paymentRepo.AddAsync(payment);
         await _uow.SaveAsync();
 
-        // 4. Build VNPay URL
+        // 5. Build VNPay URL
         var vnpUrl = _configuration["VnPay:Url"] ?? throw new Exception("Missing config: VnPay:Url");
         var vnpTmnCode = _configuration["VnPay:TmnCode"] ?? throw new Exception("Missing config: VnPay:TmnCode");
         var vnpHashSecret = _configuration["VnPay:HashSecret"] ?? throw new Exception("Missing config: VnPay:HashSecret");
@@ -63,7 +95,7 @@ public class PaymentService : IPaymentService
         // Convert UTC to GMT+7
         var vietnamTime = DateTime.UtcNow.AddHours(7);
         
-        vnpay.AddRequestData("vnp_Amount", ((long)(order.FinalPrice * 100)).ToString()); // Nhân 100 để khử phần thập phân
+        vnpay.AddRequestData("vnp_Amount", ((long)(finalPrice * 100)).ToString()); // Nhân 100 để khử phần thập phân
         vnpay.AddRequestData("vnp_CreateDate", vietnamTime.ToString("yyyyMMddHHmmss"));
         vnpay.AddRequestData("vnp_CurrCode", "VND");
         vnpay.AddRequestData("vnp_IpAddr", clientIp ?? "127.0.0.1");
@@ -80,7 +112,7 @@ public class PaymentService : IPaymentService
         {
             PaymentId = payment.Paymentid,
             OrderId = orderId,
-            Amount = order.FinalPrice,
+            Amount = finalPrice,
             PaymentUrl = paymentUrl,
             Status = "PENDING"
         };
@@ -116,7 +148,14 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Lấy Payment
+        // Kiểm tra nếu là WALLET_DEPOSIT (vnpTxnRef có format: WALLET_{WalletId}_{PaymentId}_{Timestamp})
+        if (!string.IsNullOrEmpty(vnpTxnRef) && vnpTxnRef.StartsWith("WALLET_"))
+        {
+            // Nạp tiền vào ví - gọi WalletService để xử lý
+            return await _walletService.ProcessDepositCallbackAsync(queryParams);
+        }
+
+        // ORDER_PAYMENT - parse paymentId trực tiếp từ vnpTxnRef
         if (!int.TryParse(vnpTxnRef, out var paymentId))
         {
             return new PaymentResultDto
@@ -130,7 +169,7 @@ public class PaymentService : IPaymentService
         var paymentRepo = _uow.GetRepository<Payment>();
         var payment = await paymentRepo.FindAsync(
             p => p.Paymentid == paymentId,
-            include: q => q.Include(p => p.Order)
+            include: q => q.Include(p => p.Order).Include(p => p.Wallet)
         );
 
         if (payment == null)
@@ -138,13 +177,13 @@ public class PaymentService : IPaymentService
             return new PaymentResultDto
             {
                 Success = false,
-                Message = "Order not found",
+                Message = "Payment not found",
                 ResponseCode = "01"
             };
         }
 
         // Validate amount
-        var vnpAmount = long.Parse(vnpay.GetResponseData("vnp_Amount")) / 100; // Chia 100 để lấy số tiền thực
+        var vnpAmount = long.Parse(vnpay.GetResponseData("vnp_Amount") ?? "0") / 100; // Chia 100 để lấy số tiền thực
         if (payment.Amount != vnpAmount)
         {
             return new PaymentResultDto
@@ -155,8 +194,9 @@ public class PaymentService : IPaymentService
             };
         }
 
+        // ORDER_PAYMENT - xử lý như cũ
         // Kiểm tra payment đã được xử lý chưa
-        if (payment.Status == "SUCCESS")
+        if (payment.Status == PaymentStatus.SUCCESS)
         {
             return new PaymentResultDto
             {
@@ -172,25 +212,24 @@ public class PaymentService : IPaymentService
         // Cập nhật Payment status
         if (vnpResponseCode == "00" && vnpTransactionStatus == "00")
         {
-            payment.Status = "SUCCESS";
-            // Lưu transaction no vào một field nào đó (có thể cần thêm field vào Payment entity)
-            // Tạm thời lưu vào Note hoặc tạo field mới
+            payment.Status = PaymentStatus.SUCCESS;
+            payment.Transactionno = vnpTransactionNo;
         }
         else
         {
-            payment.Status = "FAILED";
+            payment.Status = PaymentStatus.FAILED;
         }
 
         paymentRepo.Update(payment);
 
         // Cập nhật Order status nếu payment thành công
-        if (payment.Status == "SUCCESS" && payment.Order != null)
+        if (payment.Status == PaymentStatus.SUCCESS && payment.Order != null)
         {
             var orderRepo = _uow.GetRepository<Order>();
             var order = payment.Order;
-            if (order.Status == "PENDING")
+            if (order.Status == OrderStatus.PENDING)
             {
-                order.Status = "CONFIRMED";
+                order.Status = OrderStatus.CONFIRMED;
                 orderRepo.Update(order);
             }
         }
@@ -199,7 +238,7 @@ public class PaymentService : IPaymentService
 
         return new PaymentResultDto
         {
-            Success = payment.Status == "SUCCESS",
+            Success = payment.Status == PaymentStatus.SUCCESS,
             PaymentId = payment.Paymentid,
             OrderId = payment.Orderid ?? 0,
             TransactionNo = vnpTransactionNo,
@@ -241,7 +280,14 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Lấy Payment và cập nhật status (nếu chưa được cập nhật bởi IPN)
+        // Kiểm tra nếu là WALLET_DEPOSIT (vnpTxnRef có format: WALLET_{WalletId}_{PaymentId}_{Timestamp})
+        if (!string.IsNullOrEmpty(vnpTxnRef) && vnpTxnRef.StartsWith("WALLET_"))
+        {
+            // Nạp tiền vào ví - gọi WalletService để xử lý
+            return await _walletService.ProcessDepositReturnAsync(queryParams);
+        }
+
+        // ORDER_PAYMENT - parse paymentId trực tiếp từ vnpTxnRef
         if (!int.TryParse(vnpTxnRef, out var paymentId))
         {
             return new PaymentResultDto
@@ -255,7 +301,7 @@ public class PaymentService : IPaymentService
         var paymentRepo = _uow.GetRepository<Payment>();
         var payment = await paymentRepo.FindAsync(
             p => p.Paymentid == paymentId,
-            include: q => q.Include(p => p.Order)
+            include: q => q.Include(p => p.Order).Include(p => p.Wallet)
         );
 
         if (payment == null)
@@ -279,12 +325,14 @@ public class PaymentService : IPaymentService
             };
         }
 
+        // ORDER_PAYMENT - xử lý như cũ
         var success = vnpResponseCode == "00" && vnpTransactionStatus == "00";
         
         // Cập nhật Payment status nếu chưa được cập nhật (idempotent)
-        if (payment.Status != "SUCCESS" && success)
+        if (payment.Status != PaymentStatus.SUCCESS && success)
         {
-            payment.Status = "SUCCESS";
+            payment.Status = PaymentStatus.SUCCESS;
+            payment.Transactionno = vnpTransactionNo;
             paymentRepo.Update(payment);
 
             // Cập nhật Order status nếu payment thành công
@@ -292,18 +340,18 @@ public class PaymentService : IPaymentService
             {
                 var orderRepo = _uow.GetRepository<Order>();
                 var order = payment.Order;
-                if (order.Status == "PENDING")
+                if (order.Status == OrderStatus.PENDING)
                 {
-                    order.Status = "CONFIRMED";
+                    order.Status = OrderStatus.CONFIRMED;
                     orderRepo.Update(order);
                 }
             }
 
             await _uow.SaveAsync();
         }
-        else if (!success && payment.Status != "FAILED")
+        else if (!success && payment.Status != PaymentStatus.FAILED)
         {
-            payment.Status = "FAILED";
+            payment.Status = PaymentStatus.FAILED;
             paymentRepo.Update(payment);
             await _uow.SaveAsync();
         }
@@ -334,10 +382,13 @@ public class PaymentService : IPaymentService
         {
             PaymentId = p.Paymentid,
             OrderId = p.Orderid ?? 0,
+            WalletId = p.Walletid,
             Amount = p.Amount ?? 0,
-            Status = p.Status ?? "PENDING",
+            Status = p.Status ?? PaymentStatus.PENDING,
             Type = p.Type,
+            PaymentMethod = p.Paymentmethod,
             IsPayOnline = p.Ispayonline ?? false,
+            TransactionNo = p.Transactionno,
             CreatedDate = null // Payment entity không có CreatedDate, có thể thêm sau
         });
     }
@@ -357,11 +408,31 @@ public class PaymentService : IPaymentService
         {
             PaymentId = p.Paymentid,
             OrderId = p.Orderid ?? 0,
+            WalletId = p.Walletid,
             Amount = p.Amount ?? 0,
-            Status = p.Status ?? "PENDING",
+            Status = p.Status ?? PaymentStatus.PENDING,
             Type = p.Type,
+            PaymentMethod = p.Paymentmethod,
             IsPayOnline = p.Ispayonline ?? false,
+            TransactionNo = p.Transactionno,
             CreatedDate = null
         });
+    }
+
+    // ========== WALLET DEPOSIT METHODS ==========
+
+    public async Task<DepositResponseDto> CreateWalletDepositPaymentAsync(int accountId, decimal amount, string? clientIp = null)
+    {
+        return await _walletService.DepositToWalletAsync(accountId, amount, clientIp);
+    }
+
+    public async Task<PaymentResultDto> ProcessWalletDepositIpnAsync(Dictionary<string, string> queryParams)
+    {
+        return await _walletService.ProcessDepositCallbackAsync(queryParams);
+    }
+
+    public async Task<PaymentResultDto> ProcessWalletDepositReturnAsync(Dictionary<string, string> queryParams)
+    {
+        return await _walletService.ProcessDepositReturnAsync(queryParams);
     }
 }

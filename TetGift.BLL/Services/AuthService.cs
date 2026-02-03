@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Common.Securities;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -48,7 +49,7 @@ namespace TetGift.BLL.Services
             // Không dùng FirstOrDefaultAsync để BLL không cần EF Core package
             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
 
-            if (acc != null && string.Equals(acc.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            if (acc != null && acc.Status == AccountStatus.ACTIVE)
                 throw new Exception("Account already active.");
 
             if (acc == null)
@@ -60,8 +61,8 @@ namespace TetGift.BLL.Services
                     Email = email,
                     Fullname = req.Fullname,
                     Phone = req.Phone,
-                    Role = "Customer",
-                    Status = "Pending"
+                    Role = UserRole.CUSTOMER,
+                    Status = AccountStatus.PENDING
                 };
 
                 await repo.AddAsync(acc);
@@ -73,7 +74,7 @@ namespace TetGift.BLL.Services
                 acc.Fullname = req.Fullname ?? acc.Fullname;
                 acc.Phone = req.Phone ?? acc.Phone;
                 acc.Password = PasswordHasher.Hash(password);
-                acc.Status = "Pending";
+                acc.Status = AccountStatus.PENDING;
 
                 repo.Update(acc);
             }
@@ -105,7 +106,7 @@ namespace TetGift.BLL.Services
             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
 
             if (acc == null) throw new Exception("Account not found.");
-            if (string.Equals(acc.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            if (acc.Status == AccountStatus.ACTIVE)
                 throw new Exception("Account already verified.");
 
             if (acc.RegisterOtpExpiresAt == null || acc.RegisterOtpExpiresAt < DateTime.Now)
@@ -128,7 +129,7 @@ namespace TetGift.BLL.Services
                 throw new Exception("OTP invalid.");
             }
 
-            acc.Status = "Active";
+            acc.Status = AccountStatus.ACTIVE;
             acc.RegisterOtpVerifiedAt = DateTime.Now;
             acc.RegisterOtpHash = null;
             acc.RegisterOtpExpiresAt = null;
@@ -145,7 +146,7 @@ namespace TetGift.BLL.Services
                 AccountId = acc.Accountid,
                 Username = acc.Username,
                 Email = acc.Email,
-                Role = acc.Role
+                Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper()
             };
         }
 
@@ -161,7 +162,7 @@ namespace TetGift.BLL.Services
             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
 
             if (acc == null) throw new Exception("Invalid credentials.");
-            if (!string.Equals(acc.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            if (acc.Status != AccountStatus.ACTIVE)
                 throw new Exception("Account not verified.");
 
             if (!PasswordHasher.Verify(password, acc.Password))
@@ -175,7 +176,7 @@ namespace TetGift.BLL.Services
                 AccountId = acc.Accountid,
                 Username = acc.Username,
                 Email = acc.Email,
-                Role = acc.Role
+                Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper()
             };
         }
     }

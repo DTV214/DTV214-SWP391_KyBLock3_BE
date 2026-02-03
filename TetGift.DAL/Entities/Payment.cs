@@ -17,5 +17,13 @@ public partial class Payment
 
     public string? Type { get; set; }
 
+    public int? Walletid { get; set; }
+
+    public string? Paymentmethod { get; set; } // VNPAY, WALLET
+
+    public string? Transactionno { get; set; }
+
     public virtual Order? Order { get; set; }
+
+    public virtual Wallet? Wallet { get; set; }
 }

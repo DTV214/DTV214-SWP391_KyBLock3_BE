@@ -5,7 +5,7 @@ using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/config/details")]
 [ApiController]
 public class ConfigDetailsController(IConfigDetailService service) : ControllerBase
 {
