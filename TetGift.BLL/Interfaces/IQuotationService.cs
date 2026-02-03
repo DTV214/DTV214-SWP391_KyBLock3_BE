@@ -20,6 +20,7 @@ namespace TetGift.BLL.Interfaces
         Task SendToAdminAsync(int quotationId, int staffAccountId, string? message);
         Task<List<QuotationListItemDto>> GetStaffQuotationsAsync(string? status = null);
         Task<QuotationDetailDto> GetStaffQuotationDetailAsync(int quotationId);
+        Task StaffReviewFeesAsync(int quotationId, StaffReviewFeesRequest req);
 
         // ADMIN
         Task AdminApproveAsync(int quotationId, AdminDecisionRequest req);
