@@ -28,6 +28,19 @@ namespace TetGift
             builder.Services.AddDbContext<DatabaseContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+            // --- PHẦN THÊM CỦA MÌNH: ĐĂNG KÝ CORS SERVICE ---
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowReactApp",
+                    policy =>
+                    {
+                        policy.WithOrigins("http://localhost:5173") // Khớp với origin của React (Vite)
+                              .AllowAnyHeader()
+                              .AllowAnyMethod()
+                              .AllowCredentials();
+                    });
+            });
+
             builder.Services.AddControllers(options =>
             {
                 options.Filters.Add<ApiResponseWrapperFilter>();
@@ -150,41 +163,6 @@ namespace TetGift
                 });
             });
 
-            //builder.Services.AddSwaggerGen(c =>
-            //{
-            //    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-            //    {
-            //        Title = "TetGift",
-            //        Version = "v1"
-            //    });
-
-            //    // Thêm JWT Bearer authentication vào Swagger
-            //    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            //    {
-            //        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
-            //        Name = "Authorization",
-            //        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-            //        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
-            //        Scheme = "Bearer",
-            //        BearerFormat = "JWT"
-            //    });
-
-            //    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
-            //    {
-            //        {
-            //            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            //            {
-            //                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-            //                {
-            //                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-            //                    Id = "Bearer"
-            //                }
-            //            },
-            //            Array.Empty<string>()
-            //        }
-            //    });
-            //});
-
             // Đăng ký Background Services
             builder.Services.AddHostedService<PendingAccountCleanupService>();
 
@@ -213,29 +191,21 @@ namespace TetGift
             builder.Services.AddScoped<IConfigDetailService, ConfigDetailService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IProductDetailService, ProductDetailService>();
-            //Khuyen mai, ton kho
             builder.Services.AddScoped<IPromotionService, PromotionService>();
             builder.Services.AddScoped<IInventoryService, InventoryService>();
             builder.Services.AddScoped<IQuotationService, QuotationService>();
             builder.Services.AddScoped<IOrderFromQuotationService, OrderFromQuotationService>();
-            //Gio hang
             builder.Services.AddScoped<ICartService, CartService>();
-            //Don hang
             builder.Services.AddScoped<IOrderService, OrderService>();
-            //Thanh toan
             builder.Services.AddScoped<IPaymentService, PaymentService>();
-            //Vi dien tu
             builder.Services.AddScoped<IWalletService, WalletService>();
-            //Dashboard
             builder.Services.AddScoped<IDashboardService, DashboardService>();
-            //Blog
             builder.Services.AddScoped<IBlogService, BlogService>();
-            //account Profile
             builder.Services.AddScoped<IAccountService, AccountService>();
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
-            // Enable Swagger for all environments
             app.UseSwagger();
             app.UseSwaggerUI();
 
@@ -245,7 +215,11 @@ namespace TetGift
                 app.UseHttpsRedirection();
             }
 
+            // --- PHẦN THÊM CỦA MÌNH: SỬ DỤNG CORS MIDDLEWARE ---
+            // Phải đặt sau UseRouting và trước UseAuthentication/Authorization
             app.UseRouting();
+
+            app.UseCors("AllowReactApp");
 
             //Middleware
             app.UseMiddleware<ExceptionMiddleware>();
