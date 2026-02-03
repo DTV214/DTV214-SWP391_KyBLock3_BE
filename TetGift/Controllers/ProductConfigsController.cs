@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -17,6 +18,7 @@ namespace TetGift.Controllers
         public async Task<IActionResult> Get(int id) => Ok(await _service.GetByIdAsync(id));
 
         [HttpPost]
+        [Authorize]
         public async Task<IActionResult> Create(ProductConfigDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -26,6 +28,7 @@ namespace TetGift.Controllers
         }
 
         [HttpPut]
+        [Authorize]
         public async Task<IActionResult> Update(ProductConfigDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -42,6 +45,7 @@ namespace TetGift.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize]
         public async Task<IActionResult> Delete(int id)
         {
             await _service.DeleteAsync(id);

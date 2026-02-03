@@ -241,7 +241,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
         return new UpdateProductDto();
     }
 
-    public async Task<UpdateProductDto> UpdateCustomAsync(ProductDto dto)
+    public async Task<UpdateProductDto> UpdateCustomAsync(ProductDto dto, bool isCustomer)
     {
         var repo = _uow.GetRepository<Product>();
         var result = await repo.FindAsync(
@@ -252,7 +252,11 @@ public class ProductService(IUnitOfWork uow) : IProductService
 
         var response = new UpdateProductDto();
 
-        #region Validation Cate, Blank String, Number Property
+        #region Validation Account, Cate, Blank String, Number Property
+
+        // 0. Validate same account
+        if (isCustomer && entity.Accountid != dto.Accountid)
+            throw new Exception("Người chỉnh sửa sản phẩm không phải người đã tạo ra sản phẩm.");
 
         // 1. Validate ConfigId và Logic Unit
         if (dto.Configid.HasValue)
