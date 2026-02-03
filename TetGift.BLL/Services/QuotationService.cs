@@ -328,6 +328,111 @@ namespace TetGift.BLL.Services
         //    await _uow.SaveAsync();
         //}
 
+        public async Task StaffReviewFeesAsync(int quotationId, StaffReviewFeesRequest req)
+        {
+            if (quotationId <= 0) throw new Exception("quotationId is required.");
+            if (req.StaffAccountId <= 0) throw new Exception("StaffAccountId is required.");
+            if (req.Lines == null || req.Lines.Count == 0) throw new Exception("Lines is required.");
+
+            var qRepo = _uow.GetRepository<Quotation>();
+            var qiRepo = _uow.GetRepository<QuotationItem>();
+            var qfRepo = _uow.GetRepository<QuotationFee>();
+            var pRepo = _uow.GetRepository<Product>();
+
+            var q = (await qRepo.FindAsync(x => x.Quotationid == quotationId)).FirstOrDefault();
+            if (q == null) throw new Exception("Quotation not found.");
+
+            // tuỳ status của bạn, ví dụ:
+            // if (q.Status != "STAFF_REVIEWING") throw new Exception("Quotation is not in STAFF_REVIEWING.");
+
+            var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
+            if (items.Count == 0) throw new Exception("Quotation has no items.");
+
+            // map nhanh itemId -> item
+            var itemDict = items.ToDictionary(x => x.Quotationitemid, x => x);
+
+            // Validate: request phải cover tất cả items (để đảm bảo mỗi item có >=1 fee)
+            foreach (var it in items)
+            {
+                var line = req.Lines.FirstOrDefault(x => x.QuotationItemId == it.Quotationitemid);
+                if (line == null) throw new Exception($"Missing fees for quotationItemId={it.Quotationitemid}.");
+                if (line.Fees == null || line.Fees.Count == 0) throw new Exception($"QuotationItemId={it.Quotationitemid} must have at least 1 fee.");
+            }
+
+            // load product ids for fallback calc item.Price
+            var productIds = items.Where(x => x.Productid != null).Select(x => x.Productid!.Value).Distinct().ToList();
+            var products = productIds.Count == 0
+                ? new List<Product>()
+                : (await pRepo.FindAsync(p => productIds.Contains(p.Productid))).ToList();
+
+            // process each line
+            foreach (var line in req.Lines)
+            {
+                if (!itemDict.TryGetValue(line.QuotationItemId, out var item))
+                    throw new Exception($"QuotationItem not found: {line.QuotationItemId}");
+
+                var pid = item.Productid ?? 0;
+                var qty = item.Quantity ?? 0;
+                if (pid <= 0 || qty <= 0) throw new Exception("QuotationItem missing product/quantity.");
+
+                // Ensure item.Price = original line total
+                if (item.Price == null || item.Price <= 0)
+                {
+                    var prod = products.FirstOrDefault(p => p.Productid == pid);
+                    if (prod == null) throw new Exception($"Product not found: {pid}");
+
+                    var unit = prod.Price ?? 0m;
+                    if (unit <= 0) throw new Exception($"Invalid product price for product {pid}");
+
+                    item.Price = Math.Round(unit * qty, 2);
+                    qiRepo.Update(item);
+                }
+
+                // delete existing fees for this item
+                var oldFees = (await qfRepo.FindAsync(f => f.Quotationitemid == item.Quotationitemid)).ToList();
+                foreach (var of in oldFees)
+                    qfRepo.Delete(of);
+
+                // add new fees
+                foreach (var fee in line.Fees)
+                {
+                    if (fee.Price <= 0) throw new Exception("Fee price must be > 0.");
+                    if (fee.IsSubtracted != 0 && fee.IsSubtracted != 1) throw new Exception("IsSubtracted must be 0 or 1.");
+
+                    await qfRepo.AddAsync(new QuotationFee
+                    {
+                        Quotationitemid = item.Quotationitemid,
+                        Issubtracted = fee.IsSubtracted,
+                        Price = Math.Round(fee.Price, 2),
+                        Description = fee.Description
+                    });
+                }
+            }
+
+            // recompute quotation total
+            decimal totalOriginal = items.Sum(i => i.Price ?? 0m);
+
+            // fetch all new fees for quotation
+            var itemIds = items.Select(i => i.Quotationitemid).ToList();
+            var allFees = (await qfRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
+
+            decimal subtract = allFees.Where(f => (f.Issubtracted ?? 0) == 0).Sum(f => f.Price ?? 0m);
+            decimal add = allFees.Where(f => (f.Issubtracted ?? 0) == 1).Sum(f => f.Price ?? 0m);
+
+            var totalAfter = totalOriginal - subtract + add;
+            if (totalAfter < 0) throw new Exception("Total after adjustments cannot be negative.");
+
+            q.Totalprice = Math.Round(totalAfter, 2);
+            q.Staffreviewerid = req.StaffAccountId;
+            q.Staffreviewedat = DateTime.Now;
+            qRepo.Update(q);
+
+            // nếu bạn có bảng message thì add log ở đây (optional)
+            // await AddMessageAsync(...)
+
+            await _uow.SaveAsync();
+        }
+
         public async Task ProposeItemDiscountsAsync(int quotationId, StaffProposeItemDiscountRequest req)
         {
             if (req.StaffAccountId <= 0) throw new Exception("StaffAccountId is required.");
@@ -581,22 +686,26 @@ namespace TetGift.BLL.Services
 
             var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
             var itemIds = items.Select(x => x.Quotationitemid).ToList();
-            var productIds = items.Where(x => x.Productid != null).Select(x => x.Productid!.Value).Distinct().ToList();
+            var productIds = items.Where(x => x.Productid != null)
+                                  .Select(x => x.Productid!.Value)
+                                  .Distinct()
+                                  .ToList();
 
-            //products
+            // products (batch)
             var products = productIds.Count == 0
                 ? new List<Product>()
                 : (await pRepo.FindAsync(p => productIds.Contains(p.Productid))).ToList();
 
-            //fees
+            // fees (batch) - now we keep ALL fees
             var fees = itemIds.Count == 0
                 ? new List<QuotationFee>()
                 : (await qfRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
 
-            var latestFeeByItemId = fees
+            // group fees by item
+            var feesByItemId = fees
                 .Where(f => f.Quotationitemid != null)
                 .GroupBy(f => f.Quotationitemid!.Value)
-                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Quotationfeeid).First());
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Quotationfeeid).ToList());
 
             // messages
             var messages = (await msgRepo.FindAsync(m => m.Quotationid == quotationId))
@@ -614,9 +723,9 @@ namespace TetGift.BLL.Services
                 })
                 .ToList();
 
-            // build lines + totals
-            decimal totalOriginal = 0;
-            decimal totalAfter = 0;
+            decimal totalOriginal = 0m;
+            decimal totalSubtract = 0m; // sum fee where issubtracted=0
+            decimal totalAdd = 0m;      // sum fee where issubtracted=1
 
             var lines = new List<QuotationLineDto>();
 
@@ -629,18 +738,25 @@ namespace TetGift.BLL.Services
                 var prod = products.FirstOrDefault(p => p.Productid == pid);
                 var unit = prod?.Price ?? 0m;
 
-                // original line total: QuotationItem.Price (you define as line total)
+                // ORIGINAL line total: QuotationItem.Price (fallback unit*qty)
                 var originalLineTotal = it.Price ?? (unit * qty);
+                originalLineTotal = Math.Round(originalLineTotal, 2);
 
-                // discounted line total: from fee.Price (you define as line total after discount)
-                latestFeeByItemId.TryGetValue(it.Quotationitemid, out var fee);
-                var after = fee?.Price ?? originalLineTotal;
+                // Fees for this item
+                feesByItemId.TryGetValue(it.Quotationitemid, out var itemFees);
+                itemFees ??= new List<QuotationFee>();
 
-                // discount percent
-                var percent = ParsePercent(fee?.Description);
+                decimal sub = itemFees.Where(f => (f.Issubtracted ?? 0) == 0).Sum(f => f.Price ?? 0m);
+                decimal add = itemFees.Where(f => (f.Issubtracted ?? 0) == 1).Sum(f => f.Price ?? 0m);
+
+                sub = Math.Round(sub, 2);
+                add = Math.Round(add, 2);
+
+                var finalLineTotal = Math.Round(originalLineTotal - sub + add, 2);
 
                 totalOriginal += originalLineTotal;
-                totalAfter += after;
+                totalSubtract += sub;
+                totalAdd += add;
 
                 lines.Add(new QuotationLineDto
                 {
@@ -649,12 +765,26 @@ namespace TetGift.BLL.Services
                     Sku = prod?.Sku,
                     ProductName = prod?.Productname,
                     Quantity = qty,
-                    UnitPrice = unit,
-                    OriginalLineTotal = Math.Round(originalLineTotal, 2),
-                    DiscountPercent = percent,
-                    AfterDiscountLineTotal = Math.Round(after, 2)
+                    UnitPrice = Math.Round(unit, 2),
+
+                    OriginalLineTotal = originalLineTotal,
+
+                    // NEW fields
+                    SubtractTotal = sub,
+                    AddTotal = add,
+                    FinalLineTotal = finalLineTotal,
+
+                    Fees = itemFees.Select(f => new QuotationFeeViewDto
+                    {
+                        QuotationFeeId = f.Quotationfeeid,
+                        IsSubtracted = (short)(f.Issubtracted ?? 0),
+                        Price = Math.Round(f.Price ?? 0m, 2),
+                        Description = f.Description
+                    }).ToList()
                 });
             }
+
+            var totalAfter = Math.Round(totalOriginal - totalSubtract + totalAdd, 2);
 
             var dto = new QuotationDetailDto
             {
@@ -682,9 +812,12 @@ namespace TetGift.BLL.Services
                 DesiredPriceNote = q.Desiredpricenote,
                 Note = q.Note,
 
+                // totals
                 TotalOriginal = Math.Round(totalOriginal, 2),
-                TotalAfterDiscount = Math.Round(totalAfter, 2),
-                TotalDiscountAmount = Math.Round(totalOriginal - totalAfter, 2),
+                TotalSubtract = Math.Round(totalSubtract, 2),
+                TotalAdd = Math.Round(totalAdd, 2),
+                TotalAfterDiscount = totalAfter, // tên field giữ vậy cũng được, nghĩa là "after adjustments"
+                TotalDiscountAmount = Math.Round(totalOriginal - totalAfter, 2), // net discount (có thể âm nếu add > sub)
 
                 Lines = lines,
                 Messages = messages
@@ -692,6 +825,7 @@ namespace TetGift.BLL.Services
 
             return dto;
         }
+
 
         // =========================
         // DETAIL by ROLE

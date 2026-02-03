@@ -29,6 +29,8 @@
 
         // Totals
         public decimal TotalOriginal { get; set; }    // tổng giá gốc (sum QuotationItem.Price)
+        public decimal TotalSubtract { get; set; }
+        public decimal TotalAdd { get; set; }
         public decimal TotalAfterDiscount { get; set; } // tổng sau giảm (sum QuotationFee.Price)
         public decimal TotalDiscountAmount { get; set; } // tổng giảm = original - after
 
@@ -49,11 +51,20 @@
         public decimal UnitPrice { get; set; }          // Product.Price
         public decimal OriginalLineTotal { get; set; }  // QuotationItem.Price (or fallback unit*qty)
 
-        public decimal DiscountPercent { get; set; }    // parse từ QuotationFee.Description (VD: "10%")
-        public decimal AfterDiscountLineTotal { get; set; } // QuotationFee.Price (or fallback original)
-
-        public decimal DiscountAmount => Math.Max(0, OriginalLineTotal - AfterDiscountLineTotal);
+        public decimal SubtractTotal { get; set; }
+        public decimal AddTotal { get; set; }
+        public decimal FinalLineTotal { get; set; }
+        public List<QuotationFeeViewDto> Fees { get; set; } = new();
+        //public decimal DiscountAmount => Math.Max(0, OriginalLineTotal - AfterDiscountLineTotal);
     }
+    public class QuotationFeeViewDto
+    {
+        public int QuotationFeeId { get; set; }
+        public short IsSubtracted { get; set; } // 0 trừ, 1 cộng
+        public decimal Price { get; set; }      // delta
+        public string? Description { get; set; }
+    }
+
 
     public class QuotationMessageDto
     {

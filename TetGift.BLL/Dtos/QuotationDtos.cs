@@ -62,6 +62,27 @@
         public decimal DiscountPercent { get; set; } // 0..100
     }
 
+    public class StaffFeeInputDto
+    {
+        public short IsSubtracted { get; set; } // 0 = trừ, 1 = cộng
+        public decimal Price { get; set; }      // số tiền điều chỉnh (delta)
+        public string? Description { get; set; } // "Giảm 10%", "Phí ship", ...
+    }
+
+    public class StaffReviewFeesLineDto
+    {
+        public int QuotationItemId { get; set; }
+        public List<StaffFeeInputDto> Fees { get; set; } = new();
+    }
+
+    public class StaffReviewFeesRequest
+    {
+        // sẽ override từ JWT trong controller
+        public int StaffAccountId { get; set; }
+        public List<StaffReviewFeesLineDto> Lines { get; set; } = new();
+        public string? Message { get; set; }
+    }
+
     public class StaffProposeItemDiscountRequest
     {
         public int StaffAccountId { get; set; }
