@@ -13,4 +13,8 @@ public interface IProductService
     Task<UpdateProductDto> UpdateCustomAsync(ProductDto dto, bool isCustomer);
     Task DeleteAsync(int id);
     Task<ProductValidationDto> GetProductValidationStatus(int productId);
+    Task<ProductDto> CloneBasketAsync(int templateId, int customerId, string? customName);
+    Task<IEnumerable<ProductDto>> GetTemplatesAsync();
+    Task SetAsTemplateAsync(int productId);
+    Task RemoveTemplateAsync(int productId);
 }

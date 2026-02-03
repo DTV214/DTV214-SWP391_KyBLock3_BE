@@ -50,7 +50,10 @@ public class ProductService(IUnitOfWork uow) : IProductService
     public async Task<IEnumerable<ProductDto>> GetAllAsync()
     {
         var products = await _uow.GetRepository<Product>().GetAllAsync(
-            p => !p.Account.Role.Equals(UserRole.CUSTOMER) && !p.Status.Equals(ProductStatus.DELETED),
+            p => (p.Account == null || !p.Account.Role.Equals(UserRole.CUSTOMER))
+                && !p.Status.Equals(ProductStatus.DELETED)
+                && !p.Status.Equals(ProductStatus.DRAFT)
+                && (p.Status.Equals(ProductStatus.ACTIVE) || p.Status.Equals(ProductStatus.INACTIVE)),
             include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
         return products.Select(p =>
@@ -354,5 +357,147 @@ public class ProductService(IUnitOfWork uow) : IProductService
             && result.CategoryStatus.Values.All(cs => cs.IsSatisfied);
 
         return result;
+    }
+
+    public async Task<IEnumerable<ProductDto>> GetTemplatesAsync()
+    {
+        var templates = await _uow.GetRepository<Product>().GetAllAsync(
+            p => p.Status == ProductStatus.TEMPLATE && p.Configid.HasValue,
+            include: p => p
+                .Include(p => p.Config)
+                .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+        );
+
+        return templates.Select(p =>
+        {
+            p.CalculateUnit();
+            p.CalculateTotalPrice();
+
+            return new ProductDto
+            {
+                Productid = p.Productid,
+                Categoryid = p.Categoryid,
+                Configid = p.Configid,
+                Accountid = p.Accountid,
+                Sku = p.Sku,
+                Productname = p.Productname,
+                Description = p.Description,
+                Price = p.Price,
+                Status = p.Status,
+                Unit = p.Unit,
+                ImageUrl = p.ImageUrl,
+                IsCustom = true
+            };
+        });
+    }
+
+    public async Task<ProductDto> CloneBasketAsync(int templateId, int customerId, string? customName)
+    {
+        // Validate template exists and is actually a template
+        var template = await _uow.GetRepository<Product>().FindAsync(
+            p => p.Productid == templateId && p.Status == ProductStatus.TEMPLATE,
+            include: q => q
+                .Include(p => p.Config)
+                .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+        );
+        
+        if (template == null) 
+            throw new Exception("Template giỏ quà không tồn tại hoặc không khả dụng.");
+        
+        if (!template.Configid.HasValue)
+            throw new Exception("Template không hợp lệ (thiếu cấu hình).");
+        
+        // Validate customer account exists
+        await ValidateForeignKeys(customerId, null, null);
+        
+        // 1. Clone Product as DRAFT
+        var newBasket = new Product
+        {
+            Configid = template.Configid,
+            Accountid = customerId,
+            Productname = customName ?? $"Bản sao của {template.Productname}",
+            Description = template.Description,
+            ImageUrl = template.ImageUrl,
+            Status = ProductStatus.DRAFT,  // Customer có thể chỉnh sửa
+            Unit = template.Unit,
+            Price = template.Price
+        };
+        
+        await _uow.GetRepository<Product>().AddAsync(newBasket);
+        await _uow.SaveAsync();
+        
+        // 2. Clone all ProductDetails (batch insert for performance)
+        if (template.ProductDetailProductparents.Any())
+        {
+            var detailRepo = _uow.GetRepository<ProductDetail>();
+            var newDetails = template.ProductDetailProductparents.Select(detail => new ProductDetail
+            {
+                Productparentid = newBasket.Productid,
+                Productid = detail.Productid,
+                Quantity = detail.Quantity
+            }).ToList();
+            
+            await detailRepo.AddRangeAsync(newDetails);
+        }
+        
+        await _uow.SaveAsync();
+        
+        return new ProductDto
+        {
+            Productid = newBasket.Productid,
+            Configid = newBasket.Configid,
+            Accountid = newBasket.Accountid,
+            Productname = newBasket.Productname,
+            Description = newBasket.Description,
+            ImageUrl = newBasket.ImageUrl,
+            Price = newBasket.Price,
+            Unit = newBasket.Unit,
+            Status = newBasket.Status,
+            IsCustom = true
+        };
+    }
+
+    /// <summary>
+    /// Admin: Set a basket product as template
+    /// Validates that product is a valid basket before setting as template
+    /// </summary>
+    public async Task SetAsTemplateAsync(int productId)
+    {
+        var repo = _uow.GetRepository<Product>();
+        var product = await repo.FindAsync(
+            p => p.Productid == productId && !p.Status.Equals(ProductStatus.DELETED),
+            include: p => p.Include(pr => pr.Config)
+        );
+
+        if (product == null)
+            throw new Exception("Sản phẩm không tồn tại.");
+
+        if (!product.Configid.HasValue)
+            throw new Exception("Chỉ có thể đặt giỏ quà (có cấu hình) làm template.");
+
+        product.Status = ProductStatus.TEMPLATE;
+        repo.Update(product);
+        await _uow.SaveAsync();
+    }
+
+    /// <summary>
+    /// Admin: Remove template status (set back to ACTIVE)
+    /// </summary>
+    public async Task RemoveTemplateAsync(int productId)
+    {
+        var repo = _uow.GetRepository<Product>();
+        var product = await repo.GetByIdAsync(productId);
+
+        if (product == null)
+            throw new Exception("Template không tồn tại.");
+
+        if (product.Status != ProductStatus.TEMPLATE)
+            throw new Exception("Sản phẩm này không phải template.");
+
+        product.Status = ProductStatus.ACTIVE;
+        repo.Update(product);
+        await _uow.SaveAsync();
     }
 }
