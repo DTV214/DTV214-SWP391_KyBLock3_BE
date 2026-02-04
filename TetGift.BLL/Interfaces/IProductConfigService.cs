@@ -6,7 +6,7 @@ namespace TetGift.BLL.Interfaces
     {
         Task<IEnumerable<ProductConfigDto>> GetAllAsync();
         Task<ProductConfigDto?> GetByIdAsync(int id);
-        Task CreateAsync(ProductConfigDto dto);
+        Task<int> CreateAsync(ProductConfigDto dto);
         Task UpdateAsync(ProductConfigDto dto);
         Task DeleteAsync(int id);
     }

@@ -23,8 +23,8 @@ namespace TetGift.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            await _service.CreateAsync(dto);
-            return Ok(new { message = "Thêm mới thành công" });
+            var configId = await _service.CreateAsync(dto);
+            return Ok(new { message = "Thêm mới thành công", configid = configId });
         }
 
         [HttpPut]

@@ -39,7 +39,7 @@ namespace TetGift.BLL.Services
                 };
         }
 
-        public async Task CreateAsync(ProductConfigDto dto)
+        public async Task<int> CreateAsync(ProductConfigDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.Configname))
                 throw new Exception("Tên cấu hình không được để trống.");
@@ -53,6 +53,7 @@ namespace TetGift.BLL.Services
             };
             await _uow.GetRepository<ProductConfig>().AddAsync(entity);
             await _uow.SaveAsync();
+            return entity.Configid;
         }
 
         public async Task UpdateAsync(ProductConfigDto dto)

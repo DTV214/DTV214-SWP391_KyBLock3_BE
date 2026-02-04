@@ -11,7 +11,7 @@ public class ConfigDetailsController(IConfigDetailService service) : ControllerB
 {
     private readonly IConfigDetailService _service = service;
 
-    [HttpGet("/config/{configId}")]
+    [HttpGet("config/{configId}")]
     public async Task<IActionResult> GetByConfig(int configId)
     {
         var details = await _service.GetByConfigAsync(configId);
