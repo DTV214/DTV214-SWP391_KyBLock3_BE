@@ -51,7 +51,7 @@ namespace TetGift.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var configId = await _service.CreateWithDetailsAsync(request.Configname, request.Description, request.CategoryQuantities);
+            var configId = await _service.CreateAsync(request);
             return Ok(new ApiResponse<object>
             {
                 Status = 200,
@@ -71,7 +71,7 @@ namespace TetGift.Controllers
 
             try
             {
-                await _service.UpdateWithDetailsAsync(id, request.Configname, request.Description, request.CategoryQuantities);
+                await _service.UpdateAsync(id, request);
                 return Ok(new ApiResponse<object>
                 {
                     Status = 200,

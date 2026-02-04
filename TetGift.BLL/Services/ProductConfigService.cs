@@ -149,34 +149,17 @@ namespace TetGift.BLL.Services
             };
         }
 
-        public async Task<int> CreateAsync(ProductConfigDto dto)
+        public async Task<int> CreateAsync(CreateConfigRequest request)
         {
-            if (string.IsNullOrWhiteSpace(dto.Configname))
-                throw new Exception("Tên cấu hình không được để trống.");
-
-            var entity = new ProductConfig
-            {
-                Configname = dto.Configname,
-                Suitablesuggestion = dto.Suitablesuggestion,
-                Totalunit = dto.Totalunit,
-                Imageurl = dto.Imageurl
-            };
-            await _uow.GetRepository<ProductConfig>().AddAsync(entity);
-            await _uow.SaveAsync();
-            return entity.Configid;
-        }
-
-        public async Task<int> CreateWithDetailsAsync(string configname, string? description, Dictionary<int, int> categoryQuantities)
-        {
-            if (string.IsNullOrWhiteSpace(configname))
+            if (string.IsNullOrWhiteSpace(request.Configname))
                 throw new Exception("Tên cấu hình không được để trống.");
 
             // Create ProductConfig
             var config = new ProductConfig
             {
-                Configname = configname,
-                Suitablesuggestion = description,
-                Totalunit = 0,
+                Configname = request.Configname,
+                Suitablesuggestion = request.Description,
+                Totalunit = request.Totalunit,
                 Imageurl = null
             };
             await _uow.GetRepository<ProductConfig>().AddAsync(config);
@@ -184,7 +167,7 @@ namespace TetGift.BLL.Services
 
             // Create ConfigDetails for each category with quantity > 0
             var configDetailRepo = _uow.GetRepository<ConfigDetail>();
-            foreach (var kvp in categoryQuantities.Where(kv => kv.Value > 0))
+            foreach (var kvp in request.CategoryQuantities.Where(kv => kv.Value > 0))
             {
                 var detail = new ConfigDetail
                 {
@@ -199,30 +182,9 @@ namespace TetGift.BLL.Services
             return config.Configid;
         }
 
-        public async Task UpdateAsync(ProductConfigDto dto)
+        public async Task UpdateAsync(int configId, UpdateConfigRequest request)
         {
-            if (dto.Configname != null && string.IsNullOrWhiteSpace(dto.Configname))
-                throw new Exception("Tên không được để trống.");
-
-            if (dto.Totalunit.HasValue && dto.Totalunit <= 0)
-                throw new Exception("Tổng đơn vị phải lớn hơn 0.");
-
-            var repo = _uow.GetRepository<ProductConfig>();
-            var entity = await repo.GetByIdAsync(dto.Configid);
-            if (entity != null && entity.Isdeleted == false)
-            {
-                entity.Configname = dto.Configname;
-                entity.Suitablesuggestion = dto.Suitablesuggestion;
-                entity.Totalunit = dto.Totalunit;
-                entity.Imageurl = dto.Imageurl;
-                repo.Update(entity);
-                await _uow.SaveAsync();
-            }
-        }
-
-        public async Task UpdateWithDetailsAsync(int configId, string configname, string? description, Dictionary<int, int> categoryQuantities)
-        {
-            if (string.IsNullOrWhiteSpace(configname))
+            if (string.IsNullOrWhiteSpace(request.Configname))
                 throw new Exception("Tên không được để trống.");
 
             var repo = _uow.GetRepository<ProductConfig>();
@@ -231,8 +193,9 @@ namespace TetGift.BLL.Services
                 throw new Exception("Không tìm thấy cấu hình");
 
             // Update ProductConfig
-            entity.Configname = configname;
-            entity.Suitablesuggestion = description;
+            entity.Configname = request.Configname;
+            entity.Suitablesuggestion = request.Description;
+            entity.Totalunit = request.Totalunit;
             repo.Update(entity);
 
             // Delete existing ConfigDetails
@@ -247,7 +210,7 @@ namespace TetGift.BLL.Services
             }
 
             // Create new ConfigDetails
-            foreach (var kvp in categoryQuantities.Where(kv => kv.Value > 0))
+            foreach (var kvp in request.CategoryQuantities.Where(kv => kv.Value > 0))
             {
                 var detail = new ConfigDetail
                 {

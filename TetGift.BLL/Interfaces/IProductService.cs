@@ -16,6 +16,8 @@ public interface IProductService
     Task<ProductValidationDto> GetProductValidationStatus(int productId);
     Task<ProductDto> CloneBasketAsync(int templateId, int customerId, string? customName);
     Task<IEnumerable<ProductDto>> GetTemplatesAsync();
+    Task<IEnumerable<ProductDto>> GetAdminBasketsAsync(); // Lấy giỏ quà do admin/staff tạo
+    Task<ProductDto?> GetCustomProductByIdAsync(int productId); // Lấy chi tiết sản phẩm custom/basket để edit
     Task SetAsTemplateAsync(int productId);
     Task RemoveTemplateAsync(int productId);
 }

@@ -153,6 +153,30 @@ public class ProductsController(IProductService service) : BaseApiController
     }
 
     /// <summary>
+    /// Get custom product by ID with full details (for editing)
+    /// Returns product with all ProductDetails and nested child products
+    /// </summary>
+    [HttpGet("custom/{id}")]
+    public async Task<IActionResult> GetCustomProductById(int id)
+    {
+        var product = await _service.GetCustomProductByIdAsync(id);
+        if (product == null) return NotFound(new { message = "Không tìm thấy sản phẩm" });
+        return Ok(product);
+    }
+
+    /// <summary>
+    /// Get all baskets created by admin/staff (has ConfigId, not created by customers)
+    /// Returns all gift baskets managed by admin/staff including templates and other configs
+    /// </summary>
+    [HttpGet("admin-baskets")]
+    //[Authorize(Roles = "ADMIN,STAFF")]
+    public async Task<IActionResult> GetAdminBaskets()
+    {
+        var baskets = await _service.GetAdminBasketsAsync();
+        return Ok(baskets);
+    }
+
+    /// <summary>
     /// Clone a template basket to customer's account
     /// Creates a copy of Product + all ProductDetails
     /// </summary>

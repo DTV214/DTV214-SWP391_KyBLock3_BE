@@ -23,15 +23,19 @@ namespace TetGift.BLL.Dtos
 
     public class CreateConfigRequest
     {
+        [Required(ErrorMessage = "Tên cấu hình không được để trống")]
         public string Configname { get; set; } = null!;
         public string? Description { get; set; }
+        public decimal Totalunit { get; set; }
         public Dictionary<int, int> CategoryQuantities { get; set; } = new();
     }
 
     public class UpdateConfigRequest
     {
+        [Required(ErrorMessage = "Tên cấu hình không được để trống")]
         public string Configname { get; set; } = null!;
         public string? Description { get; set; }
+        public decimal Totalunit { get; set; }
         public Dictionary<int, int> CategoryQuantities { get; set; } = new();
     }
 
