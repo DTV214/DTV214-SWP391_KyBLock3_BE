@@ -10,4 +10,5 @@ public class ProductDetailResponse
     public decimal? Price { get; set; }
     public string? Imageurl { get; set; }
     public int? Quantity { get; set; }
+    public ProductDto? ChildProduct { get; set; }
 }

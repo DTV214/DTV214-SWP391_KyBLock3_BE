@@ -1,10 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using TetGift.BLL.Common;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
 namespace TetGift.Controllers
 {
+
     [Route("api/configs")]
     [ApiController]
     public class ProductConfigsController(IProductConfigService service) : ControllerBase
@@ -12,31 +15,69 @@ namespace TetGift.Controllers
         private readonly IProductConfigService _service = service;
 
         [HttpGet]
-        public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<ProductConfigDto>>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<IEnumerable<ProductConfigDto>>>> GetAll()
+        {
+            var data = await _service.GetAllAsync();
+            return Ok(new ApiResponse<IEnumerable<ProductConfigDto>>
+            {
+                Status = 200,
+                Msg = "OK",
+                Data = data
+            });
+        }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> Get(int id) => Ok(await _service.GetByIdAsync(id));
+        [ProducesResponseType(typeof(ApiResponse<ProductConfigDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponse<ProductConfigDto>>> Get(int id)
+        {
+            var data = await _service.GetByIdAsync(id);
+            if (data == null) return NotFound("Không tìm thấy cấu hình");
+            return Ok(new ApiResponse<ProductConfigDto>
+            {
+                Status = 200,
+                Msg = "OK",
+                Data = data
+            });
+        }
 
         [HttpPost]
         [Authorize]
-        public async Task<IActionResult> Create(ProductConfigDto dto)
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<ActionResult<ApiResponse<object>>> Create([FromBody] CreateConfigRequest request)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var configId = await _service.CreateAsync(dto);
-            return Ok(new { message = "Thêm mới thành công", configid = configId });
+            var configId = await _service.CreateWithDetailsAsync(request.Configname, request.Description, request.CategoryQuantities);
+            return Ok(new ApiResponse<object>
+            {
+                Status = 200,
+                Msg = "OK",
+                Data = new { configid = configId }
+            });
         }
 
-        [HttpPut]
+        [HttpPut("{id}")]
         [Authorize]
-        public async Task<IActionResult> Update(ProductConfigDto dto)
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<ActionResult<ApiResponse<object>>> Update(int id, [FromBody] UpdateConfigRequest request)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             try
             {
-                await _service.UpdateAsync(dto);
-                return Ok(new { message = "Cập nhật thành công" });
+                await _service.UpdateWithDetailsAsync(id, request.Configname, request.Description, request.CategoryQuantities);
+                return Ok(new ApiResponse<object>
+                {
+                    Status = 200,
+                    Msg = "OK",
+                    Data = null
+                });
             }
             catch (Exception ex)
             {
@@ -46,10 +87,17 @@ namespace TetGift.Controllers
 
         [HttpDelete("{id}")]
         [Authorize]
-        public async Task<IActionResult> Delete(int id)
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<ActionResult<ApiResponse<object>>> Delete(int id)
         {
             await _service.DeleteAsync(id);
-            return Ok(new { message = "Xóa thành công" });
+            return Ok(new ApiResponse<object>
+            {
+                Status = 200,
+                Msg = "OK",
+                Data = null
+            });
         }
     }
 }

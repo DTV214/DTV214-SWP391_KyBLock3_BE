@@ -20,6 +20,7 @@ namespace TetGift.BLL.Dtos
         public int? TotalQuantity { get; set; }
         public decimal? Unit { get; set; }
         public bool IsCustom { get; set; } = false;
+        public List<ProductDetailResponse>? ProductDetails { get; set; }
     }
     //DTO tạo sản phẩm đơn lẻ
     public class CreateSingleProductRequest
@@ -111,28 +112,7 @@ namespace TetGift.BLL.Dtos
         // List of product details to update (null = không update, empty = xóa hết, có items = replace)
         public List<ProductDetailRequest>? ProductDetails { get; set; }
     }
-
-    // DTO trả về Product đầy đủ thông tin
-    public class ProductDetailDto
-    {
-        public int Productid { get; set; }
-        public int? Categoryid { get; set; }
-        public string? CategoryName { get; set; }
-        public int? Configid { get; set; }
-        public string? ConfigName { get; set; }
-        public int? Accountid { get; set; }
-        public string? Sku { get; set; }
-        public string? Productname { get; set; }
-        public string? Description { get; set; }
-        public decimal? Price { get; set; }
-        public string? Status { get; set; }
-        public decimal? Unit { get; set; }
-        public string? ImageUrl { get; set; }
-        public bool IsCustom { get; set; } = false;
-        public List<ProductDetailResponse> ProductDetails { get; set; } = new();
-        public ProductConfigDetailDto? Config { get; set; }
-        public StockAvailabilityDto? StockInfo { get; set; } // Thông tin tồn kho (chỉ cho sản phẩm đơn)
-    }
+    
 
     // DTO validate giỏ quà theo Config
     public class ValidateComboRequest

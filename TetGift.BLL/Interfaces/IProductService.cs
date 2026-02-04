@@ -6,10 +6,10 @@ public interface IProductService
 {
     Task<IEnumerable<ProductDto>> GetAllAsync();
     Task<ProductDto?> GetByIdAsync(int id);
-    Task<IEnumerable<ProductDto>> GetByAccountIdAsync(int accountId);
-    Task<IEnumerable<CustomerBasketDto>> GetCustomerBasketsByAccountIdAsync(int accountId);
-    Task CreateNormalAsync(CreateSingleProductRequest dto);
-    Task CreateCustomAsync(CreateComboProductRequest dto);
+    Task<IEnumerable<ProductDto>> GetByAccountIdAsync(int accountId); // cho admin lấy giỏ mẫu
+    Task<IEnumerable<CustomerBasketDto>> GetCustomerBasketsByAccountIdAsync(int accountId); //  cho customer lấy giỏ tự tạo
+    Task CreateNormalAsync(CreateSingleProductRequest dto); // admin tạo sản phẩm thường
+    Task CreateCustomAsync(CreateComboProductRequest dto); // tạo nguyên 1 giỏ quà
     Task<UpdateProductDto> UpdateNormalAsync(ProductDto dto);
     Task<UpdateProductDto> UpdateCustomAsync(int productId, UpdateComboProductRequest dto, int? requestingAccountId);
     Task DeleteAsync(int id);
