@@ -7,44 +7,145 @@ using TetGift.DAL.Interfaces;
 
 namespace TetGift.BLL.Services;
 
-public class ProductService(IUnitOfWork uow) : IProductService
+public class ProductService(IUnitOfWork uow, IInventoryService inventoryService) : IProductService
 {
     private readonly IUnitOfWork _uow = uow;
 
-    public async Task CreateNormalAsync(ProductDto dto)
+    public async Task CreateNormalAsync(CreateSingleProductRequest dto)
     {
-        if (dto.Categoryid == null || !dto.Categoryid.HasValue
-            || dto.Accountid == null || !dto.Accountid.HasValue
-            || string.IsNullOrWhiteSpace(dto.Sku)
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(dto.Sku)
             || string.IsNullOrWhiteSpace(dto.Productname)
-            || dto.Price == null || !dto.Price.HasValue || dto.Price.Value <= 0
-            || dto.Unit == null || !dto.Unit.HasValue || dto.Unit.Value <= 0)
+            || dto.Price <= 0
+            || dto.Unit <= 0)
         {
-            throw new Exception("Thiếu thông tin bắt buộc cho sản phẩm thường (Category, Account, SKU, Name, Price, Unit).");
+            throw new Exception("Thiếu thông tin bắt buộc cho sản phẩm thường (SKU, Name, Price, Unit).");
         }
 
+        // Note: Accountid will be set from authenticated user context in controller
         await ValidateForeignKeys(dto.Accountid, null, dto.Categoryid);
 
+        // Create Product entity
         var entity = MapToEntity(dto);
         await _uow.GetRepository<Product>().AddAsync(entity);
         await _uow.SaveAsync();
     }
 
-    public async Task CreateCustomAsync(ProductDto dto)
+    public async Task CreateCustomAsync(CreateComboProductRequest dto)
     {
-        if (dto.Accountid == null || !dto.Accountid.HasValue
-            || string.IsNullOrWhiteSpace(dto.Productname))
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(dto.Productname))
         {
-            throw new Exception("Thiếu thông tin bắt buộc cho sản phẩm tùy chỉnh (ConfigId, AccountId, ProductName).");
+            throw new Exception("Tên sản phẩm không được để trống.");
         }
 
-        await ValidateForeignKeys(dto.Accountid, dto.Configid, null);
-        dto.Unit = 0;
-        dto.Price = 0;
+        if (dto.ProductDetails == null || !dto.ProductDetails.Any())
+        {
+            throw new Exception("Giỏ quà phải có ít nhất 1 sản phẩm.");
+        }
 
-        var entity = MapToEntity(dto);
+        // Validate foreign keys (Config and Account)
+        await ValidateForeignKeys(dto.Accountid, dto.Configid, null);
+
+        // Load ProductConfig with ConfigDetails to validate category requirements
+        var config = await _uow.GetRepository<ProductConfig>().FindAsync(
+            c => c.Configid == dto.Configid && c.Isdeleted == false,
+            include: q => q.Include(c => c.ConfigDetails)
+                .ThenInclude(cd => cd.Category)
+        );
+        
+        if (config == null)
+            throw new Exception($"Không tìm thấy cấu hình giỏ quà với ID {dto.Configid}.");
+
+        // Validate all ProductIds in ProductDetails exist and match config requirements
+        decimal totalWeight = 0;
+        var validCategoryIds = config.ConfigDetails?.Select(cd => cd.Categoryid).ToHashSet() ?? new HashSet<int?>();
+        
+        foreach (var detail in dto.ProductDetails)
+        {
+            if (!detail.Productid.HasValue)
+                throw new Exception("ProductId không được để trống trong ProductDetails.");
+            
+            var product = await _uow.GetRepository<Product>().FindAsync(
+                p => p.Productid == detail.Productid.Value && !p.Status.Equals(ProductStatus.DELETED),
+                include: p => p.Include(pr => pr.Category)
+            );
+            
+            if (product == null)
+                throw new Exception($"Sản phẩm với ID {detail.Productid} không tồn tại hoặc đã bị xóa.");
+            
+            // Validate product category belongs to config's allowed categories
+            if (validCategoryIds.Any())
+            {
+                if (!product.Categoryid.HasValue || !validCategoryIds.Contains(product.Categoryid))
+                {
+                    var allowedCategories = string.Join(", ", 
+                        config.ConfigDetails?.Select(cd => cd.Category?.Categoryname ?? "N/A") ?? new List<string>());
+                    throw new Exception(
+                        $"Sản phẩm '{product.Productname}' thuộc danh mục không hợp lệ. " +
+                        $"Danh mục cho phép: {allowedCategories}");
+                }
+            }
+            
+            // Calculate total weight
+            var quantity = detail.Quantity ?? 1;
+            var productWeight = product.Unit ?? 0;
+            totalWeight += productWeight * quantity;
+        }
+
+        // Validate total weight doesn't exceed config limit
+        if (config.Totalunit.HasValue && totalWeight > config.Totalunit.Value)
+        {
+            throw new Exception(
+                $"Tổng trọng lượng giỏ quà ({totalWeight}g) vượt quá giới hạn cho phép ({config.Totalunit.Value}g). " +
+                $"Vui lòng giảm số lượng sản phẩm.");
+        }
+
+        // Create Product entity (combo/basket)
+        var entity = new Product
+        {
+            Configid = dto.Configid,
+            Accountid = dto.Accountid,
+            Productname = dto.Productname,
+            Description = dto.Description,
+            ImageUrl = dto.ImageUrl,
+            Status = dto.Status ?? ProductStatus.DRAFT,
+            Unit = 0,  // Will be calculated from ProductDetails
+            Price = 0  // Will be calculated from ProductDetails
+        };
+
         await _uow.GetRepository<Product>().AddAsync(entity);
         await _uow.SaveAsync();
+
+        // Create ProductDetails
+        if (dto.ProductDetails.Any())
+        {
+            var detailRepo = _uow.GetRepository<ProductDetail>();
+            var productDetails = dto.ProductDetails.Select(d => new ProductDetail
+            {
+                Productparentid = entity.Productid,
+                Productid = d.Productid,
+                Quantity = d.Quantity ?? 1
+            }).ToList();
+
+            await detailRepo.AddRangeAsync(productDetails);
+            await _uow.SaveAsync();
+            
+            // Recalculate Unit and Price after adding details
+            var createdProduct = await _uow.GetRepository<Product>().FindAsync(
+                p => p.Productid == entity.Productid,
+                include: q => q.Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+            );
+            
+            if (createdProduct != null)
+            {
+                createdProduct.CalculateUnit();
+                createdProduct.CalculateTotalPrice();
+                _uow.GetRepository<Product>().Update(createdProduct);
+                await _uow.SaveAsync();
+            }
+        }
     }
 
     public async Task<IEnumerable<ProductDto>> GetAllAsync()
@@ -54,7 +155,8 @@ public class ProductService(IUnitOfWork uow) : IProductService
                 && !p.Status.Equals(ProductStatus.DELETED)
                 && !p.Status.Equals(ProductStatus.DRAFT)
                 && (p.Status.Equals(ProductStatus.ACTIVE) || p.Status.Equals(ProductStatus.INACTIVE)),
-            include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
+            include: p => p.Include(p => p.Stocks)
+                .Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
         return products.Select(p =>
         {
@@ -71,6 +173,18 @@ public class ProductService(IUnitOfWork uow) : IProductService
                 Productname = p.Productname,
                 Description = p.Description,
                 Price = p.Price,
+                TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                Stocks = p.Stocks?.Select(s => new StockDto
+                {
+                    StockId = s.Stockid,
+                    ProductId = s.Productid ?? 0,
+                    ProductName = p.Productname ?? string.Empty,
+                    Quantity = s.Stockquantity ?? 0,
+                    ExpiryDate = s.Expirydate.HasValue ? s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) : null,
+                    Status = s.Status ?? string.Empty,
+                    ProductionDate = s.Productiondate.HasValue ? s.Productiondate.Value.ToDateTime(TimeOnly.MinValue) : null,
+                    LastUpdated = s.Lastupdated
+                }).ToList(),
                 Status = p.Status,
                 Unit = p.Unit,
                 ImageUrl = p.ImageUrl
@@ -82,7 +196,8 @@ public class ProductService(IUnitOfWork uow) : IProductService
     {
         var product = await _uow.GetRepository<Product>().FindAsync(
             p => p.Productid == id && !p.Status.Equals(ProductStatus.DELETED),
-            include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
+            include: p => p.Include(p => p.Stocks)
+                .Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product).ThenInclude(s => s.Stocks)
             );
         if (product == null) return null;
         product.CalculateUnit();
@@ -98,6 +213,18 @@ public class ProductService(IUnitOfWork uow) : IProductService
             Productname = product.Productname,
             Description = product.Description,
             Price = product.Price,
+            TotalQuantity = product.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+            Stocks = product.Stocks?.Select(s => new StockDto
+            {
+                StockId = s.Stockid,
+                ProductId = s.Productid ?? 0,
+                ProductName = product.Productname ?? string.Empty,
+                Quantity = s.Stockquantity ?? 0,
+                ExpiryDate = s.Expirydate.HasValue ? s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) : null,
+                Status = s.Status ?? string.Empty,
+                ProductionDate = s.Productiondate.HasValue ? s.Productiondate.Value.ToDateTime(TimeOnly.MinValue) : null,
+                LastUpdated = s.Lastupdated
+            }).ToList(),
             Status = product.Status,
             Unit = product.Unit,
             ImageUrl = product.ImageUrl
@@ -108,7 +235,8 @@ public class ProductService(IUnitOfWork uow) : IProductService
     {
         var products = await _uow.GetRepository<Product>()
             .GetAllAsync(p => p.Accountid == accountId && !p.Status.Equals(ProductStatus.DELETED),
-            include: p => p.Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
+            include: p => p.Include(p => p.Stocks)
+                .Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
 
         return products.Select(p =>
@@ -125,6 +253,18 @@ public class ProductService(IUnitOfWork uow) : IProductService
                 Productname = p.Productname,
                 Description = p.Description,
                 Price = p.Price,
+                TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                Stocks = p.Stocks?.Select(s => new StockDto
+                {
+                    StockId = s.Stockid,
+                    ProductId = s.Productid ?? 0,
+                    ProductName = p.Productname ?? string.Empty,
+                    Quantity = s.Stockquantity ?? 0,
+                    ExpiryDate = s.Expirydate.HasValue ? s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) : null,
+                    Status = s.Status ?? string.Empty,
+                    ProductionDate = s.Productiondate.HasValue ? s.Productiondate.Value.ToDateTime(TimeOnly.MinValue) : null,
+                    LastUpdated = s.Lastupdated
+                }).ToList(),
                 Status = p.Status,
                 Unit = p.Unit,
                 ImageUrl = p.ImageUrl
@@ -132,18 +272,69 @@ public class ProductService(IUnitOfWork uow) : IProductService
         });
     }
 
-    private Product MapToEntity(ProductDto dto)
+    /// <summary>
+    /// Get customer's custom baskets (giỏ quà tự tạo)
+    /// Returns parent product (basket) with child products details
+    /// </summary>
+    public async Task<IEnumerable<CustomerBasketDto>> GetCustomerBasketsByAccountIdAsync(int accountId)
+    {
+        var products = await _uow.GetRepository<Product>()
+            .GetAllAsync(
+                p => p.Accountid == accountId 
+                    && p.Configid.HasValue  // Only custom baskets
+                    && !p.Status.Equals(ProductStatus.DELETED)
+                    && !p.Status.Equals(ProductStatus.TEMPLATE),
+                include: p => p
+                    .Include(p => p.Config)
+                    .Include(p => p.ProductDetailProductparents)
+                        .ThenInclude(pd => pd.Product)
+                        .ThenInclude(prod => prod.Stocks)
+            );
+
+        return products.Select(basket =>
+        {
+            basket.CalculateUnit();
+            basket.CalculateTotalPrice();
+
+            return new CustomerBasketDto
+            {
+                Productid = basket.Productid,
+                Configid = basket.Configid,
+                ConfigName = basket.Config?.Configname,
+                Productname = basket.Productname,
+                Description = basket.Description,
+                ImageUrl = basket.ImageUrl,
+                Status = basket.Status,
+                TotalPrice = basket.Price ?? 0,
+                TotalWeight = basket.Unit ?? 0,
+                ProductDetails = basket.ProductDetailProductparents.Select(pd => new BasketProductDetailDto
+                {
+                    Productdetailid = pd.Productdetailid,
+                    Productid = pd.Productid ?? 0,
+                    Productname = pd.Product?.Productname ?? "Unknown",
+                    Sku = pd.Product?.Sku,
+                    Price = pd.Product?.Price ?? 0,
+                    Unit = pd.Product?.Unit ?? 0,
+                    Quantity = pd.Quantity ?? 1,
+                    ImageUrl = pd.Product?.ImageUrl,
+                    TotalQuantityInStock = pd.Product?.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                    Subtotal = (pd.Product?.Price ?? 0) * (pd.Quantity ?? 1)
+                }).ToList()
+            };
+        });
+    }
+
+    private Product MapToEntity(CreateSingleProductRequest dto)
     {
         return new Product
         {
             Categoryid = dto.Categoryid,
-            Configid = dto.Configid,
             Accountid = dto.Accountid,
             Sku = dto.Sku,
             Productname = dto.Productname,
             Description = dto.Description,
             Price = dto.Price,
-            Status = dto.Status ?? ProductStatus.ACTIVE,
+            Status = ProductStatus.ACTIVE,
             Unit = dto.Unit,
             ImageUrl = dto.ImageUrl
         };
@@ -245,61 +436,200 @@ public class ProductService(IUnitOfWork uow) : IProductService
         return new UpdateProductDto();
     }
 
-    public async Task<UpdateProductDto> UpdateCustomAsync(ProductDto dto, bool isCustomer)
+    /// <summary>
+    /// Update custom basket/combo product (customer's custom gift basket)
+    /// </summary>
+    public async Task<UpdateProductDto> UpdateCustomAsync(int productId, UpdateComboProductRequest dto, int? requestingAccountId)
     {
         var repo = _uow.GetRepository<Product>();
-        var result = await repo.FindAsync(
-            e => e.Productid == dto.Productid && !e.Status.Equals(ProductStatus.DELETED)
-            );
-        if (!result.Any()) throw new Exception("Không tìm thấy sản phẩm.");
-        var entity = result.First();
+        var userRepo = _uow.GetRepository<Account>();
+        
+        // Check if requesting user is customer
+        var requestingUser = await userRepo.FindAsync(
+            a => a.Accountid == requestingAccountId
+        );
+        bool isCustomer = requestingUser.Any() && requestingUser.First().Role.Equals(UserRole.CUSTOMER);
+
+        // Build query with additional filter for customer
+        var productQuery = repo.FindAsync(
+            p => p.Productid == productId 
+                && p.Configid.HasValue  // Must be custom basket
+                && !p.Status.Equals(ProductStatus.DELETED)
+                && (!isCustomer || p.Accountid == requestingAccountId),  // Customer can only see their own baskets
+            include: q => q.Include(p => p.Config)
+                    .ThenInclude(c => c.ConfigDetails)
+                    .ThenInclude(cd => cd.Category)
+                .Include(p => p.Account)
+                .Include(p => p.ProductDetailProductparents)
+        );
+
+        var product = await productQuery;
+
+        if (product == null) 
+        {
+            if (isCustomer)
+                throw new Exception("Không tìm thấy giỏ quà của bạn hoặc bạn không có quyền chỉnh sửa giỏ quà này.");
+            else
+                throw new Exception("Không tìm thấy giỏ quà hoặc sản phẩm không phải giỏ quà tùy chỉnh.");
+        }
 
         var response = new UpdateProductDto();
 
-        #region Validation Account, Cate, Blank String, Number Property
+        // Check if basket belongs to a customer
+        bool basketBelongsToCustomer = product.Account != null && product.Account.Role.Equals(UserRole.CUSTOMER);
 
-        // 0. Validate same account
-        if (isCustomer && entity.Accountid != dto.Accountid)
-            throw new Exception("Người chỉnh sửa sản phẩm không phải người đã tạo ra sản phẩm.");
-
-        // 1. Validate ConfigId và Logic Unit
-        if (dto.Configid.HasValue)
+        // Admin cannot update customer's custom baskets
+        if (!isCustomer && basketBelongsToCustomer)
         {
-            var configResult = await _uow.GetRepository<ProductConfig>().FindAsync(
-                            c => c.Configid == dto.Configid.Value && c.Isdeleted == false
-                            );
-            if (!configResult.Any()) throw new Exception($"ConfigId {dto.Configid} không tồn tại.");
-            var config = configResult.First();
+            throw new Exception("Admin không thể chỉnh sửa giỏ quà tự tạo của khách hàng. Chỉ khách hàng mới có quyền chỉnh sửa giỏ quà của mình.");
+        }
 
-            entity.Configid = dto.Configid;
+        // Additional validation for customer-owned baskets
+        if (isCustomer)
+        {
+            // Customer can only update their own DRAFT or ACTIVE baskets
+            if (product.Status == ProductStatus.TEMPLATE)
+                throw new Exception("Không thể chỉnh sửa template giỏ quà. Vui lòng clone template trước.");
+            
+            // Customer cannot change basket to certain statuses
+            if (dto.Status != null && !new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE }.Contains(dto.Status))
+                throw new Exception("Khách hàng chỉ có thể đặt trạng thái DRAFT hoặc ACTIVE.");
+        }
 
-            // So sánh Unit của Product với Totalunit của Config
-            decimal currentUnit = dto.Unit ?? entity.Unit ?? 0;
-            if (config.Totalunit.HasValue && currentUnit > config.Totalunit.Value)
+        // Update basic info
+        if (!string.IsNullOrWhiteSpace(dto.Productname))
+            product.Productname = dto.Productname;
+        
+        if (dto.Description != null)
+            product.Description = dto.Description;
+        
+        if (dto.ImageUrl != null)
+            product.ImageUrl = dto.ImageUrl;
+
+        // Validate and update Status
+        if (dto.Status != null)
+        {
+            var validStatuses = isCustomer 
+                ? new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE }
+                : new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE, ProductStatus.INACTIVE };
+            
+            if (!validStatuses.Contains(dto.Status))
+                throw new Exception($"Trạng thái không hợp lệ. Chỉ chấp nhận: {string.Join(", ", validStatuses)}");
+            
+            product.Status = dto.Status;
+        }
+
+        // Update ProductDetails if provided
+        if (dto.ProductDetails != null)
+        {
+            // Load config details to validate categories
+            var validCategoryIds = product.Config?.ConfigDetails?.Select(cd => cd.Categoryid).ToHashSet() ?? new HashSet<int?>();
+            decimal totalWeight = 0;
+            
+            // Validate all ProductIds exist and are available
+            foreach (var detail in dto.ProductDetails)
             {
-                response.Warning = $"Cảnh báo: Đơn vị sản phẩm ({currentUnit}) vượt quá hạn mức cấu hình ({config.Totalunit.Value}).";
+                if (!detail.Productid.HasValue)
+                    throw new Exception("ProductId không được để trống trong ProductDetails.");
+                
+                var childProduct = await _uow.GetRepository<Product>().FindAsync(
+                    p => p.Productid == detail.Productid.Value 
+                        && p.Status == ProductStatus.ACTIVE,
+                    include: p => p.Include(pr => pr.Category)
+                );
+                
+                if (childProduct == null)
+                    throw new Exception($"Sản phẩm với ID {detail.Productid} không tồn tại hoặc không khả dụng.");
+                
+                // Validate product category belongs to config's allowed categories
+                if (product.Config != null && validCategoryIds.Any())
+                {
+                    if (!childProduct.Categoryid.HasValue || !validCategoryIds.Contains(childProduct.Categoryid))
+                    {
+                        var allowedCategories = string.Join(", ", 
+                            product.Config.ConfigDetails?.Select(cd => cd.Category?.Categoryname ?? "N/A") ?? new List<string>());
+                        throw new Exception(
+                            $"Sản phẩm '{childProduct.Productname}' thuộc danh mục không hợp lệ. " +
+                            $"Danh mục cho phép: {allowedCategories}");
+                    }
+                }
+                
+                // Calculate total weight
+                var quantity = detail.Quantity ?? 1;
+                var productWeight = childProduct.Unit ?? 0;
+                totalWeight += productWeight * quantity;
+                
+                // For customer: validate product has sufficient stock if quantity is high
+                if (isCustomer && quantity > 10)
+                {
+                    var stocks = await _uow.GetRepository<Stock>().GetAllAsync(
+                        s => s.Productid == detail.Productid && s.Status == StockStatus.ACTIVE
+                    );
+                    var totalStock = stocks.Sum(s => s.Stockquantity) ?? 0;
+                    
+                    if (totalStock == 0)
+                        throw new Exception($"Sản phẩm '{childProduct.Productname}' hiện đang hết hàng.");
+                }
+            }
+
+            // Validate total weight doesn't exceed config limit
+            if (product.Config?.Totalunit.HasValue == true && totalWeight > product.Config.Totalunit.Value)
+            {
+                throw new Exception(
+                    $"Tổng trọng lượng giỏ quà ({totalWeight}g) vượt quá giới hạn cho phép ({product.Config.Totalunit.Value}g). " +
+                    $"Vui lòng giảm số lượng sản phẩm.");
+            }
+
+            // Remove old ProductDetails
+            var detailRepo = _uow.GetRepository<ProductDetail>();
+            var oldDetails = product.ProductDetailProductparents.ToList();
+            foreach (var oldDetail in oldDetails)
+            {
+                await detailRepo.DeleteAsync(oldDetail);
+            }
+
+            // Add new ProductDetails
+            var newDetails = dto.ProductDetails.Select(d => new ProductDetail
+            {
+                Productparentid = product.Productid,
+                Productid = d.Productid,
+                Quantity = d.Quantity ?? 1
+            }).ToList();
+
+            await detailRepo.AddRangeAsync(newDetails);
+        }
+
+        repo.Update(product);
+        await _uow.SaveAsync();
+
+        // Recalculate Unit and Price after ProductDetails change
+        if (dto.ProductDetails != null)
+        {
+            // Reload with updated details
+            var updatedProduct = await repo.FindAsync(
+                p => p.Productid == productId,
+                include: q => q.Include(p => p.Config)
+                    .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+            );
+            
+            if (updatedProduct != null)
+            {
+                updatedProduct.CalculateUnit();
+                updatedProduct.CalculateTotalPrice();
+                
+                // Check config limits
+                if (updatedProduct.Config?.Totalunit.HasValue == true 
+                    && updatedProduct.Unit > updatedProduct.Config.Totalunit.Value)
+                {
+                    response.Warning = $"Cảnh báo: Trọng lượng giỏ quà ({updatedProduct.Unit}) vượt quá giới hạn cấu hình ({updatedProduct.Config.Totalunit.Value}).";
+                }
+                
+                repo.Update(updatedProduct);
+                await _uow.SaveAsync();
             }
         }
 
-        // 2. Validate string không trống
-        if (dto.Productname != null)
-        {
-            if (string.IsNullOrWhiteSpace(dto.Productname)) throw new Exception("Tên không được để trống.");
-            entity.Productname = dto.Productname;
-        }
-        if (dto.Status != null)
-        {
-            if (string.IsNullOrWhiteSpace(dto.Status)
-                || (!dto.Status.Equals(ProductStatus.ACTIVE) && !dto.Status.Equals(ProductStatus.INACTIVE)
-                && !dto.Status.Equals("OUT_OF_STOCK")
-                )) throw new Exception("Trạng thái không được để trống hoặc sai syntax.");
-            entity.Status = dto.Status;
-        }
-
-        #endregion
-
-        repo.Update(entity);
-        await _uow.SaveAsync();
         return response;
     }
 
@@ -362,11 +692,14 @@ public class ProductService(IUnitOfWork uow) : IProductService
     public async Task<IEnumerable<ProductDto>> GetTemplatesAsync()
     {
         var templates = await _uow.GetRepository<Product>().GetAllAsync(
-            p => p.Status == ProductStatus.TEMPLATE && p.Configid.HasValue,
+            p => p.Status == ProductStatus.TEMPLATE || p.Configid.HasValue,
             include: p => p
                 .Include(p => p.Config)
+                .Include(p => p.Account)
+                .Include(p => p.Stocks)
                 .Include(p => p.ProductDetailProductparents)
                     .ThenInclude(pd => pd.Product)
+                    .ThenInclude(prod => prod.Stocks)
         );
 
         return templates.Select(p =>
@@ -384,12 +717,155 @@ public class ProductService(IUnitOfWork uow) : IProductService
                 Productname = p.Productname,
                 Description = p.Description,
                 Price = p.Price,
+                TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
                 Status = p.Status,
                 Unit = p.Unit,
                 ImageUrl = p.ImageUrl,
-                IsCustom = true
+                IsCustom = true,
+                ProductDetails = p.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
+                {
+                    Productdetailid = pd.Productdetailid,
+                    Productid = pd.Productid,
+                    Quantity = pd.Quantity,
+                    ChildProduct = pd.Product != null ? new ProductDto
+                    {
+                        Productid = pd.Product.Productid,
+                        Categoryid = pd.Product.Categoryid,
+                        Sku = pd.Product.Sku,
+                        Productname = pd.Product.Productname,
+                        Description = pd.Product.Description,
+                        Price = pd.Product.Price,
+                        TotalQuantity = pd.Product.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                        Status = pd.Product.Status,
+                        Unit = pd.Product.Unit,
+                        ImageUrl = pd.Product.ImageUrl
+                    } : null
+                }).ToList()
             };
-        });
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Get custom product by ID with full details (for editing)
+    /// Returns product with ProductDetails and nested child products
+    /// </summary>
+    public async Task<ProductDto?> GetCustomProductByIdAsync(int productId)
+    {
+        var product = await _uow.GetRepository<Product>().FindAsync(
+            p => p.Productid == productId
+                && p.Configid.HasValue
+                && !p.Status.Equals(ProductStatus.DELETED),
+            include: p => p
+                .Include(p => p.Config)
+                .Include(p => p.Account)
+                .Include(p => p.Stocks)
+                .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+                    .ThenInclude(prod => prod.Stocks)
+        );
+
+        if (product == null) return null;
+
+        product.CalculateUnit();
+        product.CalculateTotalPrice();
+
+        return new ProductDto
+        {
+            Productid = product.Productid,
+            Categoryid = product.Categoryid,
+            Configid = product.Configid,
+            Accountid = product.Accountid,
+            Sku = product.Sku,
+            Productname = product.Productname,
+            Description = product.Description,
+            Price = product.Price,
+            TotalQuantity = product.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+            Status = product.Status,
+            Unit = product.Unit,
+            ImageUrl = product.ImageUrl,
+            IsCustom = true,
+            ProductDetails = product.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
+            {
+                Productdetailid = pd.Productdetailid,
+                Productid = pd.Productid,
+                Quantity = pd.Quantity,
+                ChildProduct = pd.Product != null ? new ProductDto
+                {
+                    Productid = pd.Product.Productid,
+                    Categoryid = pd.Product.Categoryid,
+                    Sku = pd.Product.Sku,
+                    Productname = pd.Product.Productname,
+                    Description = pd.Product.Description,
+                    Price = pd.Product.Price,
+                    TotalQuantity = pd.Product.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                    Status = pd.Product.Status,
+                    Unit = pd.Product.Unit,
+                    ImageUrl = pd.Product.ImageUrl
+                } : null
+            }).ToList()
+        };
+    }
+
+    /// <summary>
+    /// Get all baskets (products with ConfigId) created by admin/staff
+    /// Excludes customer-created baskets
+    /// </summary>
+    public async Task<IEnumerable<ProductDto>> GetAdminBasketsAsync()
+    {
+        var baskets = await _uow.GetRepository<Product>().GetAllAsync(
+            p => p.Configid.HasValue
+                && (p.Account == null || !p.Account.Role.Equals(UserRole.CUSTOMER))
+                && !p.Status.Equals(ProductStatus.DELETED),
+            include: p => p
+                .Include(p => p.Config)
+                .Include(p => p.Account)
+                .Include(p => p.Stocks)
+                .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+                    .ThenInclude(prod => prod.Stocks)
+        );
+
+        return baskets.Select(p =>
+        {
+            p.CalculateUnit();
+            p.CalculateTotalPrice();
+
+            return new ProductDto
+            {
+                Productid = p.Productid,
+                Categoryid = p.Categoryid,
+                Configid = p.Configid,
+                Accountid = p.Accountid,
+                Sku = p.Sku,
+                Productname = p.Productname,
+                Description = p.Description,
+                Price = p.Price,
+                TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                Status = p.Status,
+                Unit = p.Unit,
+                ImageUrl = p.ImageUrl,
+                IsCustom = true,
+                ProductDetails = p.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
+                {
+                    Productdetailid = pd.Productdetailid,
+                    Productid = pd.Productid,
+                    Quantity = pd.Quantity,
+                    ChildProduct = pd.Product != null ? new ProductDto
+                    {
+                        Productid = pd.Product.Productid,
+                        Categoryid = pd.Product.Categoryid,
+                        Sku = pd.Product.Sku,
+                        Productname = pd.Product.Productname,
+                        Description = pd.Product.Description,
+                        Price = pd.Product.Price,
+                        TotalQuantity = pd.Product.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                        Status = pd.Product.Status,
+                        Unit = pd.Product.Unit,
+                        ImageUrl = pd.Product.ImageUrl
+                    } : null
+                }).ToList()
+            };
+        }).ToList();
     }
 
     public async Task<ProductDto> CloneBasketAsync(int templateId, int customerId, string? customName)
@@ -399,6 +875,7 @@ public class ProductService(IUnitOfWork uow) : IProductService
             p => p.Productid == templateId && p.Status == ProductStatus.TEMPLATE,
             include: q => q
                 .Include(p => p.Config)
+                    .ThenInclude(c => c.ConfigDetails)
                 .Include(p => p.ProductDetailProductparents)
                     .ThenInclude(pd => pd.Product)
         );
@@ -443,19 +920,58 @@ public class ProductService(IUnitOfWork uow) : IProductService
         }
 
         await _uow.SaveAsync();
-
+        
+        // 3. Reload with full details to return complete DTO (similar to GetCustomProductByIdAsync but without Stocks)
+        var clonedBasket = await _uow.GetRepository<Product>().FindAsync(
+            p => p.Productid == newBasket.Productid,
+            include: p => p
+                .Include(p => p.Config)
+                    .ThenInclude(c => c.ConfigDetails)
+                .Include(p => p.Account)
+                .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+        );
+        
+        if (clonedBasket == null)
+            throw new Exception("Lỗi khi tạo giỏ quà clone.");
+        
+        clonedBasket.CalculateUnit();
+        clonedBasket.CalculateTotalPrice();
+        
         return new ProductDto
         {
-            Productid = newBasket.Productid,
-            Configid = newBasket.Configid,
-            Accountid = newBasket.Accountid,
-            Productname = newBasket.Productname,
-            Description = newBasket.Description,
-            ImageUrl = newBasket.ImageUrl,
-            Price = newBasket.Price,
-            Unit = newBasket.Unit,
-            Status = newBasket.Status,
-            IsCustom = true
+            Productid = clonedBasket.Productid,
+            Categoryid = clonedBasket.Categoryid,
+            Configid = clonedBasket.Configid,
+            Accountid = clonedBasket.Accountid,
+            Sku = clonedBasket.Sku,
+            Productname = clonedBasket.Productname,
+            Description = clonedBasket.Description,
+            Price = clonedBasket.Price,
+            TotalQuantity = 0,  // Not including stock data as per requirement
+            Status = clonedBasket.Status,
+            Unit = clonedBasket.Unit,
+            ImageUrl = clonedBasket.ImageUrl,
+            IsCustom = true,
+            ProductDetails = clonedBasket.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
+            {
+                Productdetailid = pd.Productdetailid,
+                Productid = pd.Productid,
+                Quantity = pd.Quantity,
+                ChildProduct = pd.Product != null ? new ProductDto
+                {
+                    Productid = pd.Product.Productid,
+                    Categoryid = pd.Product.Categoryid,
+                    Sku = pd.Product.Sku,
+                    Productname = pd.Product.Productname,
+                    Description = pd.Product.Description,
+                    Price = pd.Product.Price,
+                    TotalQuantity = 0,  // Not including stock data
+                    Status = pd.Product.Status,
+                    Unit = pd.Product.Unit,
+                    ImageUrl = pd.Product.ImageUrl
+                } : null
+            }).ToList()
         };
     }
 
