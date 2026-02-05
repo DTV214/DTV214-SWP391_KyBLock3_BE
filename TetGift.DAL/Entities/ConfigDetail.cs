@@ -19,7 +19,7 @@ public partial class ConfigDetail
     /// <summary>
     /// Reference to the ProductConfig (basket template)
     /// </summary>
-    public int? Configid { get; set; }
+    public int? Configid { get; set; } // ConfigId của giỏ Tết
 
     /// <summary>
     /// Reference to the ProductCategory that this rule applies to

@@ -61,15 +61,15 @@ public class ConfigDetailService(IUnitOfWork uow) : IConfigDetailService
 
         if (entity != null)
         {
-            if (string.IsNullOrEmpty(dto.Configid.ToString()))
+            if (dto.Quantity <= 0) throw new Exception("Số lượng cập nhật phải lớn hơn 0.");
+            
+            // Validate before updating
+            await ValidateForeignKeys(null, dto.Categoryid > 0 ? dto.Categoryid : null);
+            
+            entity.Quantity = dto.Quantity;
+            
+            if (dto.Categoryid > 0)
             {
-                if (dto.Quantity <= 0) throw new Exception("Số lượng cập nhật phải lớn hơn 0.");
-                entity.Quantity = dto.Quantity;
-            }
-
-            if (string.IsNullOrEmpty(dto.Configid.ToString()))
-            {
-                await ValidateForeignKeys(null, dto.Categoryid);
                 entity.Categoryid = dto.Categoryid;
             }
 
@@ -83,11 +83,17 @@ public class ConfigDetailService(IUnitOfWork uow) : IConfigDetailService
         var data = await _uow.GetRepository<ConfigDetail>().FindAsync(
             cd => cd.Config.Configid == configId && cd.Config.Isdeleted == false
             );
+        
+        var categoryIds = data.Select(x => x.Categoryid).Distinct().ToList();
+        var categories = await _uow.GetRepository<ProductCategory>().FindAsync(c => categoryIds.Contains(c.Categoryid));
+        var categoryDict = categories.ToDictionary(c => c.Categoryid, c => c.Categoryname);
+        
         return data.Select(x => new ConfigDetailDto
         {
             Configdetailid = x.Configdetailid,
             Configid = (int)x.Configid,
             Categoryid = (int)x.Categoryid,
+            CategoryName = categoryDict.ContainsKey((int)x.Categoryid!) ? categoryDict[(int)x.Categoryid!] : "",
             Quantity = (int)x.Quantity
         });
     }

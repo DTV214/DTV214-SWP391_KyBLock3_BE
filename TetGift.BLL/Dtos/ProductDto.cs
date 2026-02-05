@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using TetGift.DAL.Entities;
 
 namespace TetGift.BLL.Dtos
 {
@@ -15,12 +16,17 @@ namespace TetGift.BLL.Dtos
         public string? ImageUrl { get; set; }
         public decimal? Price { get; set; }
         public string? Status { get; set; }
+        public List<StockDto>? Stocks { get; set; }
+        public int? TotalQuantity { get; set; }
         public decimal? Unit { get; set; }
         public bool IsCustom { get; set; } = false;
+        public List<ProductDetailResponse>? ProductDetails { get; set; }
     }
     //DTO tạo sản phẩm đơn lẻ
     public class CreateSingleProductRequest
     {
+        public int? Accountid { get; set; }
+
         [Required]
         public int Categoryid { get; set; }
 
@@ -36,7 +42,7 @@ namespace TetGift.BLL.Dtos
         [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Đơn vị (trọng lượng) phải lớn hơn 0")]
         public decimal Unit { get; set; }
-
+        
         public string? Sku { get; set; }
 
         public string? ImageUrl { get; set; }
@@ -95,34 +101,18 @@ namespace TetGift.BLL.Dtos
         [Required(ErrorMessage = "Tên sản phẩm không được để trống")]
         public string Productname { get; set; } = null!;
 
+        public string Category { get; set; }
+
         public string? Description { get; set; }
 
         public string? ImageUrl { get; set; }
 
         public string? Status { get; set; }
-    }
 
-    // DTO trả về Product đầy đủ thông tin
-    public class ProductDetailDto
-    {
-        public int Productid { get; set; }
-        public int? Categoryid { get; set; }
-        public string? CategoryName { get; set; }
-        public int? Configid { get; set; }
-        public string? ConfigName { get; set; }
-        public int? Accountid { get; set; }
-        public string? Sku { get; set; }
-        public string? Productname { get; set; }
-        public string? Description { get; set; }
-        public decimal? Price { get; set; }
-        public string? Status { get; set; }
-        public decimal? Unit { get; set; }
-        public string? ImageUrl { get; set; }
-        public bool IsCustom { get; set; } = false;
-        public List<ProductDetailResponse> ProductDetails { get; set; } = new();
-        public ProductConfigDetailDto? Config { get; set; }
-        public StockAvailabilityDto? StockInfo { get; set; } // Thông tin tồn kho (chỉ cho sản phẩm đơn)
+        // List of product details to update (null = không update, empty = xóa hết, có items = replace)
+        public List<ProductDetailRequest>? ProductDetails { get; set; }
     }
+    
 
     // DTO validate giỏ quà theo Config
     public class ValidateComboRequest
@@ -157,4 +147,40 @@ namespace TetGift.BLL.Dtos
     {
         public string? CustomName { get; set; }
     }
+
+    /// <summary>
+    /// DTO for customer's custom basket (giỏ quà tự tạo)
+    /// Contains parent product info and list of child products
+    /// </summary>
+    public class CustomerBasketDto
+    {
+        public int Productid { get; set; }
+        public int? Configid { get; set; }
+        public string? ConfigName { get; set; }
+        public string? Productname { get; set; }
+        public string? Description { get; set; }
+        public string? ImageUrl { get; set; }
+        public string? Status { get; set; }
+        public decimal TotalPrice { get; set; }
+        public decimal TotalWeight { get; set; }
+        public List<BasketProductDetailDto> ProductDetails { get; set; } = new();
+    }
+
+    /// <summary>
+    /// DTO for products inside a basket
+    /// </summary>
+    public class BasketProductDetailDto
+    {
+        public int Productdetailid { get; set; }
+        public int Productid { get; set; }
+        public string Productname { get; set; } = string.Empty;
+        public string? Sku { get; set; }
+        public decimal Price { get; set; }
+        public decimal Unit { get; set; }
+        public int Quantity { get; set; }
+        public string? ImageUrl { get; set; }
+        public int TotalQuantityInStock { get; set; }
+        public decimal Subtotal { get; set; }
+    }
+
 }
