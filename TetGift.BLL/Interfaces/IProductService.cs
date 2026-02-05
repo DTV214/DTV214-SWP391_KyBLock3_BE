@@ -17,4 +17,5 @@ public interface IProductService
     Task<IEnumerable<ProductDto>> GetTemplatesAsync();
     Task SetAsTemplateAsync(int productId);
     Task RemoveTemplateAsync(int productId);
+    Task<IEnumerable<ProductDto>> GetWithQueryAsync(ProductQueryParameters productQuery);
 }

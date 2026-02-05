@@ -12,8 +12,8 @@ public class ProductsController(IProductService service) : BaseApiController
 {
     private readonly IProductService _service = service;
 
-    [HttpGet]
-    public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
+    //[HttpGet]
+    //public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
@@ -122,9 +122,10 @@ public class ProductsController(IProductService service) : BaseApiController
     {
         int customerId = GetAccountId();
         var newBasket = await _service.CloneBasketAsync(templateId, customerId, request.CustomName);
-        return Ok(new { 
+        return Ok(new
+        {
             message = "Giỏ quà đã được sao chép. Bạn có thể chỉnh sửa trước khi đặt hàng.",
-            basketId = newBasket.Productid 
+            basketId = newBasket.Productid
         });
     }
 
@@ -149,4 +150,7 @@ public class ProductsController(IProductService service) : BaseApiController
         await _service.RemoveTemplateAsync(id);
         return Ok(new { message = "Đã xóa trạng thái template." });
     }
+
+    [HttpGet]
+    public async Task<IActionResult> GetProducts([FromQuery] ProductQueryParameters productQuery) => Ok(await _service.GetWithQueryAsync(productQuery));
 }
