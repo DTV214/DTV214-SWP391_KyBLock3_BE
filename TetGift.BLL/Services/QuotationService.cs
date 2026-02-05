@@ -63,11 +63,12 @@ namespace TetGift.BLL.Services
         private async Task UpsertItemsAsync(int quotationId, List<QuotationItemUpsertDto> items)
         {
             var itemRepo = _uow.GetRepository<QuotationItem>();
+            var productRepo = _uow.GetRepository<Product>();
 
             // load current items
             var current = (await itemRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
 
-            // map desired
+            // map desired (merge duplicate productId)
             var desiredMap = items
                 .Where(i => i.ProductId > 0 && i.Quantity > 0)
                 .GroupBy(i => i.ProductId)
@@ -83,11 +84,25 @@ namespace TetGift.BLL.Services
                 }
             }
 
+            // load products in batch for price snapshot
+            var desiredProductIds = desiredMap.Keys.ToList();
+            var products = desiredProductIds.Count == 0
+                ? new List<Product>()
+                : (await productRepo.FindAsync(p => desiredProductIds.Contains(p.Productid))).ToList();
+
             // update existing or add new
             foreach (var kv in desiredMap)
             {
                 var pid = kv.Key;
                 var qty = kv.Value;
+
+                var prod = products.FirstOrDefault(p => p.Productid == pid);
+                if (prod == null) throw new Exception($"Product not found: {pid}");
+
+                var unit = prod.Price ?? 0m;
+                if (unit <= 0) throw new Exception($"Invalid product price: {pid}");
+
+                var lineTotal = Math.Round(unit * qty, 2);
 
                 var existed = current.FirstOrDefault(x => (x.Productid ?? 0) == pid);
                 if (existed == null)
@@ -97,16 +112,18 @@ namespace TetGift.BLL.Services
                         Quotationid = quotationId,
                         Productid = pid,
                         Quantity = qty,
-                        Price = null
+                        Price = lineTotal // IMPORTANT: store original line total
                     });
                 }
                 else
                 {
                     existed.Quantity = qty;
+                    existed.Price = lineTotal; // IMPORTANT: keep snapshot line total updated
                     itemRepo.Update(existed);
                 }
             }
         }
+
 
         // CUSTOMER - FLOW 1
         public async Task<QuotationSimpleDto> CreateManualAsync(QuotationCreateManualRequest req)
@@ -590,7 +607,7 @@ namespace TetGift.BLL.Services
 
             qfRepo.Delete(fee);
 
-            // (optional) ghi log message
+            //ghi log message
             await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, staffAccountId, QuotationAction.NOTE,
                 $"Staff deleted fee {quotationFeeId}.", meta: new { quotationFeeId, quotationItemId = itemId });
 
@@ -624,7 +641,6 @@ namespace TetGift.BLL.Services
 
             return fees;
         }
-
 
         public async Task ProposeItemDiscountsAsync(int quotationId, StaffProposeItemDiscountRequest req)
         {
@@ -663,16 +679,13 @@ namespace TetGift.BLL.Services
                 var unitPrice = product.Price ?? 0;
                 if (unitPrice <= 0) throw new Exception($"Invalid product price: {pid}");
 
-                //quootationprice tính tổng gốc trước giảm
                 var originalLineTotal = unitPrice * qty;
                 qi.Price = Math.Round(originalLineTotal, 2);
                 qiRepo.Update(qi);
 
-                //quotationfee tính tổng sau giảm
                 var afterDiscount = originalLineTotal * (1 - (line.DiscountPercent / 100m));
                 afterDiscount = Math.Round(afterDiscount, 2);
 
-                // Upsert 1 fee record for this item (take latest if exists)
                 var existingFees = (await feeRepo.FindAsync(f => f.Quotationitemid == qi.Quotationitemid)).ToList();
                 var fee = existingFees.OrderByDescending(f => f.Quotationfeeid).FirstOrDefault();
 
@@ -726,7 +739,7 @@ namespace TetGift.BLL.Services
             var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
             Ensure(items.Count > 0, "Quotation must have items.");
 
-            // ensure mỗi item đã có giá gốc (QuotationItem.Price = line total)
+            // ensure mỗi item đã có giá gốc
             foreach (var it in items)
             {
                 Ensure(it.Price != null && it.Price > 0, $"QuotationItem {it.Quotationitemid} missing original price (Price).");
@@ -739,7 +752,7 @@ namespace TetGift.BLL.Services
                 ? new List<QuotationFee>()
                 : (await feeRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
 
-            // rule: mỗi item phải có ít nhất 1 fee GIẢM (issubtracted=0)
+            //mỗi item phải có ít nhất 1 fee giảm
             var discountCountByItem = fees
                 .Where(f => f.Quotationitemid != null && (f.Issubtracted ?? 0) == 0)
                 .GroupBy(f => f.Quotationitemid!.Value)
@@ -751,7 +764,6 @@ namespace TetGift.BLL.Services
                     throw new Exception($"QuotationItem {it.Quotationitemid} must have at least 1 discount fee (issubtracted=0) before sending to admin.");
             }
 
-            // recompute totals theo rule mới: total = sum(original) - sum(sub) + sum(add)
             decimal totalOriginal = items.Sum(i => i.Price ?? 0m);
             decimal totalSubtract = fees.Where(f => (f.Issubtracted ?? 0) == 0).Sum(f => f.Price ?? 0m);
             decimal totalAdd = fees.Where(f => (f.Issubtracted ?? 0) == 1).Sum(f => f.Price ?? 0m);
@@ -897,14 +909,6 @@ namespace TetGift.BLL.Services
             return data;
         }
 
-        private static decimal ParsePercent(string? s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return 0m;
-            s = s.Trim();
-            if (s.EndsWith("%")) s = s.Substring(0, s.Length - 1);
-            return decimal.TryParse(s, out var v) ? v : 0m;
-        }
-
         private async Task<QuotationDetailDto> BuildQuotationDetailAsync(int quotationId)
         {
             var qRepo = _uow.GetRepository<Quotation>();
@@ -956,8 +960,8 @@ namespace TetGift.BLL.Services
                 .ToList();
 
             decimal totalOriginal = 0m;
-            decimal totalSubtract = 0m; // sum fee where issubtracted=0
-            decimal totalAdd = 0m;      // sum fee where issubtracted=1
+            decimal totalSubtract = 0m;
+            decimal totalAdd = 0m;
 
             var lines = new List<QuotationLineDto>();
 
@@ -1048,8 +1052,8 @@ namespace TetGift.BLL.Services
                 TotalOriginal = Math.Round(totalOriginal, 2),
                 TotalSubtract = Math.Round(totalSubtract, 2),
                 TotalAdd = Math.Round(totalAdd, 2),
-                TotalAfterDiscount = totalAfter, // tên field giữ vậy cũng được, nghĩa là "after adjustments"
-                TotalDiscountAmount = Math.Round(totalOriginal - totalAfter, 2), // net discount (có thể âm nếu add > sub)
+                TotalAfterDiscount = totalAfter,
+                TotalDiscountAmount = Math.Round(totalOriginal - totalAfter, 2),
 
                 Lines = lines,
                 Messages = messages
@@ -1126,25 +1130,21 @@ namespace TetGift.BLL.Services
 
             await _uow.SaveAsync();
 
-            // ===== Recommend MVP algorithm (simple) =====
-            // Pick products by categories, cheapest first, until reaching budget.
             var productRepo = _uow.GetRepository<Product>();
 
             var categoryIds = req.Categories.Select(x => x.CategoryId).Distinct().ToList();
 
-            // NOTE: repo.Entities is IQueryable<Product> (DAL has EF). This is okay.
             var candidates = productRepo.Entities
                 .Where(p => p.Categoryid != null && categoryIds.Contains(p.Categoryid.Value))
-                .Where(p => p.Status == null || p.Status == ProductStatus.ACTIVE) // optional
+                .Where(p => p.Status == null || p.Status.ToUpper() == ProductStatus.ACTIVE)
                 .ToList();
 
-            // order by price
+            //order by price
             candidates = candidates.OrderBy(p => p.Price ?? decimal.MaxValue).ToList();
 
             var chosen = new List<RecommendPreviewItemDto>();
             decimal total = 0;
 
-            // If user gave quantities per category, try to satisfy those first
             foreach (var cr in req.Categories)
             {
                 if (cr.Quantity == null || cr.Quantity <= 0) continue;
@@ -1255,6 +1255,9 @@ namespace TetGift.BLL.Services
             // get preview items
             var preview = await RequestRecommendInternalPreviewAsync(q.Quotationid, tempReq);
 
+            Ensure(preview.Items != null && preview.Items.Count > 0,
+                "Recommend result is empty. Budget may be too low or no active products in requested categories.");
+
             // Convert preview items -> QuotationItem
             await UpsertItemsAsync(q.Quotationid, preview.Items.Select(i => new QuotationItemUpsertDto
             {
@@ -1287,15 +1290,17 @@ namespace TetGift.BLL.Services
             }
         }
 
-        // internal helper to avoid creating new quotation inside RequestRecommendAsync
+
+
         private async Task<RecommendPreviewDto> RequestRecommendInternalPreviewAsync(int quotationId, QuotationRecommendRequest req)
         {
             var productRepo = _uow.GetRepository<Product>();
             var categoryIds = req.Categories.Select(x => x.CategoryId).Distinct().ToList();
 
+            // ✅ FIX: status filter case-insensitive + dùng constant, KHÔNG dùng "Active"
             var candidates = productRepo.Entities
                 .Where(p => p.Categoryid != null && categoryIds.Contains(p.Categoryid.Value))
-                .Where(p => p.Status == null || p.Status == "Active")
+                .Where(p => p.Status == null || p.Status.ToUpper() == ProductStatus.ACTIVE) // <-- FIX
                 .ToList()
                 .OrderBy(p => p.Price ?? decimal.MaxValue)
                 .ToList();
@@ -1351,6 +1356,8 @@ namespace TetGift.BLL.Services
                     total += price;
                 }
             }
+
+            Ensure(chosen.Count > 0, "Recommend result is empty. Budget may be too low or no active products in requested categories.");
 
             return new RecommendPreviewDto
             {

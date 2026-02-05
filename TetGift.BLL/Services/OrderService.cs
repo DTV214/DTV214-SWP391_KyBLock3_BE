@@ -471,4 +471,272 @@ public class OrderService : IOrderService
             Items = items
         };
     }
+
+    public async Task TryAllocateStockAfterPaymentAsync(int orderId)
+    {
+        if (orderId <= 0) throw new Exception("orderId is required.");
+
+        var orderRepo = _uow.GetRepository<Order>();
+        var stockRepo = _uow.GetRepository<Stock>();
+        var movementRepo = _uow.GetRepository<StockMovement>();
+
+        // load order + details
+        var order = await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q.Include(x => x.OrderDetails)
+        );
+
+        if (order == null) throw new Exception("Order not found.");
+        if (order.OrderDetails == null || order.OrderDetails.Count == 0)
+            throw new Exception("Order has no details.");
+
+
+        var status = (order.Status ?? OrderStatus.PENDING).ToUpper();
+
+        // Idempotent: nếu đã có movement OUT rồi thì coi như đã allocate
+        var existingOutMovements = await movementRepo.GetAllAsync(sm =>
+            sm.Orderid == orderId && sm.Quantity.HasValue && sm.Quantity < 0
+        );
+        if (existingOutMovements.Any()) return;
+
+        // Chỉ chạy auto allocate sau payment nếu đang CONFIRMED
+        if (status != OrderStatus.CONFIRMED)
+            return;
+
+        // 1) Check đủ kho cho tất cả items trước khi trừ
+        foreach (var d in order.OrderDetails)
+        {
+            var pid = d.Productid ?? 0;
+            var qty = d.Quantity ?? 0;
+            if (pid <= 0 || qty <= 0) continue;
+
+            var stocks = await stockRepo.FindAsync(s => s.Productid == pid && s.Status == StockStatus.ACTIVE);
+            var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+
+            if (totalStock < qty)
+            {
+                order.Status = OrderStatus.PAID_WAITING_STOCK;
+
+                order.Note = string.IsNullOrWhiteSpace(order.Note)
+                    ? $"[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {qty}."
+                    : $"{order.Note}\n[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {qty}.";
+
+                orderRepo.Update(order);
+                await _uow.SaveAsync();
+                return;
+            }
+        }
+
+        // 2) Deduct theo FIFO trong transaction
+        _uow.BeginTransaction();
+        try
+        {
+            foreach (var d in order.OrderDetails)
+            {
+                var pid = d.Productid ?? 0;
+                var need = d.Quantity ?? 0;
+                if (pid <= 0 || need <= 0) continue;
+
+                var availableStocks = (await stockRepo.FindAsync(
+                        s => s.Productid == pid && s.Status == StockStatus.ACTIVE
+                    ))
+                    .OrderBy(s => s.Productiondate) // FIFO
+                    .ToList();
+
+                var remaining = need;
+
+                foreach (var stock in availableStocks)
+                {
+                    if (remaining <= 0) break;
+
+                    var stockQty = stock.Stockquantity ?? 0;
+                    if (stockQty <= 0) continue;
+
+                    var deduct = Math.Min(remaining, stockQty);
+
+                    stock.Stockquantity = stockQty - deduct;
+                    if ((stock.Stockquantity ?? 0) <= 0)
+                        stock.Status = StockStatus.OUT_OF_STOCK;
+
+                    stockRepo.Update(stock);
+
+                    await movementRepo.AddAsync(new StockMovement
+                    {
+                        Stockid = stock.Stockid,
+                        Orderid = order.Orderid,
+                        Quantity = -deduct,
+                        Movementdate = DateTime.Now,
+                        Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
+                    });
+
+                    remaining -= deduct;
+                }
+
+                if (remaining > 0)
+                    throw new Exception($"Unexpected thiếu hàng khi xuất kho (ProductId={pid}).");
+            }
+
+            order.Status = OrderStatus.PROCESSING;
+            order.Note = string.IsNullOrWhiteSpace(order.Note)
+                ? $"[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+                : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+
+            orderRepo.Update(order);
+
+            await _uow.SaveAsync();
+            _uow.CommitTransaction();
+        }
+        catch (Exception ex)
+        {
+            _uow.RollBack();
+
+            // nếu fail thì PAID_WAITING_STOCK
+            order.Status = OrderStatus.PAID_WAITING_STOCK;
+            order.Note = string.IsNullOrWhiteSpace(order.Note)
+                ? $"[PAID_WAITING_STOCK] {ex.Message}"
+                : $"{order.Note}\n[PAID_WAITING_STOCK] {ex.Message}";
+
+            orderRepo.Update(order);
+            await _uow.SaveAsync();
+        }
+    }
+
+
+    public async Task AllocateStockForWaitingOrderAsync(int orderId)
+    {
+        if (orderId <= 0) throw new Exception("orderId is required.");
+
+        var orderRepo = _uow.GetRepository<Order>();
+
+        var order = (await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q.Include(o => o.OrderDetails)
+        ));
+
+        if (order == null) throw new Exception("Order not found.");
+
+        var status = (order.Status ?? "").ToUpper();
+        if (status != OrderStatus.PAID_WAITING_STOCK)
+            throw new Exception("Order is not in PAID_WAITING_STOCK.");
+
+        throw new Exception("Use ForceAllocateStockAsync for STAFF/ADMIN allocation retry.");
+    }
+
+
+    public async Task ForceAllocateStockAsync(int orderId, int actorAccountId, string actorRole)
+    {
+        if (orderId <= 0) throw new Exception("orderId is required.");
+        if (actorAccountId <= 0) throw new Exception("actorAccountId is required.");
+        if (string.IsNullOrWhiteSpace(actorRole)) throw new Exception("actorRole is required.");
+
+        var role = actorRole.Trim().ToUpper();
+        if (role != "ADMIN" && role != "STAFF")
+            throw new Exception("Forbidden.");
+
+        var orderRepo = _uow.GetRepository<Order>();
+        var stockRepo = _uow.GetRepository<Stock>();
+        var movementRepo = _uow.GetRepository<StockMovement>();
+
+        var order = await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q.Include(o => o.OrderDetails)
+        );
+
+        if (order == null) throw new Exception("Order not found.");
+        if (order.OrderDetails == null || order.OrderDetails.Count == 0)
+            throw new Exception("Order has no details.");
+
+        var status = (order.Status ?? OrderStatus.PENDING).ToUpper();
+
+        if (status != OrderStatus.PAID_WAITING_STOCK && status != OrderStatus.CONFIRMED)
+            throw new Exception("Order is not eligible for allocation.");
+
+        var existingOutMovements = await movementRepo.GetAllAsync(sm =>
+            sm.Orderid == orderId && sm.Quantity.HasValue && sm.Quantity < 0
+        );
+        if (existingOutMovements.Any())
+            throw new Exception("Order already allocated stock.");
+
+        foreach (var d in order.OrderDetails)
+        {
+            var pid = d.Productid ?? 0;
+            var need = d.Quantity ?? 0;
+            if (pid <= 0 || need <= 0) continue;
+
+            var stocks = await stockRepo.FindAsync(s => s.Productid == pid && s.Status == StockStatus.ACTIVE);
+            var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+
+            if (totalStock < need)
+            {
+                // vẫn có thể set PAID_WAITING_STOCK để lưu trạng thái
+                order.Status = OrderStatus.PAID_WAITING_STOCK;
+                order.Note = string.IsNullOrWhiteSpace(order.Note)
+                    ? $"[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {need}."
+                    : $"{order.Note}\n[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {need}.";
+
+                orderRepo.Update(order);
+                await _uow.SaveAsync();
+
+                // throw để controller trả lỗi thiếu hàng
+                throw new Exception($"Thiếu hàng (ProductId={pid}). Còn {totalStock}, cần {need}.");
+            }
+        }
+
+        var originalStatus = order.Status;
+
+        if ((order.Status ?? "").ToUpper() == OrderStatus.PAID_WAITING_STOCK)
+        {
+            order.Status = OrderStatus.CONFIRMED;
+            orderRepo.Update(order);
+            await _uow.SaveAsync();
+        }
+
+        await TryAllocateStockAfterPaymentAsync(orderId);
+
+        var outMovementsAfter = await movementRepo.GetAllAsync(sm =>
+            sm.Orderid == orderId && sm.Quantity.HasValue && sm.Quantity < 0
+        );
+
+        var updated = (await orderRepo.FindAsync(o => o.Orderid == orderId)).FirstOrDefault();
+        if (updated == null) throw new Exception("Order not found after allocation.");
+
+        if (outMovementsAfter.Any())
+        {
+            updated.Status = OrderStatus.PROCESSING;
+            updated.Note = string.IsNullOrWhiteSpace(updated.Note)
+                ? $"[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+                : $"{updated.Note}\n[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+
+            orderRepo.Update(updated);
+            await _uow.SaveAsync();
+            return;
+        }
+
+        foreach (var d in updated.OrderDetails ?? new List<OrderDetail>())
+        {
+            var pid = d.Productid ?? 0;
+            var need = d.Quantity ?? 0;
+            if (pid <= 0 || need <= 0) continue;
+
+            var stocks = await stockRepo.FindAsync(s => s.Productid == pid && s.Status == StockStatus.ACTIVE);
+            var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+
+            if (totalStock < need)
+            {
+                throw new Exception($"Thiếu hàng (ProductId={pid}). Còn {totalStock}, cần {need}.");
+            }
+        }
+
+        if ((originalStatus ?? "").ToUpper() == OrderStatus.PAID_WAITING_STOCK)
+        {
+            updated.Status = OrderStatus.PAID_WAITING_STOCK;
+            orderRepo.Update(updated);
+            await _uow.SaveAsync();
+        }
+
+        throw new Exception("Allocate failed unexpectedly. Please check stock data and allocation logic.");
+    }
+
+
+
 }
