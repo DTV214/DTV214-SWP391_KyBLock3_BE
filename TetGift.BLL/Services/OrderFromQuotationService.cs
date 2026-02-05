@@ -63,9 +63,9 @@ namespace TetGift.BLL.Services
             };
 
             await oRepo.AddAsync(order);
-            await _uow.SaveAsync(); // to get Orderid
+            await _uow.SaveAsync();
 
-            // 4) build order details using QuotationFee.Price (after discount)
+            // 4) build order details using: final = original - sum(sub) + sum(add)
             decimal total = 0;
 
             foreach (var it in items)
@@ -74,36 +74,43 @@ namespace TetGift.BLL.Services
                 var qty = it.Quantity ?? 0;
                 if (pid <= 0 || qty <= 0) continue;
 
-                // line total BEFORE discount (already stored in quotation_item.price)
-                decimal originalLineTotal = it.Price ?? 0;
+                // original line total (QuotationItem.Price = line total)
+                decimal originalLineTotal = it.Price ?? 0m;
 
-                // fallback if staff chưa set price gốc cho item
+                // fallback: nếu chưa có item.Price thì tính từ product.price * qty và update lại
                 if (originalLineTotal <= 0)
                 {
                     var prod = (await pRepo.FindAsync(x => x.Productid == pid)).FirstOrDefault();
                     if (prod == null) throw new Exception($"Product not found: {pid}");
 
-                    var unitPrice = prod.Price ?? 0;
+                    var unitPrice = prod.Price ?? 0m;
                     if (unitPrice <= 0) throw new Exception($"Invalid product price for product {pid}.");
 
                     originalLineTotal = unitPrice * qty;
-                    // (optional) update lại item.Price cho đúng rule dữ liệu
-                    it.Price = originalLineTotal;
+
+                    it.Price = Math.Round(originalLineTotal, 2);
                     qiRepo.Update(it);
                 }
 
-                // line total AFTER discount: lấy từ quotation_fee.price (latest)
+                // fees: MUST exist at least 1 fee per item
                 var fees = (await qfRepo.FindAsync(f => f.Quotationitemid == it.Quotationitemid)).ToList();
-                var fee = fees.OrderByDescending(f => f.Quotationfeeid).FirstOrDefault();
+                if (fees.Count == 0)
+                    throw new Exception($"QuotationItem {it.Quotationitemid} is missing quotation fees.");
 
-                decimal finalLineTotal = fee?.Price ?? 0;
-                if (finalLineTotal <= 0)
-                {
-                    // fallback: nếu chưa có fee thì dùng giá gốc
-                    finalLineTotal = originalLineTotal;
-                }
+                decimal subtractTotal = fees
+                    .Where(f => (f.Issubtracted ?? 0) == 0)
+                    .Sum(f => f.Price ?? 0m);
 
-                // IMPORTANT: finalLineTotal là "tổng tiền line", không nhân qty nữa
+                decimal addTotal = fees
+                    .Where(f => (f.Issubtracted ?? 0) == 1)
+                    .Sum(f => f.Price ?? 0m);
+
+                var finalLineTotal = originalLineTotal - subtractTotal + addTotal;
+                if (finalLineTotal < 0)
+                    throw new Exception($"Final line total cannot be negative for item {it.Quotationitemid}.");
+
+                finalLineTotal = Math.Round(finalLineTotal, 2);
+
                 total += finalLineTotal;
 
                 await odRepo.AddAsync(new OrderDetail
@@ -111,14 +118,14 @@ namespace TetGift.BLL.Services
                     Orderid = order.Orderid,
                     Productid = pid,
                     Quantity = qty,
-                    Amount = finalLineTotal // total after discount
+                    Amount = finalLineTotal
                 });
             }
 
             if (total <= 0) throw new Exception("Order total invalid (0).");
 
             // 5) update order total
-            order.Totalprice = total;
+            order.Totalprice = Math.Round(total, 2);
             oRepo.Update(order);
 
             // 6) link quotation -> order

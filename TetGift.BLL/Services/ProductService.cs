@@ -879,16 +879,16 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
                 .Include(p => p.ProductDetailProductparents)
                     .ThenInclude(pd => pd.Product)
         );
-        
-        if (template == null) 
+
+        if (template == null)
             throw new Exception("Template giỏ quà không tồn tại hoặc không khả dụng.");
-        
+
         if (!template.Configid.HasValue)
             throw new Exception("Template không hợp lệ (thiếu cấu hình).");
-        
+
         // Validate customer account exists
         await ValidateForeignKeys(customerId, null, null);
-        
+
         // 1. Clone Product as DRAFT
         var newBasket = new Product
         {
@@ -901,10 +901,10 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
             Unit = template.Unit,
             Price = template.Price
         };
-        
+
         await _uow.GetRepository<Product>().AddAsync(newBasket);
         await _uow.SaveAsync();
-        
+
         // 2. Clone all ProductDetails (batch insert for performance)
         if (template.ProductDetailProductparents.Any())
         {
@@ -915,10 +915,10 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
                 Productid = detail.Productid,
                 Quantity = detail.Quantity
             }).ToList();
-            
+
             await detailRepo.AddRangeAsync(newDetails);
         }
-        
+
         await _uow.SaveAsync();
         
         // 3. Reload with full details to return complete DTO (similar to GetCustomProductByIdAsync but without Stocks)
@@ -1015,5 +1015,111 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
         product.Status = ProductStatus.ACTIVE;
         repo.Update(product);
         await _uow.SaveAsync();
+    }
+
+    public async Task<IEnumerable<ProductDto>> GetWithQueryAsync(ProductQueryParameters productQuery)
+    {
+        var repo = _uow.GetRepository<Product>();
+
+        // 1. Khởi tạo query từ repo
+        var query = repo.Entities.AsQueryable();
+
+        #region Filter
+
+        // 2. Validate & Filter theo Search]
+        if (!string.IsNullOrWhiteSpace(productQuery.Search))
+        {
+            string search = productQuery.Search.Trim().ToLower();
+            query = query.Where(p => p.Productname.ToLower().Contains(search)
+                                  || p.Description.ToLower().Contains(search));
+        }
+
+        // 3. Filter theo Categories
+        if (productQuery.Categories != null && productQuery.Categories.Any())
+        {
+            query = query.Where(p => p.Categoryid.HasValue && productQuery.Categories.Contains(p.Categoryid.Value));
+        }
+
+        // 4. Filter theo Price Range
+        if (productQuery.MinPrice > 0)
+        {
+            query = query.Where(p => p.Price >= productQuery.MinPrice);
+        }
+        if (productQuery.MaxPrice > 0 && productQuery.MaxPrice >= productQuery.MinPrice)
+        {
+            query = query.Where(p => p.Price <= productQuery.MaxPrice);
+        }
+
+        #endregion
+
+        #region Sort
+
+        // 5. Xử lý Sort
+        if (!string.IsNullOrWhiteSpace(productQuery.Sort))
+        {
+            query = productQuery.Sort.ToLower() switch
+            {
+                "price_asc" => query.OrderBy(p => p.Price),
+                "price_desc" => query.OrderByDescending(p => p.Price),
+                "name_asc" => query.OrderBy(p => p.Productname),
+                "name_desc" => query.OrderByDescending(p => p.Productname),
+                _ => query.OrderBy(p => p.Productid)
+            };
+        }
+        // Default
+        else
+        {
+            query = query.OrderBy(p => p.Productid);
+        }
+
+        #endregion
+
+        // Common constraint
+        query = query.Where(p
+            => p.Status.Equals(ProductStatus.ACTIVE)
+            && (p.Account == null || !p.Account.Role.Equals(UserRole.CUSTOMER))
+            );
+
+        // 6. Thực thi query và map sang Dto
+        List<Product> products;
+
+        if (IsPageRequest(productQuery))
+        {
+            // Phân trang
+            int skip = (productQuery.PageNumber!.Value - 1) * productQuery.PageSize!.Value;
+            products = await query
+                .Skip(skip)
+                .Take(productQuery.PageSize.Value)
+                .ToListAsync();
+        }
+        else
+        {
+            products = await query.ToListAsync();
+        }
+
+
+        return products.Select(p =>
+        {
+            return new ProductDto
+            {
+                Productid = p.Productid,
+                Categoryid = p.Categoryid,
+                Configid = p.Configid,
+                Accountid = p.Accountid,
+                Sku = p.Sku,
+                Productname = p.Productname,
+                Description = p.Description,
+                Price = p.Price,
+                Status = p.Status,
+                Unit = p.Unit,
+                ImageUrl = p.ImageUrl
+            };
+        });
+    }
+
+    private bool IsPageRequest(ProductQueryParameters productQuery)
+    {
+        return productQuery.PageNumber.HasValue && productQuery.PageNumber > 0
+                          && productQuery.PageSize.HasValue && productQuery.PageSize > 0;
     }
 }

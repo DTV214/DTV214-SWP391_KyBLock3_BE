@@ -62,6 +62,57 @@
         public decimal DiscountPercent { get; set; } // 0..100
     }
 
+    public class StaffCreateFeeRequest
+    {
+        public int StaffAccountId { get; set; } // override từ JWT
+        public int QuotationItemId { get; set; }
+        public short IsSubtracted { get; set; } // 0 trừ, 1 cộng
+        public decimal Price { get; set; }      // delta
+        public string? Description { get; set; }
+    }
+
+    public class StaffUpdateFeeRequest
+    {
+        public int StaffAccountId { get; set; } // controller override từ JWT
+        public int QuotationFeeId { get; set; } // controller override từ route
+        public short IsSubtracted { get; set; } // 0 = trừ, 1 = cộng
+        public decimal Price { get; set; }      // delta tiền
+        public string? Description { get; set; }
+    }
+
+
+    public class StaffFeeInputDto
+    {
+        public int? QuotationFeeId { get; set; }// null => create mới
+        public short IsSubtracted { get; set; }// 0 = trừ, 1 = cộng
+        public decimal Price { get; set; }
+        public string? Description { get; set; } // "Giảm 10%", "Phí ship", ...
+        public bool IsDeleted { get; set; }
+    }
+
+    public class StaffReviewFeesLineDto
+    {
+        public int QuotationItemId { get; set; }
+        public List<StaffFeeInputDto> Fees { get; set; } = new();
+    }
+
+    public class StaffReviewFeesRequest
+    {
+        // sẽ override từ JWT trong controller
+        public int StaffAccountId { get; set; }
+        public List<StaffReviewFeesLineDto> Lines { get; set; } = new();
+        public string? Message { get; set; }
+    }
+
+    public class QuotationFeeOnItemViewDto
+    {
+        public int QuotationFeeId { get; set; }
+        public int QuotationItemId { get; set; }
+        public short IsSubtracted { get; set; } // 0=trừ, 1=cộng
+        public decimal Price { get; set; }      // delta tiền
+        public string? Description { get; set; }
+    }
+
     public class StaffProposeItemDiscountRequest
     {
         public int StaffAccountId { get; set; }

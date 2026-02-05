@@ -20,4 +20,5 @@ public interface IProductService
     Task<ProductDto?> GetCustomProductByIdAsync(int productId); // Lấy chi tiết sản phẩm custom/basket để edit
     Task SetAsTemplateAsync(int productId);
     Task RemoveTemplateAsync(int productId);
+    Task<IEnumerable<ProductDto>> GetWithQueryAsync(ProductQueryParameters productQuery);
 }

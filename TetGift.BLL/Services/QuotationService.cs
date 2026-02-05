@@ -328,6 +328,304 @@ namespace TetGift.BLL.Services
         //    await _uow.SaveAsync();
         //}
 
+        //public async Task StaffReviewFeesAsync(int quotationId, StaffReviewFeesRequest req)
+        //{
+        //    if (quotationId <= 0) throw new Exception("quotationId is required.");
+        //    if (req.StaffAccountId <= 0) throw new Exception("StaffAccountId is required.");
+        //    if (req.Lines == null || req.Lines.Count == 0) throw new Exception("Lines is required.");
+
+        //    var qRepo = _uow.GetRepository<Quotation>();
+        //    var qiRepo = _uow.GetRepository<QuotationItem>();
+        //    var qfRepo = _uow.GetRepository<QuotationFee>();
+        //    var pRepo = _uow.GetRepository<Product>();
+
+        //    var q = (await qRepo.FindAsync(x => x.Quotationid == quotationId)).FirstOrDefault();
+        //    if (q == null) throw new Exception("Quotation not found.");
+
+        //    var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
+        //    if (items.Count == 0) throw new Exception("Quotation has no items.");
+
+        //    var itemDict = items.ToDictionary(x => x.Quotationitemid, x => x);
+
+        //    // load existing fees (batch)
+        //    var itemIds = items.Select(i => i.Quotationitemid).ToList();
+        //    var existingFees = itemIds.Count == 0
+        //        ? new List<QuotationFee>()
+        //        : (await qfRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
+
+        //    var feeMap = existingFees.ToDictionary(f => f.Quotationfeeid, f => f);
+
+        //    // products for fallback price
+        //    var productIds = items.Where(x => x.Productid != null).Select(x => x.Productid!.Value).Distinct().ToList();
+        //    var products = productIds.Count == 0
+        //        ? new List<Product>()
+        //        : (await pRepo.FindAsync(p => productIds.Contains(p.Productid))).ToList();
+
+        //    foreach (var line in req.Lines)
+        //    {
+        //        if (!itemDict.TryGetValue(line.QuotationItemId, out var item))
+        //            throw new Exception($"QuotationItem not found: {line.QuotationItemId}");
+
+        //        var pid = item.Productid ?? 0;
+        //        var qty = item.Quantity ?? 0;
+        //        if (pid <= 0 || qty <= 0)
+        //            throw new Exception($"QuotationItem {item.Quotationitemid} missing product/quantity.");
+
+        //        // Ensure original line total stored in item.Price
+        //        if (item.Price == null || item.Price <= 0)
+        //        {
+        //            var prod = products.FirstOrDefault(p => p.Productid == pid);
+        //            if (prod == null) throw new Exception($"Product not found: {pid}");
+        //            var unit = prod.Price ?? 0m;
+        //            if (unit <= 0) throw new Exception($"Invalid product price: {pid}");
+        //            item.Price = Math.Round(unit * qty, 2);
+        //            qiRepo.Update(item);
+        //        }
+
+        //        foreach (var f in line.Fees)
+        //        {
+        //            // delete
+        //            if (f.IsDeleted)
+        //            {
+        //                if (f.QuotationFeeId == null) continue;
+
+        //                if (!feeMap.TryGetValue(f.QuotationFeeId.Value, out var del))
+        //                    throw new Exception($"Fee not found: {f.QuotationFeeId.Value}");
+
+        //                // safety: ensure fee belongs to this item
+        //                if (del.Quotationitemid != item.Quotationitemid)
+        //                    throw new Exception("Fee does not belong to this quotation item.");
+
+        //                qfRepo.Delete(del);
+        //                continue;
+        //            }
+
+        //            // validate
+        //            if (f.Price <= 0) throw new Exception("Fee price must be > 0.");
+        //            if (f.IsSubtracted != 0 && f.IsSubtracted != 1) throw new Exception("IsSubtracted must be 0 or 1.");
+
+        //            if (f.QuotationFeeId != null)
+        //            {
+        //                // update
+        //                if (!feeMap.TryGetValue(f.QuotationFeeId.Value, out var ex))
+        //                    throw new Exception($"Fee not found: {f.QuotationFeeId.Value}");
+
+        //                if (ex.Quotationitemid != item.Quotationitemid)
+        //                    throw new Exception("Fee does not belong to this quotation item.");
+
+        //                ex.Issubtracted = f.IsSubtracted;
+        //                ex.Price = Math.Round(f.Price, 2);
+        //                ex.Description = f.Description;
+        //                qfRepo.Update(ex);
+        //            }
+        //            else
+        //            {
+        //                // create
+        //                await qfRepo.AddAsync(new QuotationFee
+        //                {
+        //                    Quotationitemid = item.Quotationitemid,
+        //                    Issubtracted = f.IsSubtracted,
+        //                    Price = Math.Round(f.Price, 2),
+        //                    Description = f.Description
+        //                });
+        //            }
+        //        }
+        //    }
+
+        //    // Partial upsert only: do NOT require all items to have fee here
+        //    q.Staffreviewerid = req.StaffAccountId;
+        //    q.Staffreviewedat = DateTime.Now;
+        //    qRepo.Update(q);
+
+        //    await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, req.StaffAccountId,
+        //        QuotationAction.STAFF_PROPOSE,
+        //        req.Message ?? "Staff updated fees (partial).",
+        //        meta: new { updatedLines = req.Lines.Count });
+
+        //    await _uow.SaveAsync();
+        //}
+
+        public async Task CreateQuotationFeeAsync(int quotationId, StaffCreateFeeRequest req)
+        {
+            Ensure(quotationId > 0, "quotationId is required.");
+            Ensure(req.StaffAccountId > 0, "StaffAccountId is required.");
+            Ensure(req.QuotationItemId > 0, "QuotationItemId is required.");
+            Ensure(req.Price > 0, "Fee price must be > 0.");
+            Ensure(req.IsSubtracted == 0 || req.IsSubtracted == 1, "IsSubtracted must be 0 or 1.");
+
+            var qRepo = _uow.GetRepository<Quotation>();
+            var qiRepo = _uow.GetRepository<QuotationItem>();
+            var qfRepo = _uow.GetRepository<QuotationFee>();
+            var pRepo = _uow.GetRepository<Product>();
+
+            var q = (await qRepo.FindAsync(x => x.Quotationid == quotationId)).FirstOrDefault();
+            if (q == null) throw new Exception("Quotation not found.");
+            Ensure(q.Status == QuotationStatus.STAFF_REVIEWING, "Quotation is not in STAFF_REVIEWING.");
+
+            // ensure item belongs to this quotation
+            var item = (await qiRepo.FindAsync(x => x.Quotationitemid == req.QuotationItemId && x.Quotationid == quotationId))
+                .FirstOrDefault();
+            if (item == null) throw new Exception("QuotationItem not found in this quotation.");
+
+            // ensure snapshot original line total exists
+            var pid = item.Productid ?? 0;
+            var qty = item.Quantity ?? 0;
+            if (pid <= 0 || qty <= 0) throw new Exception("QuotationItem missing product/quantity.");
+
+            if (item.Price == null || item.Price <= 0)
+            {
+                var prod = (await pRepo.FindAsync(p => p.Productid == pid)).FirstOrDefault()
+                    ?? throw new Exception($"Product not found: {pid}");
+
+                var unit = prod.Price ?? 0m;
+                if (unit <= 0) throw new Exception($"Invalid product price: {pid}");
+
+                item.Price = Math.Round(unit * qty, 2);
+                qiRepo.Update(item);
+            }
+
+            await qfRepo.AddAsync(new QuotationFee
+            {
+                Quotationitemid = item.Quotationitemid,
+                Issubtracted = req.IsSubtracted,
+                Price = Math.Round(req.Price, 2),
+                Description = req.Description
+            });
+
+            q.Staffreviewerid = req.StaffAccountId;
+            q.Staffreviewedat = DateTime.Now;
+            qRepo.Update(q);
+
+            await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, req.StaffAccountId,
+                QuotationAction.NOTE,
+                "Staff created a fee (partial).",
+                meta: new { quotationItemId = req.QuotationItemId, isSubtracted = req.IsSubtracted, price = req.Price });
+
+            await _uow.SaveAsync();
+        }
+
+        public async Task UpdateQuotationFeeAsync(int quotationId, StaffUpdateFeeRequest req)
+        {
+            Ensure(quotationId > 0, "quotationId is required.");
+            Ensure(req.StaffAccountId > 0, "StaffAccountId is required.");
+            Ensure(req.QuotationFeeId > 0, "QuotationFeeId is required.");
+
+            var qRepo = _uow.GetRepository<Quotation>();
+            var qiRepo = _uow.GetRepository<QuotationItem>();
+            var qfRepo = _uow.GetRepository<QuotationFee>();
+
+            var q = (await qRepo.FindAsync(x => x.Quotationid == quotationId)).FirstOrDefault();
+            if (q == null) throw new Exception("Quotation not found.");
+            Ensure(q.Status == QuotationStatus.STAFF_REVIEWING, "Quotation is not in STAFF_REVIEWING.");
+
+            var fee = (await qfRepo.FindAsync(f => f.Quotationfeeid == req.QuotationFeeId)).FirstOrDefault();
+            if (fee == null) throw new Exception("QuotationFee not found.");
+            if (fee.Quotationitemid == null) throw new Exception("Fee missing quotationItemId.");
+
+            // ensure fee belongs to this quotation
+            var item = (await qiRepo.FindAsync(i => i.Quotationitemid == fee.Quotationitemid.Value && i.Quotationid == quotationId))
+                .FirstOrDefault();
+            if (item == null) throw new Exception("Fee does not belong to this quotation.");
+
+            //if (req.IsDeleted)
+            //{
+            //    qfRepo.Delete(fee);
+
+            //    await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, req.StaffAccountId,
+            //        QuotationAction.NOTE,
+            //        "Staff deleted a fee (partial).",
+            //        meta: new { quotationFeeId = req.QuotationFeeId });
+
+            //    await _uow.SaveAsync();
+            //    return;
+            //}
+
+            Ensure(req.Price > 0, "Fee price must be > 0.");
+            Ensure(req.IsSubtracted == 0 || req.IsSubtracted == 1, "IsSubtracted must be 0 or 1.");
+
+            fee.Issubtracted = req.IsSubtracted;
+            fee.Price = Math.Round(req.Price, 2);
+            fee.Description = req.Description;
+            qfRepo.Update(fee);
+
+            q.Staffreviewerid = req.StaffAccountId;
+            q.Staffreviewedat = DateTime.Now;
+            qRepo.Update(q);
+
+            await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, req.StaffAccountId,
+                QuotationAction.NOTE,
+                "Staff updated a fee (partial).",
+                meta: new { quotationFeeId = req.QuotationFeeId, isSubtracted = req.IsSubtracted, price = req.Price });
+
+            await _uow.SaveAsync();
+        }
+
+        public async Task DeleteQuotationFeeAsync(int quotationId, int quotationFeeId, int staffAccountId)
+        {
+            if (quotationId <= 0) throw new Exception("quotationId is required.");
+            if (quotationFeeId <= 0) throw new Exception("quotationFeeId is required.");
+            if (staffAccountId <= 0) throw new Exception("StaffAccountId is required.");
+
+            var qRepo = _uow.GetRepository<Quotation>();
+            var qfRepo = _uow.GetRepository<QuotationFee>();
+            var qiRepo = _uow.GetRepository<QuotationItem>();
+
+            var q = (await qRepo.FindAsync(x => x.Quotationid == quotationId)).FirstOrDefault();
+            if (q == null) throw new Exception("Quotation not found.");
+
+            // chỉ cho staff thao tác khi đang review (tuỳ bạn mở rộng stage)
+            if (q.Status != QuotationStatus.STAFF_REVIEWING)
+                throw new Exception("Quotation is not in STAFF_REVIEWING.");
+
+            var fee = (await qfRepo.FindAsync(x => x.Quotationfeeid == quotationFeeId)).FirstOrDefault();
+            if (fee == null) throw new Exception("Fee not found.");
+
+            // ensure fee belongs to this quotation
+            var itemId = fee.Quotationitemid ?? 0;
+            if (itemId <= 0) throw new Exception("Fee missing quotation item.");
+
+            var item = (await qiRepo.FindAsync(x => x.Quotationitemid == itemId)).FirstOrDefault();
+            if (item == null || item.Quotationid != quotationId)
+                throw new Exception("Fee does not belong to this quotation.");
+
+            qfRepo.Delete(fee);
+
+            // (optional) ghi log message
+            await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, staffAccountId, QuotationAction.NOTE,
+                $"Staff deleted fee {quotationFeeId}.", meta: new { quotationFeeId, quotationItemId = itemId });
+
+            await _uow.SaveAsync();
+        }
+
+        public async Task<List<QuotationFeeOnItemViewDto>> GetFeesByQuotationItemAsync(int quotationId, int quotationItemId)
+        {
+            if (quotationId <= 0) throw new Exception("quotationId is required.");
+            if (quotationItemId <= 0) throw new Exception("quotationItemId is required.");
+
+            var qiRepo = _uow.GetRepository<QuotationItem>();
+            var qfRepo = _uow.GetRepository<QuotationFee>();
+
+            // ensure item belongs to quotation
+            var item = (await qiRepo.FindAsync(x => x.Quotationitemid == quotationItemId)).FirstOrDefault();
+            if (item == null) throw new Exception("QuotationItem not found.");
+            if (item.Quotationid != quotationId) throw new Exception("QuotationItem does not belong to this quotation.");
+
+            var fees = (await qfRepo.FindAsync(f => f.Quotationitemid == quotationItemId))
+                .OrderBy(f => f.Quotationfeeid)
+                .Select(f => new QuotationFeeOnItemViewDto
+                {
+                    QuotationFeeId = f.Quotationfeeid,
+                    QuotationItemId = quotationItemId,
+                    IsSubtracted = (short)(f.Issubtracted ?? 0),
+                    Price = Math.Round(f.Price ?? 0m, 2),
+                    Description = f.Description
+                })
+                .ToList();
+
+            return fees;
+        }
+
+
         public async Task ProposeItemDiscountsAsync(int quotationId, StaffProposeItemDiscountRequest req)
         {
             if (req.StaffAccountId <= 0) throw new Exception("StaffAccountId is required.");
@@ -420,29 +718,68 @@ namespace TetGift.BLL.Services
             var q = await GetQuotationOrThrowAsync(quotationId);
             Ensure(q.Status == QuotationStatus.STAFF_REVIEWING, "Quotation is not in STAFF_REVIEWING.");
 
+            var qRepo = _uow.GetRepository<Quotation>();
             var feeRepo = _uow.GetRepository<QuotationFee>();
             var qiRepo = _uow.GetRepository<QuotationItem>();
 
+            // items
             var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
             Ensure(items.Count > 0, "Quotation must have items.");
 
+            // ensure mỗi item đã có giá gốc (QuotationItem.Price = line total)
             foreach (var it in items)
             {
-                var hasFee = (await feeRepo.FindAsync(f => f.Quotationitemid == it.Quotationitemid)).Any();
-                Ensure(hasFee, "Each quotation item must have a fee (discount result) before sending to admin.");
+                Ensure(it.Price != null && it.Price > 0, $"QuotationItem {it.Quotationitemid} missing original price (Price).");
             }
 
-            Ensure(q.Totalprice != null && q.Totalprice > 0, "Total price after discount must be set.");
+            var itemIds = items.Select(i => i.Quotationitemid).ToList();
 
+            // load all fees in 1 query
+            var fees = itemIds.Count == 0
+                ? new List<QuotationFee>()
+                : (await feeRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
 
+            // rule: mỗi item phải có ít nhất 1 fee GIẢM (issubtracted=0)
+            var discountCountByItem = fees
+                .Where(f => f.Quotationitemid != null && (f.Issubtracted ?? 0) == 0)
+                .GroupBy(f => f.Quotationitemid!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            foreach (var it in items)
+            {
+                if (!discountCountByItem.TryGetValue(it.Quotationitemid, out var c) || c <= 0)
+                    throw new Exception($"QuotationItem {it.Quotationitemid} must have at least 1 discount fee (issubtracted=0) before sending to admin.");
+            }
+
+            // recompute totals theo rule mới: total = sum(original) - sum(sub) + sum(add)
+            decimal totalOriginal = items.Sum(i => i.Price ?? 0m);
+            decimal totalSubtract = fees.Where(f => (f.Issubtracted ?? 0) == 0).Sum(f => f.Price ?? 0m);
+            decimal totalAdd = fees.Where(f => (f.Issubtracted ?? 0) == 1).Sum(f => f.Price ?? 0m);
+
+            var totalAfter = totalOriginal - totalSubtract + totalAdd;
+            Ensure(totalAfter >= 0, "Total after adjustments cannot be negative.");
+            Ensure(totalAfter > 0, "Total price must be > 0.");
+
+            q.Totalprice = Math.Round(totalAfter, 2);
             q.Status = QuotationStatus.WAITING_ADMIN;
-            _uow.GetRepository<Quotation>().Update(q);
+
+            qRepo.Update(q);
 
             await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, staffAccountId, QuotationAction.SEND_ADMIN,
-                message ?? "Sent to admin for approval.", toRole: QuotationRole.ADMIN);
+                message ?? "Sent to admin for approval.",
+                meta: new
+                {
+                    totalOriginal = Math.Round(totalOriginal, 2),
+                    totalSubtract = Math.Round(totalSubtract, 2),
+                    totalAdd = Math.Round(totalAdd, 2),
+                    totalAfter = Math.Round(totalAfter, 2)
+                },
+                toRole: QuotationRole.ADMIN
+            );
 
             await _uow.SaveAsync();
         }
+
 
         // ADMIN
         public async Task AdminApproveAsync(int quotationId, AdminDecisionRequest req)
@@ -581,22 +918,26 @@ namespace TetGift.BLL.Services
 
             var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
             var itemIds = items.Select(x => x.Quotationitemid).ToList();
-            var productIds = items.Where(x => x.Productid != null).Select(x => x.Productid!.Value).Distinct().ToList();
+            var productIds = items.Where(x => x.Productid != null)
+                                  .Select(x => x.Productid!.Value)
+                                  .Distinct()
+                                  .ToList();
 
-            //products
+            // products (batch)
             var products = productIds.Count == 0
                 ? new List<Product>()
                 : (await pRepo.FindAsync(p => productIds.Contains(p.Productid))).ToList();
 
-            //fees
+            // fees (batch) - now we keep ALL fees
             var fees = itemIds.Count == 0
                 ? new List<QuotationFee>()
                 : (await qfRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
 
-            var latestFeeByItemId = fees
+            // group fees by item
+            var feesByItemId = fees
                 .Where(f => f.Quotationitemid != null)
                 .GroupBy(f => f.Quotationitemid!.Value)
-                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Quotationfeeid).First());
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Quotationfeeid).ToList());
 
             // messages
             var messages = (await msgRepo.FindAsync(m => m.Quotationid == quotationId))
@@ -614,9 +955,9 @@ namespace TetGift.BLL.Services
                 })
                 .ToList();
 
-            // build lines + totals
-            decimal totalOriginal = 0;
-            decimal totalAfter = 0;
+            decimal totalOriginal = 0m;
+            decimal totalSubtract = 0m; // sum fee where issubtracted=0
+            decimal totalAdd = 0m;      // sum fee where issubtracted=1
 
             var lines = new List<QuotationLineDto>();
 
@@ -629,18 +970,25 @@ namespace TetGift.BLL.Services
                 var prod = products.FirstOrDefault(p => p.Productid == pid);
                 var unit = prod?.Price ?? 0m;
 
-                // original line total: QuotationItem.Price (you define as line total)
+                // ORIGINAL line total: QuotationItem.Price (fallback unit*qty)
                 var originalLineTotal = it.Price ?? (unit * qty);
+                originalLineTotal = Math.Round(originalLineTotal, 2);
 
-                // discounted line total: from fee.Price (you define as line total after discount)
-                latestFeeByItemId.TryGetValue(it.Quotationitemid, out var fee);
-                var after = fee?.Price ?? originalLineTotal;
+                // Fees for this item
+                feesByItemId.TryGetValue(it.Quotationitemid, out var itemFees);
+                itemFees ??= new List<QuotationFee>();
 
-                // discount percent
-                var percent = ParsePercent(fee?.Description);
+                decimal sub = itemFees.Where(f => (f.Issubtracted ?? 0) == 0).Sum(f => f.Price ?? 0m);
+                decimal add = itemFees.Where(f => (f.Issubtracted ?? 0) == 1).Sum(f => f.Price ?? 0m);
+
+                sub = Math.Round(sub, 2);
+                add = Math.Round(add, 2);
+
+                var finalLineTotal = Math.Round(originalLineTotal - sub + add, 2);
 
                 totalOriginal += originalLineTotal;
-                totalAfter += after;
+                totalSubtract += sub;
+                totalAdd += add;
 
                 lines.Add(new QuotationLineDto
                 {
@@ -649,12 +997,26 @@ namespace TetGift.BLL.Services
                     Sku = prod?.Sku,
                     ProductName = prod?.Productname,
                     Quantity = qty,
-                    UnitPrice = unit,
-                    OriginalLineTotal = Math.Round(originalLineTotal, 2),
-                    DiscountPercent = percent,
-                    AfterDiscountLineTotal = Math.Round(after, 2)
+                    UnitPrice = Math.Round(unit, 2),
+
+                    OriginalLineTotal = originalLineTotal,
+
+                    // NEW fields
+                    SubtractTotal = sub,
+                    AddTotal = add,
+                    FinalLineTotal = finalLineTotal,
+
+                    Fees = itemFees.Select(f => new QuotationFeeViewDto
+                    {
+                        QuotationFeeId = f.Quotationfeeid,
+                        IsSubtracted = (short)(f.Issubtracted ?? 0),
+                        Price = Math.Round(f.Price ?? 0m, 2),
+                        Description = f.Description
+                    }).ToList()
                 });
             }
+
+            var totalAfter = Math.Round(totalOriginal - totalSubtract + totalAdd, 2);
 
             var dto = new QuotationDetailDto
             {
@@ -682,9 +1044,12 @@ namespace TetGift.BLL.Services
                 DesiredPriceNote = q.Desiredpricenote,
                 Note = q.Note,
 
+                // totals
                 TotalOriginal = Math.Round(totalOriginal, 2),
-                TotalAfterDiscount = Math.Round(totalAfter, 2),
-                TotalDiscountAmount = Math.Round(totalOriginal - totalAfter, 2),
+                TotalSubtract = Math.Round(totalSubtract, 2),
+                TotalAdd = Math.Round(totalAdd, 2),
+                TotalAfterDiscount = totalAfter, // tên field giữ vậy cũng được, nghĩa là "after adjustments"
+                TotalDiscountAmount = Math.Round(totalOriginal - totalAfter, 2), // net discount (có thể âm nếu add > sub)
 
                 Lines = lines,
                 Messages = messages
@@ -692,6 +1057,7 @@ namespace TetGift.BLL.Services
 
             return dto;
         }
+
 
         // =========================
         // DETAIL by ROLE
