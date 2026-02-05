@@ -53,40 +53,40 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
             include: q => q.Include(c => c.ConfigDetails)
                 .ThenInclude(cd => cd.Category)
         );
-        
+
         if (config == null)
             throw new Exception($"Không tìm thấy cấu hình giỏ quà với ID {dto.Configid}.");
 
         // Validate all ProductIds in ProductDetails exist and match config requirements
         decimal totalWeight = 0;
         var validCategoryIds = config.ConfigDetails?.Select(cd => cd.Categoryid).ToHashSet() ?? new HashSet<int?>();
-        
+
         foreach (var detail in dto.ProductDetails)
         {
             if (!detail.Productid.HasValue)
                 throw new Exception("ProductId không được để trống trong ProductDetails.");
-            
+
             var product = await _uow.GetRepository<Product>().FindAsync(
                 p => p.Productid == detail.Productid.Value && !p.Status.Equals(ProductStatus.DELETED),
                 include: p => p.Include(pr => pr.Category)
             );
-            
+
             if (product == null)
                 throw new Exception($"Sản phẩm với ID {detail.Productid} không tồn tại hoặc đã bị xóa.");
-            
+
             // Validate product category belongs to config's allowed categories
             if (validCategoryIds.Any())
             {
                 if (!product.Categoryid.HasValue || !validCategoryIds.Contains(product.Categoryid))
                 {
-                    var allowedCategories = string.Join(", ", 
+                    var allowedCategories = string.Join(", ",
                         config.ConfigDetails?.Select(cd => cd.Category?.Categoryname ?? "N/A") ?? new List<string>());
                     throw new Exception(
                         $"Sản phẩm '{product.Productname}' thuộc danh mục không hợp lệ. " +
                         $"Danh mục cho phép: {allowedCategories}");
                 }
             }
-            
+
             // Calculate total weight
             var quantity = detail.Quantity ?? 1;
             var productWeight = product.Unit ?? 0;
@@ -130,14 +130,14 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
 
             await detailRepo.AddRangeAsync(productDetails);
             await _uow.SaveAsync();
-            
+
             // Recalculate Unit and Price after adding details
             var createdProduct = await _uow.GetRepository<Product>().FindAsync(
                 p => p.Productid == entity.Productid,
                 include: q => q.Include(p => p.ProductDetailProductparents)
                     .ThenInclude(pd => pd.Product)
             );
-            
+
             if (createdProduct != null)
             {
                 createdProduct.CalculateUnit();
@@ -280,7 +280,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
     {
         var products = await _uow.GetRepository<Product>()
             .GetAllAsync(
-                p => p.Accountid == accountId 
+                p => p.Accountid == accountId
                     && p.Configid.HasValue  // Only custom baskets
                     && !p.Status.Equals(ProductStatus.DELETED)
                     && !p.Status.Equals(ProductStatus.TEMPLATE),
@@ -443,7 +443,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
     {
         var repo = _uow.GetRepository<Product>();
         var userRepo = _uow.GetRepository<Account>();
-        
+
         // Check if requesting user is customer
         var requestingUser = await userRepo.FindAsync(
             a => a.Accountid == requestingAccountId
@@ -452,7 +452,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
 
         // Build query with additional filter for customer
         var productQuery = repo.FindAsync(
-            p => p.Productid == productId 
+            p => p.Productid == productId
                 && p.Configid.HasValue  // Must be custom basket
                 && !p.Status.Equals(ProductStatus.DELETED)
                 && (!isCustomer || p.Accountid == requestingAccountId),  // Customer can only see their own baskets
@@ -465,7 +465,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
 
         var product = await productQuery;
 
-        if (product == null) 
+        if (product == null)
         {
             if (isCustomer)
                 throw new Exception("Không tìm thấy giỏ quà của bạn hoặc bạn không có quyền chỉnh sửa giỏ quà này.");
@@ -490,7 +490,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
             // Customer can only update their own DRAFT or ACTIVE baskets
             if (product.Status == ProductStatus.TEMPLATE)
                 throw new Exception("Không thể chỉnh sửa template giỏ quà. Vui lòng clone template trước.");
-            
+
             // Customer cannot change basket to certain statuses
             if (dto.Status != null && !new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE }.Contains(dto.Status))
                 throw new Exception("Khách hàng chỉ có thể đặt trạng thái DRAFT hoặc ACTIVE.");
@@ -499,23 +499,23 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
         // Update basic info
         if (!string.IsNullOrWhiteSpace(dto.Productname))
             product.Productname = dto.Productname;
-        
+
         if (dto.Description != null)
             product.Description = dto.Description;
-        
+
         if (dto.ImageUrl != null)
             product.ImageUrl = dto.ImageUrl;
 
         // Validate and update Status
         if (dto.Status != null)
         {
-            var validStatuses = isCustomer 
+            var validStatuses = isCustomer
                 ? new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE }
                 : new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE, ProductStatus.INACTIVE };
-            
+
             if (!validStatuses.Contains(dto.Status))
                 throw new Exception($"Trạng thái không hợp lệ. Chỉ chấp nhận: {string.Join(", ", validStatuses)}");
-            
+
             product.Status = dto.Status;
         }
 
@@ -525,40 +525,40 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
             // Load config details to validate categories
             var validCategoryIds = product.Config?.ConfigDetails?.Select(cd => cd.Categoryid).ToHashSet() ?? new HashSet<int?>();
             decimal totalWeight = 0;
-            
+
             // Validate all ProductIds exist and are available
             foreach (var detail in dto.ProductDetails)
             {
                 if (!detail.Productid.HasValue)
                     throw new Exception("ProductId không được để trống trong ProductDetails.");
-                
+
                 var childProduct = await _uow.GetRepository<Product>().FindAsync(
-                    p => p.Productid == detail.Productid.Value 
+                    p => p.Productid == detail.Productid.Value
                         && p.Status == ProductStatus.ACTIVE,
                     include: p => p.Include(pr => pr.Category)
                 );
-                
+
                 if (childProduct == null)
                     throw new Exception($"Sản phẩm với ID {detail.Productid} không tồn tại hoặc không khả dụng.");
-                
+
                 // Validate product category belongs to config's allowed categories
                 if (product.Config != null && validCategoryIds.Any())
                 {
                     if (!childProduct.Categoryid.HasValue || !validCategoryIds.Contains(childProduct.Categoryid))
                     {
-                        var allowedCategories = string.Join(", ", 
+                        var allowedCategories = string.Join(", ",
                             product.Config.ConfigDetails?.Select(cd => cd.Category?.Categoryname ?? "N/A") ?? new List<string>());
                         throw new Exception(
                             $"Sản phẩm '{childProduct.Productname}' thuộc danh mục không hợp lệ. " +
                             $"Danh mục cho phép: {allowedCategories}");
                     }
                 }
-                
+
                 // Calculate total weight
                 var quantity = detail.Quantity ?? 1;
                 var productWeight = childProduct.Unit ?? 0;
                 totalWeight += productWeight * quantity;
-                
+
                 // For customer: validate product has sufficient stock if quantity is high
                 if (isCustomer && quantity > 10)
                 {
@@ -566,7 +566,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
                         s => s.Productid == detail.Productid && s.Status == StockStatus.ACTIVE
                     );
                     var totalStock = stocks.Sum(s => s.Stockquantity) ?? 0;
-                    
+
                     if (totalStock == 0)
                         throw new Exception($"Sản phẩm '{childProduct.Productname}' hiện đang hết hàng.");
                 }
@@ -612,19 +612,19 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
                     .Include(p => p.ProductDetailProductparents)
                     .ThenInclude(pd => pd.Product)
             );
-            
+
             if (updatedProduct != null)
             {
                 updatedProduct.CalculateUnit();
                 updatedProduct.CalculateTotalPrice();
-                
+
                 // Check config limits
-                if (updatedProduct.Config?.Totalunit.HasValue == true 
+                if (updatedProduct.Config?.Totalunit.HasValue == true
                     && updatedProduct.Unit > updatedProduct.Config.Totalunit.Value)
                 {
                     response.Warning = $"Cảnh báo: Trọng lượng giỏ quà ({updatedProduct.Unit}) vượt quá giới hạn cấu hình ({updatedProduct.Config.Totalunit.Value}).";
                 }
-                
+
                 repo.Update(updatedProduct);
                 await _uow.SaveAsync();
             }
@@ -920,7 +920,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
         }
 
         await _uow.SaveAsync();
-        
+
         // 3. Reload with full details to return complete DTO (similar to GetCustomProductByIdAsync but without Stocks)
         var clonedBasket = await _uow.GetRepository<Product>().FindAsync(
             p => p.Productid == newBasket.Productid,
@@ -931,13 +931,13 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
                 .Include(p => p.ProductDetailProductparents)
                     .ThenInclude(pd => pd.Product)
         );
-        
+
         if (clonedBasket == null)
             throw new Exception("Lỗi khi tạo giỏ quà clone.");
-        
+
         clonedBasket.CalculateUnit();
         clonedBasket.CalculateTotalPrice();
-        
+
         return new ProductDto
         {
             Productid = clonedBasket.Productid,
@@ -1017,7 +1017,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
         await _uow.SaveAsync();
     }
 
-    public async Task<IEnumerable<ProductDto>> GetWithQueryAsync(ProductQueryParameters productQuery)
+    public async Task<PagedResponse<ProductDto>> GetWithQueryAsync(ProductQueryParameters productQuery)
     {
         var repo = _uow.GetRepository<Product>();
 
@@ -1083,7 +1083,12 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
         // 6. Thực thi query và map sang Dto
         List<Product> products;
 
-        if (IsPageRequest(productQuery))
+        #region Paging
+
+        int totalItems = await query.CountAsync();
+        bool isPagingRequested = IsPageRequest(productQuery);
+
+        if (isPagingRequested)
         {
             // Phân trang
             int skip = (productQuery.PageNumber!.Value - 1) * productQuery.PageSize!.Value;
@@ -1097,8 +1102,11 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
             products = await query.ToListAsync();
         }
 
+        #endregion
 
-        return products.Select(p =>
+        #region Mapping
+
+        var dtos = products.Select(p =>
         {
             return new ProductDto
             {
@@ -1115,6 +1123,15 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
                 ImageUrl = p.ImageUrl
             };
         });
+
+        #endregion
+
+        return new PagedResponse<ProductDto>(
+            dtos,
+            totalItems,
+            productQuery.PageNumber ?? 1,
+            isPagingRequested ? productQuery.PageSize!.Value : totalItems
+            );
     }
 
     private bool IsPageRequest(ProductQueryParameters productQuery)
