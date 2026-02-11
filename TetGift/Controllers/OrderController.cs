@@ -143,4 +143,27 @@ public class OrderController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    [HttpPost("{orderId:int}/allocate-stock")]
+    [Authorize(Roles = "ADMIN,STAFF")]
+    public async Task<IActionResult> AllocateStock(int orderId)
+    {
+        try
+        {
+            var accountIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim) || !int.TryParse(accountIdClaim, out var actorId))
+                return Unauthorized(new { message = "Không thể xác định người dùng." });
+
+            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value ?? "";
+
+            await _orderService.ForceAllocateStockAsync(orderId, actorId, role);
+
+            return Ok(new { message = "Allocate stock executed." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
 }

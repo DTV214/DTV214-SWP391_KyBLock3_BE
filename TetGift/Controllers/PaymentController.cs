@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
+using TetGift.BLL.Services;
 
 namespace TetGift.Controllers;
 
@@ -12,11 +13,13 @@ public class PaymentController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
     private readonly IWalletService _walletService;
+    private readonly IOrderService _orderService;
 
-    public PaymentController(IPaymentService paymentService, IWalletService walletService)
+    public PaymentController(IPaymentService paymentService, IWalletService walletService, IOrderService orderService)
     {
         _paymentService = paymentService;
         _walletService = walletService;
+        _orderService = orderService;
     }
 
     private int GetCurrentAccountId()
@@ -142,6 +145,12 @@ public class PaymentController : ControllerBase
 
             var result = await _paymentService.ProcessIpnCallbackAsync(queryParams);
 
+            ////Bảo: check stock nếu đủ thì lấy
+            //if (result.Success && result.OrderId > 0)
+            //{
+            //    await _orderService.TryAllocateStockAfterPaymentAsync(result.OrderId);
+            //}
+
             // Trả về JSON response cho VNPay
             var response = new
             {
@@ -164,6 +173,12 @@ public class PaymentController : ControllerBase
         {
             var queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
             var result = await _paymentService.ProcessReturnUrlAsync(queryParams);
+
+            ////Bảo: check stock nếu đủ thì lấy
+            //if (result.Success && result.OrderId > 0)
+            //{
+            //    await _orderService.TryAllocateStockAfterPaymentAsync(result.OrderId);
+            //}
 
             return Ok(result);
         }

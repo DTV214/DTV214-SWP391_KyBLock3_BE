@@ -6,9 +6,32 @@ namespace TetGift.BLL.Services
     {
         public string RenderOtp(string otp, int minutes)
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "EmailTemplates", "OtpEmail.html");
-            if (!File.Exists(path))
-                path = Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", "OtpEmail.html");
+            // Try multiple possible paths
+            var possiblePaths = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "EmailTemplates", "OtpEmail.html"),
+                Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", "OtpEmail.html"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EmailTemplates", "OtpEmail.html")
+            };
+
+            string? path = null;
+            foreach (var possiblePath in possiblePaths)
+            {
+                if (File.Exists(possiblePath))
+                {
+                    path = possiblePath;
+                    break;
+                }
+            }
+
+            if (path == null || !File.Exists(path))
+            {
+                var searchedPaths = string.Join(", ", possiblePaths);
+                throw new FileNotFoundException(
+                    $"Email template 'OtpEmail.html' not found. Searched paths: {searchedPaths}. " +
+                    $"Current directory: {Directory.GetCurrentDirectory()}, " +
+                    $"Base directory: {AppContext.BaseDirectory}");
+            }
 
             var html = File.ReadAllText(path);
 
