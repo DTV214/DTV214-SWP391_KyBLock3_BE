@@ -24,118 +24,130 @@ namespace TetGift.BLL.Services
             var qiRepo = _uow.GetRepository<QuotationItem>();
             var qfRepo = _uow.GetRepository<QuotationFee>();
             var pRepo = _uow.GetRepository<Product>();
+
             var oRepo = _uow.GetRepository<Order>();
             var odRepo = _uow.GetRepository<OrderDetail>();
 
-            // 1) load quotation
             var q = (await qRepo.FindAsync(x => x.Quotationid == quotationId)).FirstOrDefault();
             if (q == null) throw new Exception("Quotation not found.");
-            if (q.Accountid != accountId) throw new Exception("Forbidden.");
+            if ((q.Accountid ?? 0) != accountId) throw new Exception("Forbidden.");
 
-            // prevent duplicate conversion
-            if (q.Orderid != null && q.Orderid > 0)
-                return q.Orderid.Value;
+            // chống double convert
+            if (q.Orderid != null && q.Orderid > 0) return q.Orderid.Value;
 
-            // Only allow conversion at accepted stage
-            if (!string.Equals(q.Status, QuotationStatus.CUSTOMER_ACCEPTED, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(q.Status, QuotationStatus.CONVERTED_TO_ORDER, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new Exception("Quotation is not accepted yet.");
-            }
-
-            // 2) load items
             var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
             if (items.Count == 0) throw new Exception("Quotation has no items.");
 
-            // 3) create order first
-            var order = new Order
+            _uow.BeginTransaction();
+            try
             {
-                Accountid = accountId,
-                Orderdatetime = DateTime.Now,
-                Status = OrderStatus.PENDING,
-                Totalprice = 0,
-
-                Customername = q.Company,
-                Customerphone = q.Phone,
-                Customeremail = q.Email,
-                Customeraddress = q.Address,
-                Note = q.Note
-            };
-
-            await oRepo.AddAsync(order);
-            await _uow.SaveAsync();
-
-            // 4) build order details using: final = original - sum(sub) + sum(add)
-            decimal total = 0;
-
-            foreach (var it in items)
-            {
-                var pid = it.Productid ?? 0;
-                var qty = it.Quantity ?? 0;
-                if (pid <= 0 || qty <= 0) continue;
-
-                // original line total (QuotationItem.Price = line total)
-                decimal originalLineTotal = it.Price ?? 0m;
-
-                // fallback: nếu chưa có item.Price thì tính từ product.price * qty và update lại
-                if (originalLineTotal <= 0)
+                // 1) ensure QuotationItem.Price = line total gốc (snapshot)
+                foreach (var it in items)
                 {
-                    var prod = (await pRepo.FindAsync(x => x.Productid == pid)).FirstOrDefault();
-                    if (prod == null) throw new Exception($"Product not found: {pid}");
+                    var pid = it.Productid ?? 0;
+                    var qty = it.Quantity ?? 0;
+                    if (pid <= 0 || qty <= 0)
+                        throw new Exception($"QuotationItem {it.Quotationitemid} missing product/quantity.");
 
-                    var unitPrice = prod.Price ?? 0m;
-                    if (unitPrice <= 0) throw new Exception($"Invalid product price for product {pid}.");
+                    if (it.Price == null || it.Price <= 0)
+                    {
+                        var prod = (await pRepo.FindAsync(p => p.Productid == pid)).FirstOrDefault()
+                                   ?? throw new Exception($"Product not found: {pid}");
 
-                    originalLineTotal = unitPrice * qty;
+                        var unit = prod.Price ?? 0m;
+                        if (unit <= 0) throw new Exception($"Invalid product price: {pid}");
 
-                    it.Price = Math.Round(originalLineTotal, 2);
-                    qiRepo.Update(it);
+                        it.Price = Math.Round(unit * qty, 2);
+                        qiRepo.Update(it);
+                    }
+                }
+                await _uow.SaveAsync();
+
+                // 2) load all fees (batch)
+                var itemIds = items.Select(i => i.Quotationitemid).ToList();
+                var fees = itemIds.Count == 0
+                    ? new List<QuotationFee>()
+                    : (await qfRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
+
+                var feesByItem = fees
+                    .Where(f => f.Quotationitemid != null)
+                    .GroupBy(f => f.Quotationitemid!.Value)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                // 3) create Order (PENDING: chờ payment)
+                var order = new Order
+                {
+                    Accountid = accountId,
+                    Orderdatetime = DateTime.Now,
+                    Status = OrderStatus.PENDING,
+
+                    Customername = q.Company,
+                    Customerphone = q.Phone,
+                    Customeremail = q.Email,
+                    Customeraddress = q.Address,
+                    Note = q.Note,
+
+                    Totalprice = 0m
+                };
+
+                await oRepo.AddAsync(order);
+                await _uow.SaveAsync();
+
+                // 4) create OrderDetails + compute total = sum(original) - sum(sub) + sum(add)
+                decimal total = 0m;
+
+                foreach (var it in items)
+                {
+                    var pid = it.Productid ?? 0;
+                    var qty = it.Quantity ?? 0;
+                    if (pid <= 0 || qty <= 0) continue;
+
+                    var original = Math.Round(it.Price ?? 0m, 2);
+
+                    feesByItem.TryGetValue(it.Quotationitemid, out var itemFees);
+                    itemFees ??= new List<QuotationFee>();
+
+                    var sub = itemFees.Where(f => (f.Issubtracted ?? 0) == 0).Sum(f => f.Price ?? 0m);
+                    var add = itemFees.Where(f => (f.Issubtracted ?? 0) == 1).Sum(f => f.Price ?? 0m);
+
+                    sub = Math.Round(sub, 2);
+                    add = Math.Round(add, 2);
+
+                    var finalLine = Math.Round(original - sub + add, 2);
+                    if (finalLine < 0) throw new Exception($"Final line total cannot be negative (quotationItemId={it.Quotationitemid}).");
+
+                    total += finalLine;
+
+                    await odRepo.AddAsync(new OrderDetail
+                    {
+                        Orderid = order.Orderid,
+                        Productid = pid,
+                        Quantity = qty,
+                        Amount = finalLine
+                    });
                 }
 
-                // fees: MUST exist at least 1 fee per item
-                var fees = (await qfRepo.FindAsync(f => f.Quotationitemid == it.Quotationitemid)).ToList();
-                if (fees.Count == 0)
-                    throw new Exception($"QuotationItem {it.Quotationitemid} is missing quotation fees.");
+                if (total <= 0) throw new Exception("Order total invalid.");
 
-                decimal subtractTotal = fees
-                    .Where(f => (f.Issubtracted ?? 0) == 0)
-                    .Sum(f => f.Price ?? 0m);
+                order.Totalprice = Math.Round(total, 2);
+                oRepo.Update(order);
 
-                decimal addTotal = fees
-                    .Where(f => (f.Issubtracted ?? 0) == 1)
-                    .Sum(f => f.Price ?? 0m);
+                // 5) link quotation -> order
+                q.Orderid = order.Orderid;
+                q.Status = QuotationStatus.CONVERTED_TO_ORDER;
+                qRepo.Update(q);
 
-                var finalLineTotal = originalLineTotal - subtractTotal + addTotal;
-                if (finalLineTotal < 0)
-                    throw new Exception($"Final line total cannot be negative for item {it.Quotationitemid}.");
+                await _uow.SaveAsync();
+                _uow.CommitTransaction();
 
-                finalLineTotal = Math.Round(finalLineTotal, 2);
-
-                total += finalLineTotal;
-
-                await odRepo.AddAsync(new OrderDetail
-                {
-                    Orderid = order.Orderid,
-                    Productid = pid,
-                    Quantity = qty,
-                    Amount = finalLineTotal
-                });
+                return order.Orderid;
             }
-
-            if (total <= 0) throw new Exception("Order total invalid (0).");
-
-            // 5) update order total
-            order.Totalprice = Math.Round(total, 2);
-            oRepo.Update(order);
-
-            // 6) link quotation -> order
-            q.Orderid = order.Orderid;
-            q.Status = QuotationStatus.CONVERTED_TO_ORDER;
-            qRepo.Update(q);
-
-            await _uow.SaveAsync();
-
-            return order.Orderid;
+            catch
+            {
+                _uow.RollBack();
+                throw;
+            }
         }
+
     }
 }
