@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
 using TetGift.BackgroundJobs;
 using TetGift.BLL.Common;
 using TetGift.BLL.Interfaces;
@@ -34,7 +34,7 @@ namespace TetGift
                 options.AddPolicy("AllowReactApp",
                     policy =>
                     {
-                        policy.WithOrigins("http://localhost:5173") // Khớp với origin của React (Vite)
+                        policy.WithOrigins("http://localhost:5173", "http://14.225.207.221") // Khớp với origin của React (Vite)
                               .AllowAnyHeader()
                               .AllowAnyMethod()
                               .AllowCredentials();
