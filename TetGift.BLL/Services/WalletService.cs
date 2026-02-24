@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using System.Net;
 using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Common.VnPay;
 using TetGift.BLL.Dtos;
@@ -100,7 +99,7 @@ public class WalletService : IWalletService
     public async Task<WalletResponseDto> CreateWalletForAccountAsync(int accountId)
     {
         var walletRepo = _uow.GetRepository<Wallet>();
-        
+
         // Kiểm tra đã có ví chưa
         var existingWallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
         if (existingWallet != null)
@@ -177,7 +176,7 @@ public class WalletService : IWalletService
         vnpay.AddRequestData("vnp_Version", VnPayLibrary.VERSION);
         vnpay.AddRequestData("vnp_Command", "pay");
         vnpay.AddRequestData("vnp_TmnCode", vnpTmnCode);
-        
+
         var vietnamTime = DateTime.UtcNow.AddHours(7);
         vnpay.AddRequestData("vnp_Amount", ((long)(amount * 100)).ToString());
         vnpay.AddRequestData("vnp_CreateDate", vietnamTime.ToString("yyyyMMddHHmmss"));
@@ -372,13 +371,13 @@ public class WalletService : IWalletService
                 .ThenInclude(od => od.Product)
                 .Include(o => o.Promotion)
         );
-        
+
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng hoặc bạn không có quyền thanh toán đơn hàng này.");
-        
+
         if (order.Status != OrderStatus.PENDING)
             throw new Exception("Chỉ có thể thanh toán cho đơn hàng đang chờ xác nhận.");
-        
+
         // Calculate FinalPrice từ Order (Totalprice đã được tính với discount khi tạo order)
         decimal finalPrice = order.Totalprice ?? 0;
 
@@ -393,7 +392,7 @@ public class WalletService : IWalletService
         // 3. Lấy ví và kiểm tra số dư
         var walletRepo = _uow.GetRepository<Wallet>();
         var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
-        
+
         if (wallet == null)
         {
             // Tự động tạo ví nếu chưa có
@@ -426,6 +425,7 @@ public class WalletService : IWalletService
             Status = PaymentStatus.SUCCESS,
             Type = "ORDER_PAYMENT",
             Paymentmethod = "WALLET",
+            CreatedDate = DateTime.UtcNow,
             Ispayonline = false
         };
         await paymentRepo.AddAsync(payment);
@@ -466,11 +466,11 @@ public class WalletService : IWalletService
     {
         var paymentRepo = _uow.GetRepository<Payment>();
         var orderRepo = _uow.GetRepository<Order>();
-        
+
         // Tìm payment thành công (WALLET hoặc VNPAY)
         var payment = await paymentRepo.FindAsync(
-            p => p.Orderid == orderId && 
-                 (p.Paymentmethod == "WALLET" || p.Paymentmethod == "VNPAY") && 
+            p => p.Orderid == orderId &&
+                 (p.Paymentmethod == "WALLET" || p.Paymentmethod == "VNPAY") &&
                  p.Status == PaymentStatus.SUCCESS,
             include: q => q.Include(p => p.Wallet)
         );
