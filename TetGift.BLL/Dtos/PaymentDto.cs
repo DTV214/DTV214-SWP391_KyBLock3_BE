@@ -24,6 +24,7 @@ public class PaymentResponseDto
     public decimal Amount { get; set; }
     public string PaymentUrl { get; set; } = null!;
     public string Status { get; set; } = null!;
+    public DateTime? CreatedDate { get; set; }
 }
 
 public class PaymentResultDto

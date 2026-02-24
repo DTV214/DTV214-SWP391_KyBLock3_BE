@@ -97,6 +97,22 @@ public class OrderController : ControllerBase
         }
     }
 
+    [HttpPut("{orderId}/shipping-info")]
+    public async Task<IActionResult> UpdateShippingInfo(int orderId, [FromBody] UpdateOrderShippingRequest request)
+    {
+        try
+        {
+            var accountId = GetCurrentAccountId();
+            var userRole = GetCurrentUserRole();
+            var result = await _orderService.UpdateOrderShippingInfoAsync(orderId, accountId, userRole, request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     // ========== ADMIN ENDPOINTS ==========
 
     [HttpGet()]

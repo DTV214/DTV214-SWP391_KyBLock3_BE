@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace TetGift.DAL.Entities;
+﻿namespace TetGift.DAL.Entities;
 
 public partial class Payment
 {
@@ -19,7 +16,9 @@ public partial class Payment
 
     public int? Walletid { get; set; }
 
-    public string? Paymentmethod { get; set; } // VNPAY, WALLET
+    public DateTime? CreatedDate { get; set; }
+
+    public string? Paymentmethod { get; set; }
 
     public string? Transactionno { get; set; }
 

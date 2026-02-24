@@ -44,7 +44,7 @@ public class OrderService : IOrderService
 
                 // Lấy promotionId từ promotion service
                 var allPromotions = await _promotionService.GetAllAsync();
-                var promotion = allPromotions.FirstOrDefault(p => 
+                var promotion = allPromotions.FirstOrDefault(p =>
                     p.Code.Equals(request.PromotionCode, StringComparison.OrdinalIgnoreCase));
                 if (promotion != null)
                     promotionId = promotion.PromotionId;
@@ -169,6 +169,56 @@ public class OrderService : IOrderService
         return orders.Select(o => MapToOrderResponseDto(o));
     }
 
+    public async Task<OrderResponseDto> UpdateOrderShippingInfoAsync(int orderId, int accountId, string userRole, UpdateOrderShippingRequest request)
+    {
+        var orderRepo = _uow.GetRepository<Order>();
+        var orders = await orderRepo.FindAsync(o => o.Orderid == orderId);
+
+        if (!orders.Any())
+            throw new Exception("Không tìm thấy đơn hàng.");
+
+        var order = orders.FirstOrDefault();
+        if (order == null)
+            throw new Exception("Không tìm thấy đơn hàng.");
+
+        // Kiểm tra quyền: Chỉ ADMIN hoặc chính chủ đơn hàng mới được sửa
+        var normalizedRole = userRole.ToUpper();
+        if (normalizedRole != "ADMIN" && order.Accountid != accountId)
+        {
+            throw new Exception("Bạn không có quyền chỉnh sửa thông tin đơn hàng này.");
+        }
+
+        // Chỉ cho phép sửa khi đơn hàng chưa giao hoặc chưa hủy (tùy nghiệp vụ của bạn)
+        if (order.Status == OrderStatus.DELIVERED || order.Status == OrderStatus.CANCELLED)
+        {
+            throw new Exception("Không thể cập nhật thông tin cho đơn hàng đã hoàn tất hoặc đã hủy.");
+        }
+
+        // Cập nhật các trường nếu không null hoặc empty
+        if (!string.IsNullOrWhiteSpace(request.CustomerName))
+            order.Customername = request.CustomerName;
+
+        if (!string.IsNullOrWhiteSpace(request.CustomerPhone))
+            order.Customerphone = request.CustomerPhone;
+
+        if (!string.IsNullOrWhiteSpace(request.CustomerEmail))
+            order.Customeremail = request.CustomerEmail;
+
+        if (!string.IsNullOrWhiteSpace(request.CustomerAddress))
+            order.Customeraddress = request.CustomerAddress;
+
+        // Riêng Note có thể cho phép xóa trắng nếu cần, 
+        // nhưng theo yêu cầu của bạn "null/empty thì không sửa" nên tôi áp dụng logic tương tự
+        if (!string.IsNullOrWhiteSpace(request.Note))
+            order.Note = request.Note;
+
+        orderRepo.Update(order);
+        await _uow.SaveAsync();
+
+        // Load lại dữ liệu đầy đủ để trả về
+        return await GetOrderByIdAsync(orderId, order.Accountid ?? accountId);
+    }
+
     public async Task<OrderResponseDto> GetOrderByIdAsync(int orderId, int accountId)
     {
         var orderRepo = _uow.GetRepository<Order>();
@@ -189,7 +239,7 @@ public class OrderService : IOrderService
     public async Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync(string? status = null)
     {
         var orderRepo = _uow.GetRepository<Order>();
-        
+
         IEnumerable<Order> orders;
         if (!string.IsNullOrWhiteSpace(status))
         {
@@ -261,7 +311,7 @@ public class OrderService : IOrderService
         if (newStatus == OrderStatus.CANCELLED && currentStatus != OrderStatus.CANCELLED)
         {
             await RestoreStockAsync(order);
-            
+
             // Hoàn tiền vào ví nếu thanh toán bằng ví
             await _walletService.RefundToWalletAsync(orderId);
         }
@@ -323,7 +373,7 @@ public class OrderService : IOrderService
 
         // Process cancellation
         await RestoreStockAsync(order);
-        
+
         // Hoàn tiền vào ví (nếu đã thanh toán)
         await _walletService.RefundToWalletAsync(orderId);
 
@@ -389,11 +439,11 @@ public class OrderService : IOrderService
             {
                 var quantityToRestore = Math.Abs(movement.Quantity ?? 0);
                 stock.Stockquantity = (stock.Stockquantity ?? 0) + quantityToRestore;
-                
+
                 // Nếu stock đang OUT_OF_STOCK và sau khi hoàn lại có số lượng > 0, chuyển về ACTIVE
                 if (stock.Status == StockStatus.OUT_OF_STOCK && stock.Stockquantity > 0)
                     stock.Status = StockStatus.ACTIVE;
-                
+
                 stockRepo.Update(stock);
 
                 // Tạo StockMovement mới để ghi log hoàn lại
