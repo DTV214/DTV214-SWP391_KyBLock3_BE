@@ -369,16 +369,28 @@ public class OrderService : IOrderService
             }
         }
 
-        // Process cancellation
-        await RestoreStockAsync(order);
+        _uow.BeginTransaction();
 
-        // Hoàn tiền vào ví (nếu đã thanh toán)
-        await _walletService.RefundToWalletAsync(orderId);
+        try
+        {
+            // Process cancellation
+            await RestoreStockAsync(order);
 
-        // Update order status
-        order.Status = OrderStatus.CANCELLED;
-        orderRepo.Update(order);
-        await _uow.SaveAsync();
+            // Hoàn tiền vào ví (nếu đã thanh toán)
+            await _walletService.RefundToWalletAsync(orderId);
+
+            // Update order status
+            order.Status = OrderStatus.CANCELLED;
+            orderRepo.Update(order);
+            await _uow.SaveAsync();
+
+            _uow.CommitTransaction();
+        }
+        catch (Exception)
+        {
+            _uow.RollBack();
+            throw;
+        }
 
         // Load lại với đầy đủ thông tin
         var updatedOrder = await orderRepo.FindAsync(
@@ -420,12 +432,7 @@ public class OrderService : IOrderService
             sm => sm.Orderid == order.Orderid && sm.Quantity.HasValue && sm.Quantity < 0
         );
 
-        if (movements == null || !movements.Any())
-        {
-            // Nếu không tìm thấy StockMovement, có thể đơn hàng này chưa có stock được trừ
-            // Hoặc đã được hoàn lại rồi - không cần làm gì
-            return;
-        }
+        if (movements == null || !movements.Any()) return;
 
         foreach (var movement in movements)
         {

@@ -24,6 +24,9 @@ namespace TetGift
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // Npgsql xử lý Datetime không khắc khe DateTime.Kind (Utc và no time zone)
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
             // ConnectionString
             builder.Services.AddDbContext<DatabaseContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
