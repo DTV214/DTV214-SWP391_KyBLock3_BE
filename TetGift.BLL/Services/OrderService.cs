@@ -83,7 +83,7 @@ public class OrderService : IOrderService
             Customeremail = request.CustomerEmail,
             Customeraddress = request.CustomerAddress,
             Note = request.Note,
-            Orderdatetime = DateTime.Now
+            Orderdatetime = DateTime.UtcNow
         };
         await orderRepo.AddAsync(order);
         await _uow.SaveAsync();
@@ -129,7 +129,7 @@ public class OrderService : IOrderService
                     Stockid = stock.Stockid,
                     Orderid = order.Orderid,
                     Quantity = -quantityToDeduct, // Số âm để thể hiện xuất kho
-                    Movementdate = DateTime.Now,
+                    Movementdate = DateTime.UtcNow,
                     Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
                 };
                 await stockMovementRepo.AddAsync(movement);
@@ -362,12 +362,10 @@ public class OrderService : IOrderService
             if (order.Accountid != accountId)
                 throw new Exception("Bạn không có quyền hủy đơn hàng này.");
 
-            // Validate time limit: 15 phút cho Customer
-            if (order.Orderdatetime.HasValue)
+            // Validate order status
+            if (order.Status != OrderStatus.PENDING && order.Status != OrderStatus.CONFIRMED)
             {
-                var timeElapsed = DateTime.Now - order.Orderdatetime.Value;
-                if (timeElapsed.TotalMinutes > 15)
-                    throw new Exception("Chỉ có thể hủy đơn hàng trong vòng 15 phút kể từ khi đặt hàng.");
+                throw new Exception("Chỉ có thể hủy đơn hàng trong giai đoạn chưa xử lí đơn hàng.");
             }
         }
 
@@ -452,7 +450,7 @@ public class OrderService : IOrderService
                     Stockid = stock.Stockid,
                     Orderid = order.Orderid,
                     Quantity = quantityToRestore, // Số dương để thể hiện nhập lại
-                    Movementdate = DateTime.Now,
+                    Movementdate = DateTime.UtcNow,
                     Note = $"Hoàn lại kho do hủy đơn hàng #{order.Orderid}"
                 };
                 await stockMovementRepo.AddAsync(restoreMovement);
@@ -615,7 +613,7 @@ public class OrderService : IOrderService
                         Stockid = stock.Stockid,
                         Orderid = order.Orderid,
                         Quantity = -deduct,
-                        Movementdate = DateTime.Now,
+                        Movementdate = DateTime.UtcNow,
                         Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
                     });
 
@@ -628,8 +626,8 @@ public class OrderService : IOrderService
 
             order.Status = OrderStatus.PROCESSING;
             order.Note = string.IsNullOrWhiteSpace(order.Note)
-                ? $"[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
-                : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+                ? $"[ALLOCATED] Auto allocated at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}"
+                : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}";
 
             orderRepo.Update(order);
 
@@ -754,8 +752,8 @@ public class OrderService : IOrderService
         {
             updated.Status = OrderStatus.PROCESSING;
             updated.Note = string.IsNullOrWhiteSpace(updated.Note)
-                ? $"[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
-                : $"{updated.Note}\n[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+                ? $"[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}"
+                : $"{updated.Note}\n[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}";
 
             orderRepo.Update(updated);
             await _uow.SaveAsync();

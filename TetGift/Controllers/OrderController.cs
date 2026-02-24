@@ -81,7 +81,7 @@ public class OrderController : ControllerBase
         }
     }
 
-    [HttpPost("{orderId}/cancel")]
+    [HttpDelete("{orderId}/cancel")]
     public async Task<IActionResult> CancelOrder(int orderId)
     {
         try
