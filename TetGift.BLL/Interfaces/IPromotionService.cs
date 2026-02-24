@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TetGift.BLL.Dtos;
+﻿using TetGift.BLL.Dtos;
 
 namespace TetGift.BLL.Interfaces
 {
@@ -13,6 +8,7 @@ namespace TetGift.BLL.Interfaces
         Task<IEnumerable<PromotionResponseDto>> GetAllAsync();
         // --- THÊM MỚI ---
         Task<PromotionResponseDto> GetByIdAsync(int id);
+        Task<PromotionResponseDto> GetByCodeAsync(string code);
         Task UpdateAsync(int id, UpdatePromotionRequest req);
         Task DeleteAsync(int id);
     }

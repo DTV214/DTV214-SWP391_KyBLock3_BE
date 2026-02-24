@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TetGift.BLL.Dtos;
+﻿using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
 using TetGift.DAL.Interfaces;
@@ -19,7 +14,7 @@ namespace TetGift.BLL.Services
         }
         public async Task<PromotionResponseDto> CreateAsync(CreatePromotionRequest req)
         {
-            if(req.ExpiryDate <= DateTime.UtcNow)
+            if (req.ExpiryDate <= DateTime.UtcNow)
             {
                 throw new Exception("Ngày hết hạn phải lớn hơn thời điểm hiện tại.");
             }
@@ -131,6 +126,27 @@ namespace TetGift.BLL.Services
             // 3. Save
             await repo.UpdateAsync(promo);
             // _unitOfWork.SaveAsync(); // Nếu GenericRepo chưa save thì bỏ comment dòng này
+        }
+
+        public async Task<PromotionResponseDto> GetByCodeAsync(string code)
+        {
+            var repo = _unitOfWork.GetRepository<Promotion>();
+            var promos = await repo.FindAsync(p => p.Code.Equals(code));
+            if (!promos.Any()) throw new Exception("Không tìm thấy mã giảm giá.");
+
+            var promo = promos.FirstOrDefault();
+
+            if (promo == null || promo.Isdeleted == true)
+                throw new Exception("Không tìm thấy mã giảm giá.");
+
+            return new PromotionResponseDto
+            {
+                PromotionId = promo.Promotionid,
+                Code = promo.Code ?? "",
+                DiscountValue = promo.Discountvalue ?? 0,
+                ExpiryDate = promo.Expirydate ?? DateTime.MinValue,
+                IsActive = promo.Expirydate > DateTime.Now
+            };
         }
         // ----------------
     }
