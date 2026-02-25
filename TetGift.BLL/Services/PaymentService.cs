@@ -93,7 +93,7 @@ public class PaymentService : IPaymentService
         vnpay.AddRequestData("vnp_TmnCode", vnpTmnCode);
         // VNPay yêu cầu timezone GMT+7 (Vietnam time)
         // Convert UTC to GMT+7
-        var vietnamTime = DateTime.UtcNow.AddHours(7);
+        var vietnamTime = DateTime.Now.AddHours(7);
 
         vnpay.AddRequestData("vnp_Amount", ((long)(finalPrice * 100)).ToString()); // Nhân 100 để khử phần thập phân
         vnpay.AddRequestData("vnp_CreateDate", vietnamTime.ToString("yyyyMMddHHmmss"));

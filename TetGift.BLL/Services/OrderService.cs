@@ -83,7 +83,7 @@ public class OrderService : IOrderService
             Customeremail = request.CustomerEmail,
             Customeraddress = request.CustomerAddress,
             Note = request.Note,
-            Orderdatetime = DateTime.UtcNow
+            Orderdatetime = DateTime.Now
         };
         await orderRepo.AddAsync(order);
         await _uow.SaveAsync();
@@ -129,7 +129,7 @@ public class OrderService : IOrderService
                     Stockid = stock.Stockid,
                     Orderid = order.Orderid,
                     Quantity = -quantityToDeduct, // Số âm để thể hiện xuất kho
-                    Movementdate = DateTime.UtcNow,
+                    Movementdate = DateTime.Now,
                     Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
                 };
                 await stockMovementRepo.AddAsync(movement);
@@ -457,7 +457,7 @@ public class OrderService : IOrderService
                     Stockid = stock.Stockid,
                     Orderid = order.Orderid,
                     Quantity = quantityToRestore, // Số dương để thể hiện nhập lại
-                    Movementdate = DateTime.UtcNow,
+                    Movementdate = DateTime.Now,
                     Note = $"Hoàn lại kho do hủy đơn hàng #{order.Orderid}"
                 };
                 await stockMovementRepo.AddAsync(restoreMovement);
@@ -620,7 +620,7 @@ public class OrderService : IOrderService
                         Stockid = stock.Stockid,
                         Orderid = order.Orderid,
                         Quantity = -deduct,
-                        Movementdate = DateTime.UtcNow,
+                        Movementdate = DateTime.Now,
                         Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
                     });
 
@@ -633,8 +633,8 @@ public class OrderService : IOrderService
 
             order.Status = OrderStatus.PROCESSING;
             order.Note = string.IsNullOrWhiteSpace(order.Note)
-                ? $"[ALLOCATED] Auto allocated at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}"
-                : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}";
+                ? $"[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+                : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
 
             orderRepo.Update(order);
 
@@ -759,8 +759,8 @@ public class OrderService : IOrderService
         {
             updated.Status = OrderStatus.PROCESSING;
             updated.Note = string.IsNullOrWhiteSpace(updated.Note)
-                ? $"[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}"
-                : $"{updated.Note}\n[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}";
+                ? $"[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+                : $"{updated.Note}\n[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
 
             orderRepo.Update(updated);
             await _uow.SaveAsync();
