@@ -285,6 +285,8 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.Totalprice)
                 .HasPrecision(18, 2)
                 .HasColumnName("totalprice");
+            entity.Property(e => e.isQuotation)
+                .HasColumnName("isquotation");
 
             entity.HasOne(d => d.Account).WithMany(p => p.Orders)
                 .HasForeignKey(d => d.Accountid)

@@ -26,6 +26,7 @@ public partial class Order
     public string? Customeraddress { get; set; }
 
     public string? Note { get; set; }
+    public int? isQuotation { get;set; } // 0 or null for normal order, 1 for quotation converted order
 
     public virtual Account? Account { get; set; }
 

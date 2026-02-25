@@ -87,7 +87,8 @@ namespace TetGift.BLL.Services
                     Customeraddress = q.Address,
                     Note = q.Note,
 
-                    Totalprice = 0m
+                    Totalprice = 0m,
+                    isQuotation = 1
                 };
 
                 await oRepo.AddAsync(order);
