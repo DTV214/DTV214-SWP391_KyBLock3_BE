@@ -35,7 +35,7 @@ namespace TetGift
                 options.AddPolicy("AllowReactApp",
                     policy =>
                     {
-                        policy.WithOrigins("http://localhost:5173", "http://14.225.207.221") // Khớp với origin của React (Vite)
+                        policy.WithOrigins("http://localhost:5173", "http://14.225.207.221", "https://localhost:7056/") // Khớp với origin của React (Vite)
                               .AllowAnyHeader()
                               .AllowAnyMethod()
                               .AllowCredentials();
@@ -224,11 +224,13 @@ namespace TetGift
 
             // --- PHẦN THÊM CỦA MÌNH: SỬ DỤNG CORS MIDDLEWARE ---
             // Phải đặt sau UseRouting và trước UseAuthentication/Authorization
+            app.UseStaticFiles();
+
             app.UseRouting();
 
             app.UseCors("AllowReactApp");
 
-            app.MapHub<ChatHub>("/chatHub");    
+            app.MapHub<ChatHub>("/hubs/chat");
 
             //Middleware
             app.UseMiddleware<ExceptionMiddleware>();

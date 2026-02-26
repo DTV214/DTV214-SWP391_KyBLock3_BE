@@ -3,6 +3,7 @@ using TetGift.BLL.Hubs;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
 using TetGift.DAL.Interfaces;
+using TetGift.BLL.Dtos;
 
 namespace TetGift.BLL.Services
 {
@@ -50,6 +51,24 @@ namespace TetGift.BLL.Services
             );
         }
 
+        public async Task<IEnumerable<Message>> GetMessagesForUserAsync(int conversationId, int userId)
+        {
+            var conversationRepo = _unitOfWork.GetRepository<Conversation>();
+            var messageRepo = _unitOfWork.GetRepository<Message>();
+
+            var conversation = await conversationRepo.GetByIdAsync(conversationId);
+            if (conversation == null)
+                throw new Exception("Conversation not found.");
+
+            if (conversation.UserId != userId)
+                throw new UnauthorizedAccessException("Bạn không có quyền xem conversation này.");
+
+            return await messageRepo.GetAllAsync(
+                x => x.ConversationId == conversationId,
+                include: q => q.OrderBy(m => m.CreatedAt)
+            );
+        }
+
         public async Task<Message> SendMessageAsync(int senderId, int? orderId, string content)
         {
             _unitOfWork.BeginTransaction();
@@ -58,8 +77,15 @@ namespace TetGift.BLL.Services
             {
                 var conversationRepo = _unitOfWork.GetRepository<Conversation>();
                 var messageRepo = _unitOfWork.GetRepository<Message>();
+                var orderRepo = _unitOfWork.GetRepository<Order>();
 
-                // 1 user = 1 conversation
+                if (orderId.HasValue)
+                {
+                    var existingOrder = await orderRepo.GetByIdAsync(orderId.Value);
+                    if (existingOrder == null)
+                        throw new InvalidOperationException($"Order with ID {orderId.Value} does not exist.");
+                }
+
                 var conversation = (await conversationRepo
                     .FindAsync(x => x.UserId == senderId))
                     .FirstOrDefault();
@@ -92,10 +118,83 @@ namespace TetGift.BLL.Services
                 await _unitOfWork.SaveAsync();
                 _unitOfWork.CommitTransaction();
 
-                // 🔥 Realtime push
+                // Map sang DTO trước khi push realtime (tránh đưa entity EF có navigation)
+                var pushDto = new MessageResponse
+                {
+                    Id = message.Id,
+                    ConversationId = message.ConversationId,
+                    SenderId = message.SenderId,
+                    OrderId = message.OrderId,
+                    Content = message.Content,
+                    IsRead = message.IsRead,
+                    CreatedAt = message.CreatedAt
+                };
+
                 await _hubContext.Clients
                     .Group($"conversation_{conversation.Id}")
-                    .SendAsync("ReceiveMessage", message);
+                    .SendAsync("ReceiveMessage", pushDto);
+
+                return message;
+            }
+            catch
+            {
+                _unitOfWork.RollBack();
+                throw;
+            }
+        }
+
+        public async Task<Message> ReplyToConversationAsync(int staffId, int conversationId, int? orderId, string content)
+        {
+            _unitOfWork.BeginTransaction();
+
+            try
+            {
+                var conversationRepo = _unitOfWork.GetRepository<Conversation>();
+                var messageRepo = _unitOfWork.GetRepository<Message>();
+                var orderRepo = _unitOfWork.GetRepository<Order>();
+
+                var conversation = await conversationRepo.GetByIdAsync(conversationId);
+                if (conversation == null)
+                    throw new Exception("Conversation not found.");
+
+                if (orderId.HasValue)
+                {
+                    var existingOrder = await orderRepo.GetByIdAsync(orderId.Value);
+                    if (existingOrder == null)
+                        throw new InvalidOperationException($"Order with ID {orderId.Value} does not exist.");
+                }
+
+                var message = new Message
+                {
+                    ConversationId = conversationId,
+                    SenderId = staffId,
+                    OrderId = orderId,
+                    Content = content,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await messageRepo.AddAsync(message);
+
+                conversation.LastMessageAt = DateTime.UtcNow;
+                await conversationRepo.UpdateAsync(conversation);
+
+                await _unitOfWork.SaveAsync();
+                _unitOfWork.CommitTransaction();
+
+                var pushDto = new MessageResponse
+                {
+                    Id = message.Id,
+                    ConversationId = message.ConversationId,
+                    SenderId = message.SenderId,
+                    OrderId = message.OrderId,
+                    Content = message.Content,
+                    IsRead = message.IsRead,
+                    CreatedAt = message.CreatedAt
+                };
+
+                await _hubContext.Clients
+                    .Group($"conversation_{conversationId}")
+                    .SendAsync("ReceiveMessage", pushDto);
 
                 return message;
             }

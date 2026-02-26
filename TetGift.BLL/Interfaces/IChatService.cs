@@ -1,5 +1,4 @@
-﻿using TetGift.BLL.Dtos;
-using TetGift.DAL.Entities;
+﻿using TetGift.DAL.Entities;
 
 namespace TetGift.BLL.Interfaces
 {
@@ -10,5 +9,11 @@ namespace TetGift.BLL.Interfaces
         Task<Message> SendMessageAsync(int senderId, int? orderId, string content);
         Task<IEnumerable<Conversation>> GetAllConversationsAsync();
         Task MarkAsReadAsync(int conversationId, int readerId);
+
+        // Mới: trả messages nhưng đảm bảo conversation thuộc về userId
+        Task<IEnumerable<Message>> GetMessagesForUserAsync(int conversationId, int userId);
+
+        // Mới: staff/admin reply cho 1 conversation
+        Task<Message> ReplyToConversationAsync(int staffId, int conversationId, int? orderId, string content);
     }
 }
