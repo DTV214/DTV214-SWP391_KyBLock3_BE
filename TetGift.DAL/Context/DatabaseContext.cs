@@ -63,6 +63,8 @@ public partial class DatabaseContext : DbContext
     public virtual DbSet<Wallet> Wallets { get; set; }
 
     public virtual DbSet<WalletTransaction> WalletTransactions { get; set; }
+    public virtual DbSet<Conversation> Conversations { get; set; }
+    public virtual DbSet<Message> Messages { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -776,6 +778,44 @@ public partial class DatabaseContext : DbContext
                 .HasForeignKey(d => d.Orderid)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("wallet_transaction_orderid_fkey");
+        });
+
+        // ===================== CHAT SYSTEM =====================
+
+        modelBuilder.Entity<Conversation>(entity =>
+        {
+            entity.Property(e => e.Id)
+                    .UseIdentityColumn();
+
+            entity.HasIndex(e => e.UserId)
+                  .IsUnique();
+
+            entity.HasOne(d => d.User)
+                  .WithOne()
+                  .HasForeignKey<Conversation>(d => d.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+
+        modelBuilder.Entity<Message>(entity =>
+        {
+            entity.Property(e => e.Id)
+                    .UseIdentityColumn();
+
+            entity.HasOne(d => d.Conversation)
+                  .WithMany(p => p.Messages)
+                  .HasForeignKey(d => d.ConversationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(d => d.Sender)
+                  .WithMany()
+                  .HasForeignKey(d => d.SenderId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.Order)
+                  .WithMany()
+                  .HasForeignKey(d => d.OrderId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         OnModelCreatingPartial(modelBuilder);
