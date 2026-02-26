@@ -13,7 +13,7 @@ namespace TetGift.BLL.Services
         public async Task<IEnumerable<ProductConfigDto>> GetAllAsync()
         {
             var data = await _uow.GetRepository<ProductConfig>().GetAllAsync(
-                pc => pc.Isdeleted == false,
+                pc => pc.Isdeleted != true,
                 include: q => q.Include(pc => pc.Products)
                     .ThenInclude(p => p.ProductDetailProductparents)
                         .ThenInclude(pd => pd.Product)
@@ -79,8 +79,8 @@ namespace TetGift.BLL.Services
 
         public async Task<ProductConfigDto?> GetByIdAsync(int id)
         {
-            var configs = await _uow.GetRepository<ProductConfig>().FindAsync(
-                pc => pc.Configid == id && pc.Isdeleted == false,
+            var result = await _uow.GetRepository<ProductConfig>().FindAsync(
+                pc => pc.Configid == id && pc.Isdeleted != true,
                 include: q => q.Include(pc => pc.Products)
                     .ThenInclude(p => p.ProductDetailProductparents)
                         .ThenInclude(pd => pd.Product)
@@ -88,10 +88,7 @@ namespace TetGift.BLL.Services
                         .ThenInclude(cd => cd.Category)
             );
 
-            var config = configs as IEnumerable<ProductConfig>;
-            if (config == null || !config.Any()) return null;
-
-            var result = config.First();
+            if (result == null) return null;
 
             return new ProductConfigDto
             {
@@ -149,7 +146,7 @@ namespace TetGift.BLL.Services
             };
         }
 
-        public async Task<int> CreateAsync(CreateConfigRequest request)
+        public async Task<IEnumerable<ProductConfigDto>> CreateAsync(CreateConfigRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Configname))
                 throw new Exception("Tên cấu hình không được để trống.");
@@ -160,7 +157,8 @@ namespace TetGift.BLL.Services
                 Configname = request.Configname,
                 Suitablesuggestion = request.Description,
                 Totalunit = request.Totalunit,
-                Imageurl = null
+                Imageurl = null,
+                Isdeleted = false
             };
             await _uow.GetRepository<ProductConfig>().AddAsync(config);
             await _uow.SaveAsync();
@@ -179,10 +177,10 @@ namespace TetGift.BLL.Services
             }
             await _uow.SaveAsync();
 
-            return config.Configid;
+            return await GetAllAsync();
         }
 
-        public async Task UpdateAsync(int configId, UpdateConfigRequest request)
+        public async Task<IEnumerable<ProductConfigDto>> UpdateAsync(int configId, UpdateConfigRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Configname))
                 throw new Exception("Tên không được để trống.");
@@ -222,9 +220,11 @@ namespace TetGift.BLL.Services
             }
 
             await _uow.SaveAsync();
+
+            return await GetAllAsync();
         }
 
-        public async Task DeleteAsync(int id)
+        public async Task<IEnumerable<ProductConfigDto>> DeleteAsync(int id)
         {
             var repo = _uow.GetRepository<ProductConfig>();
             var entity = await repo.GetByIdAsync(id);
@@ -234,6 +234,8 @@ namespace TetGift.BLL.Services
                 repo.Update(entity);
                 await _uow.SaveAsync();
             }
+
+            return await GetAllAsync();
         }
     }
 }
