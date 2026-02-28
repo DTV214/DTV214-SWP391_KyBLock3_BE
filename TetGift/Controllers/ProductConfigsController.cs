@@ -44,39 +44,39 @@ namespace TetGift.Controllers
 
         [HttpPost]
         [Authorize]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<ProductConfigDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<ApiResponse<object>>> Create([FromBody] CreateConfigRequest request)
+        public async Task<ActionResult<ApiResponse<IEnumerable<ProductConfigDto>>>> Create([FromBody] CreateConfigRequest request)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var configId = await _service.CreateAsync(request);
-            return Ok(new ApiResponse<object>
+            var configs = await _service.CreateAsync(request);
+            return Ok(new ApiResponse<IEnumerable<ProductConfigDto>>
             {
                 Status = 200,
                 Msg = "OK",
-                Data = new { configid = configId }
+                Data = configs
             });
         }
 
         [HttpPut("{id}")]
         [Authorize]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<ProductConfigDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<ApiResponse<object>>> Update(int id, [FromBody] UpdateConfigRequest request)
+        public async Task<ActionResult<ApiResponse<IEnumerable<ProductConfigDto>>>> Update(int id, [FromBody] UpdateConfigRequest request)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             try
             {
-                await _service.UpdateAsync(id, request);
-                return Ok(new ApiResponse<object>
+                var configs = await _service.UpdateAsync(id, request);
+                return Ok(new ApiResponse<IEnumerable<ProductConfigDto>>
                 {
                     Status = 200,
                     Msg = "OK",
-                    Data = null
+                    Data = configs
                 });
             }
             catch (Exception ex)
@@ -87,16 +87,16 @@ namespace TetGift.Controllers
 
         [HttpDelete("{id}")]
         [Authorize]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<ProductConfigDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<ApiResponse<object>>> Delete(int id)
+        public async Task<ActionResult<ApiResponse<IEnumerable<ProductConfigDto>>>> Delete(int id)
         {
-            await _service.DeleteAsync(id);
-            return Ok(new ApiResponse<object>
+            var configs = await _service.DeleteAsync(id);
+            return Ok(new ApiResponse<IEnumerable<ProductConfigDto>>
             {
                 Status = 200,
                 Msg = "OK",
-                Data = null
+                Data = configs
             });
         }
     }
