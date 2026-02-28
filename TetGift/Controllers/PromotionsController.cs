@@ -41,6 +41,13 @@ namespace TetGift.Controllers
             return Ok(result);
         }
 
+        [HttpGet("code/{code}")]
+        public async Task<IActionResult> GetByCode(string code)
+        {
+            var result = await _promotionService.GetByCodeAsync(code);
+            return Ok(result);
+        }
+
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdatePromotionRequest req)
         {

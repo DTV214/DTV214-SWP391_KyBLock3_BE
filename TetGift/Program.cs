@@ -1,12 +1,13 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
 using TetGift.BackgroundJobs;
 using TetGift.BLL.Common;
+using TetGift.BLL.Hubs;
 using TetGift.BLL.Interfaces;
 using TetGift.BLL.Services;
 using TetGift.DAL.Context;
@@ -34,7 +35,7 @@ namespace TetGift
                 options.AddPolicy("AllowReactApp",
                     policy =>
                     {
-                        policy.WithOrigins("http://localhost:5173") // Khớp với origin của React (Vite)
+                        policy.WithOrigins("http://localhost:5173", "http://14.225.207.221", "https://localhost:7056/") // Khớp với origin của React (Vite)
                               .AllowAnyHeader()
                               .AllowAnyMethod()
                               .AllowCredentials();
@@ -202,6 +203,12 @@ namespace TetGift
             builder.Services.AddScoped<IDashboardService, DashboardService>();
             builder.Services.AddScoped<IBlogService, BlogService>();
             builder.Services.AddScoped<IAccountService, AccountService>();
+            builder.Services.AddScoped<IChatService, ChatService>();
+
+
+            builder.Services.AddSignalR();
+
+            
 
             var app = builder.Build();
 
@@ -217,9 +224,13 @@ namespace TetGift
 
             // --- PHẦN THÊM CỦA MÌNH: SỬ DỤNG CORS MIDDLEWARE ---
             // Phải đặt sau UseRouting và trước UseAuthentication/Authorization
+            app.UseStaticFiles();
+
             app.UseRouting();
 
             app.UseCors("AllowReactApp");
+
+            app.MapHub<ChatHub>("/hubs/chat");
 
             //Middleware
             app.UseMiddleware<ExceptionMiddleware>();

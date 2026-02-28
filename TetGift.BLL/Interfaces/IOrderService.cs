@@ -9,6 +9,7 @@ public interface IOrderService
     Task<IEnumerable<OrderResponseDto>> GetOrdersByAccountIdAsync(int accountId);
     Task<OrderResponseDto> GetOrderByIdAsync(int orderId, int accountId);
     Task<OrderResponseDto> CancelOrderAsync(int orderId, int accountId, string userRole);
+    Task<OrderResponseDto> UpdateOrderShippingInfoAsync(int orderId, int accountId, string userRole, UpdateOrderShippingRequest request);
 
     // Admin endpoints
     Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync(string? status = null);

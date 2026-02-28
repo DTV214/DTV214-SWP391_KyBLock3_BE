@@ -1,0 +1,276 @@
+﻿<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>ChatHub — Admin / Staff</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --card: #fff;
+            --accent: #0b74ff;
+            --admin: #ffdfe0;
+            --user: #e8f4ff;
+            --muted: #6b7280
+        }
+
+        body {
+            font-family: Inter,system-ui,Segoe UI,Arial;
+            margin: 0;
+            background: var(--bg);
+            color: #111
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 28px auto;
+            padding: 18px
+        }
+
+        .panel {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 8px 24px rgba(11,22,70,0.06)
+        }
+
+        .top {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px
+        }
+
+            .top input[type=text] {
+                padding: 8px 10px;
+                border-radius: 8px;
+                border: 1px solid #e6e9ef
+            }
+
+        .status {
+            margin-left: auto;
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 600
+        }
+
+        .chat-area {
+            height: 440px;
+            border-radius: 8px;
+            padding: 14px;
+            overflow: auto;
+            background: linear-gradient(180deg,#fff,#f7fbff)
+        }
+
+        .msg {
+            display: flex;
+            margin: 8px 0;
+            align-items: flex-end
+        }
+
+        .bubble {
+            max-width: 78%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(2,6,23,0.04)
+        }
+
+            .bubble.admin {
+                background: var(--admin);
+                align-self: flex-end;
+                margin-left: auto;
+                border-bottom-right-radius: 4px
+            }
+
+            .bubble.user {
+                background: var(--user);
+                border-bottom-left-radius: 4px
+            }
+
+        .meta {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px
+        }
+
+            .controls input {
+                flex: 1;
+                padding: 10px;
+                border-radius: 8px;
+                border: 1px solid #e6e9ef
+            }
+
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer
+        }
+
+            .btn.ghost {
+                background: #eef3ff;
+                color: var(--accent)
+            }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="panel">
+            <div class="top">
+                <input id="token" type="text" placeholder="Paste admin/staff JWT token here" style="width:52%" />
+                <input id="conversationId" type="text" value="1" style="width:90px" />
+                <button id="connect" class="btn">Connect & Join</button>
+                <button id="leave" class="btn ghost">Leave</button>
+                <div class="status" id="status">Offline</div>
+            </div>
+
+            <div class="row" style="margin-bottom:8px">
+                <button id="fetchMessages" class="btn ghost">Fetch History</button>
+                <div style="font-size:13px;color:var(--muted)">Use Reply to respond to selected conversation</div>
+            </div>
+
+            <div class="chat-area" id="chatArea"></div>
+
+            <div class="controls">
+                <input id="message" placeholder="Message to user..." />
+                <button id="sendReply" class="btn">Reply</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function decodeJwt(token) {
+            try { const payload = token.split('.')[1]; const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/')); return JSON.parse(decodeURIComponent(escape(json))); } catch { return {}; }
+        }
+        function formatTime(iso) { try { const d = new Date(iso); return d.toLocaleString(); } catch { return iso; } }
+        function escapeHtml(s) { return s?.replace?.(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''; }
+
+        function renderMessageAdmin(m, adminId) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'msg';
+            // Set data-id for dedupe
+            if (m && (m.id !== undefined && m.id !== null)) wrapper.dataset.id = String(m.id);
+
+            const isAdmin = m.senderId === adminId;
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble ' + (isAdmin ? 'admin' : 'user');
+            bubble.innerHTML = `<div><strong>${isAdmin ? 'Staff' : 'User'} (${m.senderId})</strong></div>
+                                  <div style="margin-top:6px">${escapeHtml(m.content)}</div>
+                                  <div class="meta">${formatTime(m.createdAt)}</div>`;
+            if (isAdmin) bubble.style.marginLeft = 'auto';
+            wrapper.appendChild(bubble);
+            return wrapper;
+        }
+
+        let connection = null;
+        const chatArea = document.getElementById('chatArea');
+        const statusEl = document.getElementById('status');
+
+        document.getElementById('connect').onclick = async () => {
+            const token = document.getElementById('token').value.trim();
+            const conv = parseInt(document.getElementById('conversationId').value, 10);
+            if (!token) { alert('Token required'); return; }
+            const current = decodeJwt(token);
+            const adminId = Number(current.nameid || current.sub || current.unique_name || current.id || 0);
+
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl('/hubs/chat', { accessTokenFactory: () => token })
+                .withAutomaticReconnect()
+                .build();
+
+            // Deduped receive handler
+            connection.on('ReceiveMessage', m => {
+                try {
+                    if (m && (m.id !== undefined && m.id !== null)) {
+                        if (chatArea.querySelector(`[data-id="${m.id}"]`)) {
+                            // already rendered
+                            return;
+                        }
+                    }
+                    chatArea.appendChild(renderMessageAdmin(m, adminId));
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                } catch (e) {
+                    console.error('ReceiveMessage handler error', e);
+                }
+            });
+
+            try {
+                await connection.start();
+                statusEl.textContent = 'Connected';
+                await connection.invoke('JoinConversation', conv);
+                statusEl.textContent = 'Joined';
+            } catch (err) {
+                statusEl.textContent = 'Error';
+                alert('Connect error: ' + err);
+            }
+        };
+
+        document.getElementById('leave').onclick = async () => {
+            if (!connection) return;
+            const conv = parseInt(document.getElementById('conversationId').value, 10);
+            try { await connection.invoke('LeaveConversation', conv); } catch { } await connection.stop();
+            statusEl.textContent = 'Disconnected';
+        };
+
+        document.getElementById('fetchMessages').onclick = async () => {
+            const token = document.getElementById('token').value.trim();
+            const conv = parseInt(document.getElementById('conversationId').value, 10);
+            if (!token) return alert('Token required');
+            const resp = await fetch(`/api/chat/messages/${conv}`, { headers: { 'Authorization': 'Bearer ' + token } });
+            const payload = await resp.json();
+            const items = payload?.data ?? payload;
+            if (Array.isArray(items)) {
+                chatArea.innerHTML = '';
+                const current = decodeJwt(token);
+                const adminId = Number(current.nameid || current.sub || current.unique_name || current.id || 0);
+                items.forEach(m => {
+                    // protect against duplicates when history already contains item
+                    if (m && (m.id !== undefined && m.id !== null)) {
+                        if (chatArea.querySelector(`[data-id="${m.id}"]`)) return;
+                    }
+                    chatArea.appendChild(renderMessageAdmin(m, adminId));
+                });
+                chatArea.scrollTop = chatArea.scrollHeight;
+            } else {
+                alert('Fetch failed: ' + JSON.stringify(payload));
+            }
+        };
+
+        document.getElementById('sendReply').onclick = async () => {
+            const token = document.getElementById('token').value.trim();
+            const conv = parseInt(document.getElementById('conversationId').value, 10);
+            const content = document.getElementById('message').value.trim();
+            if (!token || !content) return alert('token and message required');
+
+            const resp = await fetch(`/api/chat/reply/${conv}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ content, orderId: null })
+            });
+
+            const body = await resp.json();
+            if (resp.ok) {
+                // Do not append immediately — wait for server to push via SignalR (deduplicated)
+                document.getElementById('message').value = '';
+            } else {
+                alert('Reply failed: ' + JSON.stringify(body));
+            }
+        };
+    </script>
+</body>
+</html>

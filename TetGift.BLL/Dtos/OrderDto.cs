@@ -31,6 +31,15 @@ public class UpdateOrderStatusRequest
     public string Status { get; set; } = null!;
 }
 
+public class UpdateOrderShippingRequest
+{
+    public string? CustomerName { get; set; }
+    public string? CustomerPhone { get; set; }
+    public string? CustomerEmail { get; set; }
+    public string? CustomerAddress { get; set; }
+    public string? Note { get; set; }
+}
+
 public class OrderDetailResponseDto
 {
     public int OrderDetailId { get; set; }

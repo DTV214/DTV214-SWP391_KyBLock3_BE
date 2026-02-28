@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using System.Net;
 using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Common.VnPay;
 using TetGift.BLL.Dtos;
@@ -34,13 +33,13 @@ public class PaymentService : IPaymentService
                 .ThenInclude(od => od.Product)
                 .Include(o => o.Promotion)
         );
-        
+
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng hoặc bạn không có quyền thanh toán đơn hàng này.");
-        
+
         if (order.Status != OrderStatus.PENDING)
             throw new Exception("Chỉ có thể thanh toán cho đơn hàng đang chờ xác nhận.");
-        
+
         // Calculate FinalPrice từ Order
         decimal finalPrice = order.Totalprice ?? 0;
 
@@ -76,6 +75,7 @@ public class PaymentService : IPaymentService
             Status = PaymentStatus.PENDING,
             Type = "ORDER_PAYMENT",
             Paymentmethod = "VNPAY",
+            CreatedDate = DateTime.UtcNow,
             Ispayonline = true
         };
         await paymentRepo.AddAsync(payment);
@@ -93,8 +93,8 @@ public class PaymentService : IPaymentService
         vnpay.AddRequestData("vnp_TmnCode", vnpTmnCode);
         // VNPay yêu cầu timezone GMT+7 (Vietnam time)
         // Convert UTC to GMT+7
-        var vietnamTime = DateTime.UtcNow.AddHours(7);
-        
+        var vietnamTime = DateTime.Now.AddHours(7);
+
         vnpay.AddRequestData("vnp_Amount", ((long)(finalPrice * 100)).ToString()); // Nhân 100 để khử phần thập phân
         vnpay.AddRequestData("vnp_CreateDate", vietnamTime.ToString("yyyyMMddHHmmss"));
         vnpay.AddRequestData("vnp_CurrCode", "VND");
@@ -114,6 +114,7 @@ public class PaymentService : IPaymentService
             OrderId = orderId,
             Amount = finalPrice,
             PaymentUrl = paymentUrl,
+            CreatedDate = payment.CreatedDate,
             Status = "PENDING"
         };
     }
@@ -327,7 +328,7 @@ public class PaymentService : IPaymentService
 
         // ORDER_PAYMENT - xử lý như cũ
         var success = vnpResponseCode == "00" && vnpTransactionStatus == "00";
-        
+
         // Cập nhật Payment status nếu chưa được cập nhật (idempotent)
         if (payment.Status != PaymentStatus.SUCCESS && success)
         {
@@ -389,7 +390,7 @@ public class PaymentService : IPaymentService
             PaymentMethod = p.Paymentmethod,
             IsPayOnline = p.Ispayonline ?? false,
             TransactionNo = p.Transactionno,
-            CreatedDate = null // Payment entity không có CreatedDate, có thể thêm sau
+            CreatedDate = p.CreatedDate
         });
     }
 
@@ -415,7 +416,7 @@ public class PaymentService : IPaymentService
             PaymentMethod = p.Paymentmethod,
             IsPayOnline = p.Ispayonline ?? false,
             TransactionNo = p.Transactionno,
-            CreatedDate = null
+            CreatedDate = p.CreatedDate
         });
     }
 

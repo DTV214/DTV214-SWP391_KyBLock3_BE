@@ -81,7 +81,7 @@ public class OrderController : ControllerBase
         }
     }
 
-    [HttpPost("{orderId}/cancel")]
+    [HttpDelete("{orderId}/cancel")]
     public async Task<IActionResult> CancelOrder(int orderId)
     {
         try
@@ -89,6 +89,22 @@ public class OrderController : ControllerBase
             var accountId = GetCurrentAccountId();
             var userRole = GetCurrentUserRole();
             var result = await _orderService.CancelOrderAsync(orderId, accountId, userRole);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{orderId}/shipping-info")]
+    public async Task<IActionResult> UpdateShippingInfo(int orderId, [FromBody] UpdateOrderShippingRequest request)
+    {
+        try
+        {
+            var accountId = GetCurrentAccountId();
+            var userRole = GetCurrentUserRole();
+            var result = await _orderService.UpdateOrderShippingInfoAsync(orderId, accountId, userRole, request);
             return Ok(result);
         }
         catch (Exception ex)
