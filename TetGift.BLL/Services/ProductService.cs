@@ -227,7 +227,20 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
             }).ToList(),
             Status = product.Status,
             Unit = product.Unit,
-            ImageUrl = product.ImageUrl
+            ImageUrl = product.ImageUrl,
+            ProductDetails = product.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
+            {
+                Productdetailid = pd.Productdetailid,
+                Productparentid = pd.Productparentid,
+                Productid = pd.Productid,
+                Categoryid = pd.Product?.Categoryid,
+                Productname = pd.Product?.Productname,
+                Unit = pd.Product?.Unit,
+                Price = pd.Product?.Price,
+                Imageurl = pd.Product?.ImageUrl,
+                Quantity = pd.Quantity,
+                ChildProduct = null
+            }).ToList()
         };
     }
 
