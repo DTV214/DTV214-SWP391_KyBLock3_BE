@@ -7,9 +7,10 @@ using TetGift.DAL.Interfaces;
 
 namespace TetGift.BLL.Services;
 
-public class ProductService(IUnitOfWork uow, IInventoryService inventoryService) : IProductService
+public class ProductService(IUnitOfWork uow, IInventoryService inventoryService, ICacheService cacheService) : IProductService
 {
     private readonly IUnitOfWork _uow = uow;
+    private readonly ICacheService _cacheService = cacheService;
 
     public async Task CreateNormalAsync(CreateSingleProductRequest dto)
     {
@@ -29,6 +30,8 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
         var entity = MapToEntity(dto);
         await _uow.GetRepository<Product>().AddAsync(entity);
         await _uow.SaveAsync();
+
+        await _cacheService.IncreaseVersionAsync("Products");
     }
 
     public async Task CreateCustomAsync(CreateComboProductRequest dto)
@@ -146,6 +149,8 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
                 await _uow.SaveAsync();
             }
         }
+
+        await _cacheService.IncreaseVersionAsync("Products");
     }
 
     public async Task<IEnumerable<ProductDto>> GetAllAsync()
@@ -349,6 +354,8 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
             entity.Status = ProductStatus.DELETED;
             repo.Update(entity);
             await _uow.SaveAsync();
+
+            await _cacheService.IncreaseVersionAsync("Products");
         }
     }
 
@@ -433,6 +440,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
 
         repo.Update(entity);
         await _uow.SaveAsync();
+        await _cacheService.IncreaseVersionAsync("Products");
         return new UpdateProductDto();
     }
 
@@ -629,6 +637,8 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
                 await _uow.SaveAsync();
             }
         }
+
+        await _cacheService.IncreaseVersionAsync("Products");
 
         return response;
     }
@@ -937,6 +947,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
 
         clonedBasket.CalculateUnit();
         clonedBasket.CalculateTotalPrice();
+        await _cacheService.IncreaseVersionAsync("Products");
 
         return new ProductDto
         {
@@ -996,6 +1007,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
         product.Status = ProductStatus.TEMPLATE;
         repo.Update(product);
         await _uow.SaveAsync();
+        await _cacheService.IncreaseVersionAsync("Products");
     }
 
     /// <summary>
@@ -1015,10 +1027,28 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
         product.Status = ProductStatus.ACTIVE;
         repo.Update(product);
         await _uow.SaveAsync();
+        await _cacheService.IncreaseVersionAsync("Products");
     }
 
     public async Task<PagedResponse<ProductDto>> GetWithQueryAsync(ProductQueryParameters productQuery)
     {
+        #region Redis Cache (Lấy thử trong Redis)
+
+        // Lấy version hiện tại của module Products
+        string version = await _cacheService.GetVersionAsync("Products");
+
+        // 1. Định nghĩa tiền tố cho Cache key
+        string cachePrefix = $"TetGift:Products:V{version}:Search";
+
+        // 2. Tạo Key duy nhất dựa trên nội dung của productQuery (Search, Page, Sort...)
+        string cacheKey = _cacheService.GenerateCacheKey(productQuery, cachePrefix);
+
+        // 3. Thử lấy từ Redis trước
+        var cachedResult = await _cacheService.GetAsync<PagedResponse<ProductDto>>(cacheKey);
+        if (cachedResult != null) return cachedResult;
+
+        #endregion
+
         var repo = _uow.GetRepository<Product>();
 
         // 1. Khởi tạo query từ repo
@@ -1126,12 +1156,11 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService)
 
         #endregion
 
-        return new PagedResponse<ProductDto>(
-            dtos,
-            totalItems,
-            productQuery.PageNumber ?? 1,
-            isPagingRequested ? productQuery.PageSize!.Value : totalItems
-            );
+        var finalResponse = new PagedResponse<ProductDto>(dtos, totalItems, productQuery.PageNumber ?? 1, productQuery.PageSize ?? totalItems);
+
+        await _cacheService.SetAsync(cacheKey, finalResponse, TimeSpan.FromMinutes(15));
+
+        return finalResponse;
     }
 
     private bool IsPageRequest(ProductQueryParameters productQuery)

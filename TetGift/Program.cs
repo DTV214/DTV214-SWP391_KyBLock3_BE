@@ -132,6 +132,24 @@ namespace TetGift
 
             builder.Services.AddAuthorization();
 
+            #region Redis
+
+            // Đọc cấu hình từ appsettings.json
+            var redisConfig = builder.Configuration.GetSection("RedisOptions");
+
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                // Sử dụng ConnectionString đã khai báo ở trên
+                options.Configuration = redisConfig["ConnectionString"];
+
+                // InstanceName giúp phân biệt các key của project này với project khác trên cùng 1 database Redis
+                options.InstanceName = redisConfig["InstanceName"];
+            });
+
+            builder.Services.AddScoped<ICacheService, CacheService>();
+
+            #endregion
+
             // Add services to the container.
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(c =>
@@ -208,7 +226,7 @@ namespace TetGift
 
             builder.Services.AddSignalR();
 
-            
+
 
             var app = builder.Build();
 

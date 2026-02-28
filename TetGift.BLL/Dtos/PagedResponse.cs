@@ -1,11 +1,22 @@
 ﻿namespace TetGift.BLL.Dtos
 {
-    public class PagedResponse<T>(IEnumerable<T> data, int totalItems, int pageNumber, int pageSize)
+    public class PagedResponse<T>
     {
-        public IEnumerable<T> Data { get; set; } = data;
-        public int CurrentPage { get; set; } = pageNumber;
-        public int TotalPages { get; set; } = (int)Math.Ceiling(totalItems / (double)pageSize);
-        public int TotalItems { get; set; } = totalItems;
-        public int PageSize { get; set; } = pageSize;
+        public PagedResponse() { }
+
+        public PagedResponse(IEnumerable<T> data, int totalItems, int pageNumber, int pageSize)
+        {
+            Data = data;
+            TotalItems = totalItems;
+            CurrentPage = pageNumber;
+            PageSize = pageSize;
+            TotalPages = (int)Math.Ceiling(TotalItems / (double)PageSize);
+        }
+
+        public IEnumerable<T> Data { get; set; }
+        public int CurrentPage { get; set; }
+        public int TotalPages { get; set; }
+        public int TotalItems { get; set; }
+        public int PageSize { get; set; }
     }
 }
