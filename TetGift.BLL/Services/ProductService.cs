@@ -199,8 +199,14 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
 
     public async Task<ProductDto?> GetByIdAsync(int id)
     {
+        //var product = await _uow.GetRepository<Product>().FindAsync(
+        //    p => p.Productid == id 
+        //    && !p.Status.Equals(ProductStatus.DELETED),
+        //    include: p => p.Include(p => p.Stocks)
+        //        .Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product).ThenInclude(s => s.Stocks)
+        //    );
         var product = await _uow.GetRepository<Product>().FindAsync(
-            p => p.Productid == id && !p.Status.Equals(ProductStatus.DELETED),
+            p => p.Productid == id,
             include: p => p.Include(p => p.Stocks)
                 .Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product).ThenInclude(s => s.Stocks)
             );
@@ -458,66 +464,91 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
     }
 
     /// <summary>
-    /// Update custom basket/combo product (customer's custom gift basket)
+    /// Update custom basket/combo product.
+    /// 
+    /// Business rules:
+    ///   • Admin/Staff can only edit baskets they (or other admin/staff) created — NOT customer baskets.
+    ///   • Customer can only edit their own baskets.
+    ///   • A TEMPLATE basket (admin-created) cannot be edited by customers — they must clone it first.
+    ///   • Admin/Staff may transition status freely (DRAFT / ACTIVE / INACTIVE / TEMPLATE).
+    ///   • Customer may only use DRAFT or ACTIVE.
     /// </summary>
     public async Task<UpdateProductDto> UpdateCustomAsync(int productId, UpdateComboProductRequest dto, int? requestingAccountId)
     {
         var repo = _uow.GetRepository<Product>();
-        var userRepo = _uow.GetRepository<Account>();
 
-        // Check if requesting user is customer
-        var requestingUser = await userRepo.FindAsync(
+        // ─── 1. Identify the requesting user ────────────────────────────────────
+        var requestorList = await _uow.GetRepository<Account>().FindAsync(
             a => a.Accountid == requestingAccountId
         );
-        bool isCustomer = requestingUser.Any() && requestingUser.First().Role.Equals(UserRole.CUSTOMER);
+        var requestor = requestorList.FirstOrDefault();
 
-        // Build query with additional filter for customer
-        var productQuery = repo.FindAsync(
+        bool requestorIsCustomer      = requestor?.Role.Equals(UserRole.CUSTOMER) == true;
+        bool requestorIsAdminOrStaff  = requestor?.Role.Equals(UserRole.ADMIN) == true
+                                     || requestor?.Role.Equals(UserRole.STAFF) == true;
+
+        // ─── 2. Fetch the basket (customers may only see their own) ─────────────
+        var product = await repo.FindAsync(
             p => p.Productid == productId
-                && p.Configid.HasValue  // Must be custom basket
+                && p.Configid.HasValue                                             // must be a basket/combo
                 && !p.Status.Equals(ProductStatus.DELETED)
-                && (!isCustomer || p.Accountid == requestingAccountId),  // Customer can only see their own baskets
-            include: q => q.Include(p => p.Config)
+                && (!requestorIsCustomer || p.Accountid == requestingAccountId),   // customers see their own only
+            include: q => q
+                .Include(p => p.Config)
                     .ThenInclude(c => c.ConfigDetails)
                     .ThenInclude(cd => cd.Category)
                 .Include(p => p.Account)
                 .Include(p => p.ProductDetailProductparents)
         );
 
-        var product = await productQuery;
-
         if (product == null)
-        {
-            if (isCustomer)
-                throw new Exception("Không tìm thấy giỏ quà của bạn hoặc bạn không có quyền chỉnh sửa giỏ quà này.");
-            else
-                throw new Exception("Không tìm thấy giỏ quà hoặc sản phẩm không phải giỏ quà tùy chỉnh.");
-        }
+            throw new Exception(requestorIsCustomer
+                ? "Không tìm thấy giỏ quà của bạn hoặc bạn không có quyền chỉnh sửa."
+                : "Không tìm thấy giỏ quà hoặc sản phẩm không phải giỏ quà tùy chỉnh.");
 
         var response = new UpdateProductDto();
 
-        // Check if basket belongs to a customer
-        bool basketBelongsToCustomer = product.Account != null && product.Account.Role.Equals(UserRole.CUSTOMER);
+        // ─── 3. Determine basket origin ──────────────────────────────────────────
+        //   isCustomerBasket  = basket was created by a customer (cloned from template or self-composed)
+        //   isAdminBasket     = basket was created by admin / staff (includes templates)
+        bool isCustomerBasket = product.Account?.Role.Equals(UserRole.CUSTOMER) == true;
+        bool isAdminBasket    = !isCustomerBasket;
 
-        // Admin cannot update customer's custom baskets
-        if (!isCustomer && basketBelongsToCustomer)
-        {
-            throw new Exception("Admin không thể chỉnh sửa giỏ quà tự tạo của khách hàng. Chỉ khách hàng mới có quyền chỉnh sửa giỏ quà của mình.");
-        }
+        // ─── 4. Access-control ───────────────────────────────────────────────────
+        // Admin/Staff must NOT touch customer baskets — those belong to the customer.
+        if (requestorIsAdminOrStaff && isCustomerBasket)
+            throw new Exception(
+                "Admin/Staff không thể chỉnh sửa giỏ quà của khách hàng. " +
+                "Chỉ chính khách hàng mới có quyền chỉnh sửa giỏ quà của họ.");
 
-        // Additional validation for customer-owned baskets
-        if (isCustomer)
+        // Customer must NOT touch admin-managed (template) baskets directly — they must clone first.
+        if (requestorIsCustomer && isAdminBasket)
+            throw new Exception(
+                "Không thể chỉnh sửa giỏ quà mẫu của admin. " +
+                "Vui lòng clone template để tạo bản sao riêng trước khi chỉnh sửa.");
+
+        // ─── 5. Per-role field & status restrictions ─────────────────────────────
+        if (requestorIsCustomer)
         {
-            // Customer can only update their own DRAFT or ACTIVE baskets
+            // Customer's own basket: must not be in TEMPLATE state
             if (product.Status == ProductStatus.TEMPLATE)
                 throw new Exception("Không thể chỉnh sửa template giỏ quà. Vui lòng clone template trước.");
 
-            // Customer cannot change basket to certain statuses
-            if (dto.Status != null && !new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE }.Contains(dto.Status))
+            // Customer may only transition between DRAFT ↔ ACTIVE
+            if (dto.Status != null &&
+                !new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE }.Contains(dto.Status))
                 throw new Exception("Khách hàng chỉ có thể đặt trạng thái DRAFT hoặc ACTIVE.");
         }
+        else
+        {
+            // Admin/Staff: any status except DELETED (use DELETE API for that)
+            if (dto.Status != null && dto.Status.Equals(ProductStatus.DELETED))
+                throw new Exception(
+                    "Không thể đặt trạng thái DELETED qua API này. " +
+                    "Vui lòng sử dụng API xóa sản phẩm (DELETE /products/{id}).");
+        }
 
-        // Update basic info
+        // ─── 6. Apply basic field updates ────────────────────────────────────────
         if (!string.IsNullOrWhiteSpace(dto.Productname))
             product.Productname = dto.Productname;
 
@@ -527,27 +558,22 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         if (dto.ImageUrl != null)
             product.ImageUrl = dto.ImageUrl;
 
-        // Validate and update Status
+        // ─── 7. Apply status update ──────────────────────────────────────────────
         if (dto.Status != null)
         {
-            var validStatuses = isCustomer
-                ? new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE }
-                : new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE, ProductStatus.INACTIVE };
-
-            if (!validStatuses.Contains(dto.Status))
-                throw new Exception($"Trạng thái không hợp lệ. Chỉ chấp nhận: {string.Join(", ", validStatuses)}");
-
+            // By this point per-role validation above has already ensured the status is valid.
             product.Status = dto.Status;
         }
 
-        // Update ProductDetails if provided
+        // ─── 8. Update ProductDetails if provided ────────────────────────────────
         if (dto.ProductDetails != null)
         {
-            // Load config details to validate categories
-            var validCategoryIds = product.Config?.ConfigDetails?.Select(cd => cd.Categoryid).ToHashSet() ?? new HashSet<int?>();
+            var validCategoryIds = product.Config?.ConfigDetails?
+                .Select(cd => cd.Categoryid)
+                .ToHashSet() ?? new HashSet<int?>();
+
             decimal totalWeight = 0;
 
-            // Validate all ProductIds exist and are available
             foreach (var detail in dto.ProductDetails)
             {
                 if (!detail.Productid.HasValue)
@@ -562,38 +588,37 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 if (childProduct == null)
                     throw new Exception($"Sản phẩm với ID {detail.Productid} không tồn tại hoặc không khả dụng.");
 
-                // Validate product category belongs to config's allowed categories
+                // Validate product category is allowed by this config
                 if (product.Config != null && validCategoryIds.Any())
                 {
                     if (!childProduct.Categoryid.HasValue || !validCategoryIds.Contains(childProduct.Categoryid))
                     {
-                        var allowedCategories = string.Join(", ",
-                            product.Config.ConfigDetails?.Select(cd => cd.Category?.Categoryname ?? "N/A") ?? new List<string>());
+                        var allowed = string.Join(", ",
+                            product.Config.ConfigDetails?
+                                .Select(cd => cd.Category?.Categoryname ?? "N/A")
+                            ?? Enumerable.Empty<string>());
                         throw new Exception(
                             $"Sản phẩm '{childProduct.Productname}' thuộc danh mục không hợp lệ. " +
-                            $"Danh mục cho phép: {allowedCategories}");
+                            $"Danh mục cho phép: {allowed}");
                     }
                 }
 
-                // Calculate total weight
-                var quantity = detail.Quantity ?? 1;
-                var productWeight = childProduct.Unit ?? 0;
-                totalWeight += productWeight * quantity;
+                var quantity       = detail.Quantity ?? 1;
+                var productWeight  = childProduct.Unit ?? 0;
+                totalWeight       += productWeight * quantity;
 
-                // For customer: validate product has sufficient stock if quantity is high
-                if (isCustomer && quantity > 10)
+                // For customers only: out-of-stock guard for large quantities
+                if (requestorIsCustomer && quantity > 10)
                 {
                     var stocks = await _uow.GetRepository<Stock>().GetAllAsync(
                         s => s.Productid == detail.Productid && s.Status == StockStatus.ACTIVE
                     );
-                    var totalStock = stocks.Sum(s => s.Stockquantity) ?? 0;
-
-                    if (totalStock == 0)
+                    if ((stocks.Sum(s => s.Stockquantity) ?? 0) == 0)
                         throw new Exception($"Sản phẩm '{childProduct.Productname}' hiện đang hết hàng.");
                 }
             }
 
-            // Validate total weight doesn't exceed config limit
+            // ── Weight limit check ───────────────────────────────────────────────
             if (product.Config?.Totalunit.HasValue == true && totalWeight > product.Config.Totalunit.Value)
             {
                 throw new Exception(
@@ -601,7 +626,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                     $"Vui lòng giảm số lượng sản phẩm.");
             }
 
-            // Remove old ProductDetails
+            // ── Replace ProductDetails (delete old, insert new) ──────────────────
             var detailRepo = _uow.GetRepository<ProductDetail>();
             var oldDetails = product.ProductDetailProductparents.ToList();
             foreach (var oldDetail in oldDetails)
@@ -609,7 +634,6 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 await detailRepo.DeleteAsync(oldDetail);
             }
 
-            // Add new ProductDetails
             var newDetails = dto.ProductDetails.Select(d => new ProductDetail
             {
                 Productparentid = product.Productid,
@@ -620,16 +644,16 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             await detailRepo.AddRangeAsync(newDetails);
         }
 
+        // ─── 9. Persist and recalculate weight/price ─────────────────────────────
         repo.Update(product);
         await _uow.SaveAsync();
 
-        // Recalculate Unit and Price after ProductDetails change
         if (dto.ProductDetails != null)
         {
-            // Reload with updated details
             var updatedProduct = await repo.FindAsync(
                 p => p.Productid == productId,
-                include: q => q.Include(p => p.Config)
+                include: q => q
+                    .Include(p => p.Config)
                     .Include(p => p.ProductDetailProductparents)
                     .ThenInclude(pd => pd.Product)
             );
@@ -639,7 +663,6 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 updatedProduct.CalculateUnit();
                 updatedProduct.CalculateTotalPrice();
 
-                // Check config limits
                 if (updatedProduct.Config?.Totalunit.HasValue == true
                     && updatedProduct.Unit > updatedProduct.Config.Totalunit.Value)
                 {
