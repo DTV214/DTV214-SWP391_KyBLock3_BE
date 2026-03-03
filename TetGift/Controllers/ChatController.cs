@@ -11,14 +11,11 @@ namespace TetGift.Controllers
     [Route("api/chat")]
     [Authorize]
     public class ChatController : BaseApiController
-    [Route("api/[controller]")]
-    public class ChatController : ControllerBase
     {
         private readonly IChatService _chatService;
         private readonly GeminiChatService _geminiChatService;
 
-        public ChatController(IChatService chatService)
-        public ChatController(GeminiChatService geminiChatService)
+        public ChatController(IChatService chatService, GeminiChatService geminiChatService)
         {
             _chatService = chatService;
             _geminiChatService = geminiChatService;
@@ -27,6 +24,13 @@ namespace TetGift.Controllers
         // Lấy conversation của chính mình
         [HttpGet("conversation")]
         public async Task<IActionResult> GetConversation()
+        {
+            var userId = GetAccountId();
+
+            var result = await _chatService.GetOrCreateConversationAsync(userId);
+            return Ok(result);
+        }
+
         /// <summary>
         /// Chat endpoint for Gemini AI assistant
         /// </summary>
@@ -35,22 +39,26 @@ namespace TetGift.Controllers
         [HttpPost]
         public async Task<ActionResult<ChatResponse>> Chat([FromBody] ChatRequest request)
         {
-            var userId = GetAccountId();
+            if (string.IsNullOrWhiteSpace(request.Message))
+            {
+                return BadRequest(new ChatResponse
+                {
+                    Reply = "Vui lòng nhập tin nhắn."
+                });
+            }
 
-            var result = await _chatService.GetOrCreateConversationAsync(userId);
-            return Ok(result);
+            var response = await _geminiChatService.ChatAsync(request.History, request.Message);
+            return Ok(response);
         }
 
         // Load messages - CHỈ DÀNH CHO STAFF/ADMIN (xem tất cả)
         [HttpGet("messages/{conversationId}")]
         [Authorize(Roles = "STAFF,ADMIN")]
         public async Task<IActionResult> GetMessages(int conversationId)
-            if (string.IsNullOrWhiteSpace(request.Message))
         {
             var messages = await _chatService.GetMessagesAsync(conversationId);
 
             var response = messages.Select(m => new MessageResponse
-                return BadRequest(new ChatResponse
             {
                 Id = m.Id,
                 ConversationId = m.ConversationId,
@@ -59,7 +67,6 @@ namespace TetGift.Controllers
                 Content = m.Content,
                 IsRead = m.IsRead,
                 CreatedAt = m.CreatedAt
-                    Reply = "Vui lòng nhập tin nhắn."
             });
 
             return Ok(response);
@@ -86,7 +93,6 @@ namespace TetGift.Controllers
                     CreatedAt = m.CreatedAt
                 });
 
-            var response = await _geminiChatService.ChatAsync(request.History, request.Message);
                 return Ok(response);
             }
             catch (UnauthorizedAccessException)
