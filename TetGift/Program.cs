@@ -203,6 +203,11 @@ namespace TetGift
             builder.Services.AddScoped<IBlogService, BlogService>();
             builder.Services.AddScoped<IAccountService, AccountService>();
 
+            // --- CHATBOT SERVICES ---
+            builder.Services.AddScoped<IProductRepository, ProductRepository>();
+            builder.Services.AddHttpClient<GeminiChatService>();
+            builder.Services.AddScoped<GeminiChatService>();
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
