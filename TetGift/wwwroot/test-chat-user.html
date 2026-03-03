@@ -1,0 +1,262 @@
+﻿<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>ChatHub — User</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
+    <style>
+        :root {
+            --bg: #f5f7fb;
+            --card: #fff;
+            --accent: #2b8cff;
+            --mine: #daf1d8;
+            --theirs: #ffffff;
+            --muted: #7a7a7a;
+        }
+
+        body {
+            font-family: Inter,system-ui,Segoe UI,Arial;
+            margin: 0;
+            background: var(--bg);
+            color: #222
+        }
+
+        .wrap {
+            max-width: 820px;
+            margin: 28px auto;
+            padding: 18px
+        }
+
+        .panel {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 6px 18px rgba(15,23,42,0.06)
+        }
+
+        .top {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px
+        }
+
+            .top input[type=text] {
+                padding: 8px 10px;
+                border-radius: 8px;
+                border: 1px solid #e3e7ee
+            }
+
+        .status {
+            margin-left: auto;
+            font-weight: 600;
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .chat-area {
+            height: 420px;
+            border-radius: 8px;
+            padding: 12px;
+            overflow: auto;
+            background: linear-gradient(180deg,#fbfdff,#f7fbff)
+        }
+
+        .msg {
+            display: flex;
+            margin: 8px 0;
+            align-items: flex-end;
+            max-width: 80%;
+        }
+
+            .msg.mine {
+                margin-left: auto;
+                flex-direction: row-reverse
+            }
+
+        .bubble {
+            padding: 10px 12px;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(2,6,23,0.04);
+            font-size: 14px;
+            line-height: 1.35
+        }
+
+            .bubble.mine {
+                background: var(--mine);
+                border-bottom-right-radius: 4px
+            }
+
+            .bubble.their {
+                background: var(--theirs);
+                border-bottom-left-radius: 4px
+            }
+
+        .meta {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px
+        }
+
+            .controls input {
+                flex: 1;
+                padding: 10px;
+                border-radius: 8px;
+                border: 1px solid #e3e7ee
+            }
+
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer
+        }
+
+            .btn.secondary {
+                background: #f0f3ff;
+                color: #0b57d0
+            }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="panel">
+            <div class="top">
+                <input id="token" type="text" placeholder="Paste your JWT token (only token string)" style="width:56%" />
+                <input id="conversationId" type="text" value="1" style="width:90px;padding:8px;border-radius:8px;border:1px solid #e3e7ee" />
+                <button id="connect" class="btn">Connect & Join</button>
+                <button id="leave" class="btn secondary">Leave</button>
+                <div class="status" id="status">Offline</div>
+            </div>
+
+            <div class="chat-area" id="chatArea"></div>
+
+            <div class="controls">
+                <input id="message" placeholder="Type a message..." />
+                <button id="sendHttp" class="btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // small helpers
+        function decodeJwt(token) {
+            try {
+                const payload = token.split('.')[1];
+                const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+                return JSON.parse(decodeURIComponent(escape(json)));
+            } catch { return {}; }
+        }
+        function formatTime(iso) { try { return new Date(iso).toLocaleString(); } catch { return iso; } }
+        function escapeHtml(s) { return s?.replace?.(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''; }
+
+        function renderMessage(msg, currentUserId) {
+            const el = document.createElement('div');
+            el.className = 'msg ' + ((msg.senderId == currentUserId) ? 'mine' : '');
+            if (msg && (msg.id !== undefined && msg.id !== null)) el.dataset.id = String(msg.id);
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble ' + ((msg.senderId == currentUserId) ? 'mine' : 'their');
+            bubble.innerHTML = `<div>${escapeHtml(msg.content)}</div><div class="meta">${msg.senderId} · ${formatTime(msg.createdAt)}</div>`;
+            el.appendChild(bubble);
+            return el;
+        }
+
+        // state
+        let connection = null;
+        const chatArea = document.getElementById('chatArea');
+        const statusEl = document.getElementById('status');
+
+        document.getElementById('connect').onclick = async () => {
+            const token = document.getElementById('token').value.trim();
+            const conv = parseInt(document.getElementById('conversationId').value, 10);
+            if (!token) { alert('Token required'); return; }
+            const current = decodeJwt(token);
+            const userId = Number(current.nameid || current.sub || current.unique_name || current.id || 0);
+
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl('/hubs/chat', { accessTokenFactory: () => token })
+                .withAutomaticReconnect()
+                .build();
+
+            // single canonical append: dedupe by data-id
+            connection.on('ReceiveMessage', m => {
+                try {
+                    if (m && (m.id !== undefined && m.id !== null)) {
+                        if (chatArea.querySelector(`[data-id="${m.id}"]`)) return;
+                    }
+                    chatArea.appendChild(renderMessage(m, userId));
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                } catch (e) {
+                    console.error('ReceiveMessage error', e);
+                }
+            });
+
+            connection.onclose(() => statusEl.textContent = 'Disconnected');
+            connection.onreconnecting(() => statusEl.textContent = 'Reconnecting...');
+            connection.onreconnected(() => statusEl.textContent = 'Connected');
+
+            try {
+                await connection.start();
+                statusEl.textContent = 'Connected';
+                await connection.invoke('JoinConversation', conv);
+                statusEl.textContent = 'Joined';
+
+                // Fetch history for this user (me endpoint)
+                const resp = await fetch(`/api/chat/messages/me/${conv}`, { headers: { 'Authorization': 'Bearer ' + token } });
+                const payload = await resp.json();
+                const items = payload?.data ?? payload;
+                if (Array.isArray(items)) {
+                    chatArea.innerHTML = '';
+                    items.forEach(m => {
+                        if (m && (m.id !== undefined && m.id !== null)) {
+                            if (chatArea.querySelector(`[data-id="${m.id}"]`)) return;
+                        }
+                        chatArea.appendChild(renderMessage(m, userId));
+                    });
+                    chatArea.scrollTop = chatArea.scrollHeight;
+                }
+            } catch (err) {
+                statusEl.textContent = 'Error';
+                alert('Connect error: ' + err);
+            }
+        };
+
+        document.getElementById('leave').onclick = async () => {
+            if (!connection) return;
+            const conv = parseInt(document.getElementById('conversationId').value, 10);
+            try { await connection.invoke('LeaveConversation', conv); } catch { }
+            await connection.stop();
+            statusEl.textContent = 'Disconnected';
+        };
+
+        // send via HTTP — do not append locally to avoid duplicate; wait for hub push
+        document.getElementById('sendHttp').onclick = async () => {
+            const token = document.getElementById('token').value.trim();
+            const content = document.getElementById('message').value.trim();
+            if (!token || !content) return alert('Token and message required');
+
+            const resp = await fetch('/api/chat/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ content, orderId: null })
+            });
+
+            const body = await resp.json();
+            if (resp.ok) {
+                // clear input; server will push canonical message
+                document.getElementById('message').value = '';
+            } else {
+                alert('Send failed: ' + JSON.stringify(body));
+            }
+        };
+    </script>
+</body>
+</html>

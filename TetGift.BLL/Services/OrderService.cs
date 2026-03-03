@@ -363,7 +363,9 @@ public class OrderService : IOrderService
                 throw new Exception("Bạn không có quyền hủy đơn hàng này.");
 
             // Validate order status
-            if (order.Status != OrderStatus.PENDING && order.Status != OrderStatus.CONFIRMED)
+            if (order.Status != OrderStatus.PENDING &&
+                order.Status != OrderStatus.CONFIRMED &&
+                order.Status != OrderStatus.PAID_WAITING_STOCK)
             {
                 throw new Exception("Chỉ có thể hủy đơn hàng trong giai đoạn chưa xử lí đơn hàng.");
             }
@@ -386,7 +388,7 @@ public class OrderService : IOrderService
 
             _uow.CommitTransaction();
         }
-        catch (Exception)
+        catch (Exception e)
         {
             _uow.RollBack();
             throw;

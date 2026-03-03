@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TetGift.DAL.Context;
@@ -11,9 +12,11 @@ using TetGift.DAL.Context;
 namespace TetGift.DAL.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260226041510_AddChatSystem")]
+    partial class AddChatSystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -120,57 +123,6 @@ namespace TetGift.DAL.Migrations
                         .IsUnique();
 
                     b.ToTable("account", (string)null);
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.AccountAddress", b =>
-                {
-                    b.Property<int>("AccountAddressId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("account_address_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("AccountAddressId"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("integer")
-                        .HasColumnName("accountid");
-
-                    b.Property<string>("AddressLine")
-                        .HasColumnType("text")
-                        .HasColumnName("address_line");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<bool>("IsDefault")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_default");
-
-                    b.Property<string>("Label")
-                        .HasColumnType("text")
-                        .HasColumnName("label");
-
-                    b.Property<decimal?>("Latitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("numeric(10,7)")
-                        .HasColumnName("latitude");
-
-                    b.Property<decimal?>("Longitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("numeric(10,7)")
-                        .HasColumnName("longitude");
-
-                    b.HasKey("AccountAddressId")
-                        .HasName("account_address_pkey");
-
-                    b.HasIndex("AccountId");
-
-                    b.ToTable("account_address", (string)null);
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Blog", b =>
@@ -1179,53 +1131,6 @@ namespace TetGift.DAL.Migrations
                     b.ToTable("stock_movement", (string)null);
                 });
 
-            modelBuilder.Entity("TetGift.DAL.Entities.StoreLocation", b =>
-                {
-                    b.Property<int>("StoreLocationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("store_location_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("StoreLocationId"));
-
-                    b.Property<string>("AddressLine")
-                        .HasColumnType("text")
-                        .HasColumnName("address_line");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<decimal>("Latitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("numeric(10,7)")
-                        .HasColumnName("latitude");
-
-                    b.Property<decimal>("Longitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("numeric(10,7)")
-                        .HasColumnName("longitude");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<string>("OpenHoursText")
-                        .HasColumnType("text")
-                        .HasColumnName("open_hours_text");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasColumnType("text")
-                        .HasColumnName("phone_number");
-
-                    b.HasKey("StoreLocationId")
-                        .HasName("store_location_pkey");
-
-                    b.ToTable("store_location", (string)null);
-                });
-
             modelBuilder.Entity("TetGift.DAL.Entities.Wallet", b =>
                 {
                     b.Property<int>("Walletid")
@@ -1346,18 +1251,6 @@ namespace TetGift.DAL.Migrations
                         .HasForeignKey("ConversationId");
 
                     b.Navigation("Conversation");
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.AccountAddress", b =>
-                {
-                    b.HasOne("TetGift.DAL.Entities.Account", "Account")
-                        .WithMany()
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("account_address_accountid_fkey");
-
-                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Blog", b =>

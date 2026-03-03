@@ -534,9 +534,20 @@ public class WalletService : IWalletService
         };
         await transactionRepo.AddAsync(transaction);
 
-        // Cập nhật Payment status
-        payment.Status = PaymentStatus.REFUNDED;
-        paymentRepo.Update(payment);
+        //payment.Status = PaymentStatus.REFUNDED;
+        //paymentRepo.Update(payment);
+
+        var refundPayment = new Payment
+        {
+            Orderid = orderId,
+            Amount = refundAmount,
+            Status = PaymentStatus.REFUNDED,
+            Type = "ORDER_REFUND",
+            Paymentmethod = "WALLET",
+            CreatedDate = DateTime.UtcNow,
+            Ispayonline = false
+        };
+        await paymentRepo.AddAsync(refundPayment);
 
         await _uow.SaveAsync();
     }

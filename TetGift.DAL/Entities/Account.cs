@@ -43,5 +43,7 @@ public partial class Account
 
     public virtual ICollection<Quotation> Quotations { get; set; } = new List<Quotation>();
 
+    public virtual Conversation? Conversation { get; set; }
+
     public virtual Wallet? Wallet { get; set; }
 }
