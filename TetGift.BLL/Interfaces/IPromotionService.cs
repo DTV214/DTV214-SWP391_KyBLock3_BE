@@ -4,12 +4,12 @@ namespace TetGift.BLL.Interfaces
 {
     public interface IPromotionService
     {
-        Task<PromotionResponseDto> CreateAsync(CreatePromotionRequest req);
+        Task<PromotionResponseDto> CreateAsync(PromotionRequest req);
         Task<IEnumerable<PromotionResponseDto>> GetAllAsync();
-        // --- THÊM MỚI ---
+        Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited);
         Task<PromotionResponseDto> GetByIdAsync(int id);
         Task<PromotionResponseDto> GetByCodeAsync(string code);
-        Task UpdateAsync(int id, UpdatePromotionRequest req);
+        Task UpdateAsync(int id, PromotionRequest req);
         Task DeleteAsync(int id);
     }
 }
