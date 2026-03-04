@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TetGift.DAL.Context;
@@ -11,9 +12,11 @@ using TetGift.DAL.Context;
 namespace TetGift.DAL.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260303095131_AddMapEntity")]
+    partial class AddMapEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -138,15 +141,6 @@ namespace TetGift.DAL.Migrations
                     b.Property<string>("AddressLine")
                         .HasColumnType("text")
                         .HasColumnName("address_line");
-
-                    b.Property<string>("Customeremail")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Customername")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Customerphone")
-                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
