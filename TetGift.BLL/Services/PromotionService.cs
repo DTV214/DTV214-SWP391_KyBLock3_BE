@@ -12,7 +12,7 @@ namespace TetGift.BLL.Services
         public async Task<PromotionResponseDto> CreateAsync(PromotionRequest req)
         {
             // Logic kiểm tra thời gian
-            if (req.StartTime >= req.EndTime)
+            if (req.StartTime >= req.ExpiryDate)
             {
                 throw new Exception("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.");
             }
@@ -29,7 +29,7 @@ namespace TetGift.BLL.Services
                 MaxDiscountPrice = req.MaxDiscountPrice,
                 IsPercentage = req.IsPercentage,
                 StartTime = req.StartTime,
-                EndTime = req.EndTime,
+                Expirydate = req.ExpiryDate,
                 IsLimited = req.IsLimited,
                 LimitedCount = req.LimitedCount,
                 UsedCount = 0,
@@ -95,7 +95,7 @@ namespace TetGift.BLL.Services
             promo.MaxDiscountPrice = req.MaxDiscountPrice;
             promo.IsPercentage = req.IsPercentage;
             promo.StartTime = req.StartTime;
-            promo.EndTime = req.EndTime;
+            promo.Expirydate = req.ExpiryDate;
             promo.IsLimited = req.IsLimited;
             promo.LimitedCount = req.LimitedCount;
 
@@ -120,7 +120,6 @@ namespace TetGift.BLL.Services
 
         private PromotionResponseDto MapToResponseDto(Promotion e)
         {
-            var now = DateTime.Now;
             return new PromotionResponseDto
             {
                 PromotionId = e.Promotionid,
@@ -130,10 +129,10 @@ namespace TetGift.BLL.Services
                 MaxDiscountPrice = e.MaxDiscountPrice,
                 IsPercentage = e.IsPercentage ?? false,
                 StartTime = e.StartTime,
-                EndTime = e.EndTime,
+                ExpiryDate = e.Expirydate,
                 IsLimited = e.IsLimited ?? false,
                 LimitedCount = e.LimitedCount,
-                IsActive = (e.StartTime <= now && e.EndTime >= now)
+                IsActive = e.IsValid()
             };
         }
 

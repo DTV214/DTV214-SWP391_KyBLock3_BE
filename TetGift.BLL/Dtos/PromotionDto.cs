@@ -21,7 +21,7 @@ namespace TetGift.BLL.Dtos
         public DateTime StartTime { get; set; }
 
         [Required(ErrorMessage = "Thời gian kết thúc là bắt buộc")]
-        public DateTime EndTime { get; set; }
+        public DateTime ExpiryDate { get; set; }
 
         public bool IsLimited { get; set; }
         public int? LimitedCount { get; set; }
@@ -37,7 +37,7 @@ namespace TetGift.BLL.Dtos
         public decimal? MaxDiscountPrice { get; set; }
         public bool IsPercentage { get; set; }
         public DateTime? StartTime { get; set; }
-        public DateTime? EndTime { get; set; }
+        public DateTime? ExpiryDate { get; set; }
         public bool IsLimited { get; set; }
         public int? LimitedCount { get; set; }
         public int? UsedCount { get; set; }

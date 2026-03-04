@@ -24,14 +24,14 @@ namespace TetGift.Controllers
             return Ok(result);
         }
 
-        [HttpGet("/limited")]
+        [HttpGet("limited")]
         public async Task<IActionResult> GetAllLimited()
         {
             var result = await _promotionService.GetAllAsync(true);
             return Ok(result);
         }
 
-        [HttpGet("/unlimited")]
+        [HttpGet("unlimited")]
         public async Task<IActionResult> GetAllUnLimited()
         {
             var result = await _promotionService.GetAllAsync(false);

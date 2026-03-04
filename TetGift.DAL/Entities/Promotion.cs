@@ -7,7 +7,6 @@ public partial class Promotion
     public string? Code { get; set; }
     public decimal? MinPriceToApply { get; set; }
     public decimal? MaxDiscountPrice { get; set; }
-    public DateTime? EndTime { get; set; }
     public DateTime? StartTime { get; set; }
     public int? LimitedCount { get; set; }
     public int? UsedCount { get; set; }
@@ -22,27 +21,67 @@ public partial class Promotion
 
     public bool IsValid()
     {
-        if (!Isdeleted.HasValue) Isdeleted = false;
-        if (!IsLimited.HasValue) IsLimited = false;
-        if (!UsedCount.HasValue) UsedCount = 0;
+        var now = DateTime.Now;
+        // Kiểm tra cơ bản: chưa xóa, trong thời hạn hiệu lực
+        bool basicCheck = (Isdeleted != true)
+                          && (Expirydate.HasValue && now <= Expirydate.Value)
+                          && (StartTime.HasValue && now >= StartTime.Value);
 
-        return !Isdeleted.Value
-            && DateTime.Now < EndTime
-            && DateTime.Now > StartTime
-            && (!IsLimited.Value || (IsLimited.Value && UsedCount.Value > 0));
+        if (!basicCheck) return false;
+
+        // Nếu có giới hạn số lượng, kiểm tra xem còn lượt dùng không
+        if (IsLimited == true)
+        {
+            return (UsedCount ?? 0) < (LimitedCount ?? 0);
+        }
+
+        return true;
     }
 
-    public double ApplyPromotion(double price)
+    public (double appliedPrice, bool isApplied, string message) ApplyPromotion(double price)
     {
-        if (!IsPercentage.HasValue) IsPercentage = false;
+        // 1. Kiểm tra điều kiện cơ bản (Thời gian, Trạng thái xóa)
+        if (!IsValid())
+            return (price, false, "Mã giảm giá đã hết hạn hoặc không còn hiệu lực.");
 
-        if (IsPercentage.Value)
+        // 2. Kiểm tra giới hạn số lượng (IsLimited)
+        if (IsLimited == true && (UsedCount ?? 0) >= (LimitedCount ?? 0))
         {
+            return (price, false, "Mã giảm giá đã hết lượt sử dụng.");
+        }
 
+        // 3. Kiểm tra giá trị đơn hàng tối thiểu (MinPriceToApply)
+        decimal minPrice = MinPriceToApply ?? 0;
+        if ((decimal)price < minPrice)
+        {
+            return (price, false, $"Đơn hàng chưa đạt giá trị tối thiểu {minPrice:N0}đ để áp dụng mã.");
+        }
+
+        double discountAmount = 0;
+        double val = (double)(Discountvalue ?? 0);
+
+        // 4. Tính toán số tiền được giảm
+        if (IsPercentage == true)
+        {
+            // Tính theo %
+            discountAmount = price * (val / 100);
+
+            // Kiểm tra mức giảm tối đa (MaxDiscountPrice)
+            if (MaxDiscountPrice.HasValue && discountAmount > (double)MaxDiscountPrice.Value)
+            {
+                discountAmount = (double)MaxDiscountPrice.Value;
+            }
         }
         else
         {
-
+            // Tính theo số tiền cố định
+            discountAmount = val;
         }
+
+        // 5. Tính giá cuối cùng (đảm bảo không âm)
+        double finalPrice = price - discountAmount;
+        if (finalPrice < 0) finalPrice = 0;
+
+        return (finalPrice, true, "Áp dụng mã giảm giá thành công.");
     }
 }
