@@ -143,7 +143,11 @@ namespace TetGift.BLL.Services
             Latitude = x.Latitude,
             Longitude = x.Longitude,
             IsDefault = x.IsDefault,
-            IsActive = x.IsActive
+            IsActive = x.IsActive,
+
+            Customername = x.Customername,
+            Customerphone = x.Customerphone,
+            Customeremail = x.Customeremail
         };
     }
 }
