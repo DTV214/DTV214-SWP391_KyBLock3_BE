@@ -13,7 +13,7 @@ namespace TetGift.Controllers
         [HttpPost]
         public async Task<IActionResult> SavePromotion([FromBody] AssignPromotionRequest req)
         {
-            req.AccountId = GetId();
+            req.AccountId = GetAccountId();
             await _accountPromotionService.SaveToAccountAsync(req);
             return Ok(new { message = "Lưu mã giảm giá thành công." });
         }
