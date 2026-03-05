@@ -1,4 +1,6 @@
-﻿using TetGift.BLL.Dtos;
+﻿using Microsoft.EntityFrameworkCore;
+using TetGift.BLL.Common.Constraint;
+using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
 using TetGift.DAL.Interfaces;
@@ -28,8 +30,8 @@ namespace TetGift.BLL.Services
                 Discountvalue = req.DiscountValue,
                 MaxDiscountPrice = req.MaxDiscountPrice,
                 IsPercentage = req.IsPercentage,
-                StartTime = req.StartTime,
-                Expirydate = req.ExpiryDate,
+                StartTime = DateTime.SpecifyKind(req.StartTime, DateTimeKind.Utc),
+                Expirydate = DateTime.SpecifyKind(req.ExpiryDate, DateTimeKind.Utc),
                 IsLimited = req.IsLimited,
                 LimitedCount = req.LimitedCount,
                 UsedCount = 0,
@@ -50,11 +52,18 @@ namespace TetGift.BLL.Services
         }
 
 
-        public async Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited)
+        public async Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited, int accountId)
         {
             var promoRepo = _unitOfWork.GetRepository<Promotion>();
             var entities = await promoRepo.FindAsync(p => p.Isdeleted != true && p.IsLimited.Equals(isLimited));
-            return entities.Select(MapToResponseDto);
+
+            var limitedPromos = GetAccountLimitedPromo(accountId, true).Result.ToList();
+
+            return entities.Select(MapToResponseDto).Select(a =>
+            {
+                a.IsAlreadySave = limitedPromos.FirstOrDefault(lm => lm.Promotionid == a.PromotionId) != null;
+                return a;
+            });
         }
 
         public async Task DeleteAsync(int id)
@@ -94,8 +103,8 @@ namespace TetGift.BLL.Services
             promo.Discountvalue = req.DiscountValue;
             promo.MaxDiscountPrice = req.MaxDiscountPrice;
             promo.IsPercentage = req.IsPercentage;
-            promo.StartTime = req.StartTime;
-            promo.Expirydate = req.ExpiryDate;
+            promo.StartTime = DateTime.SpecifyKind(req.StartTime, DateTimeKind.Utc);
+            promo.Expirydate = DateTime.SpecifyKind(req.ExpiryDate, DateTimeKind.Utc);
             promo.IsLimited = req.IsLimited;
             promo.LimitedCount = req.LimitedCount;
 
@@ -120,6 +129,18 @@ namespace TetGift.BLL.Services
 
         private PromotionResponseDto MapToResponseDto(Promotion e)
         {
+            PromotionStatus status;
+
+            if (e.StillNotYet())
+                status = PromotionStatus.WAIT_FOR_ACTIVE;
+            else if (e.IsValid())
+                status = PromotionStatus.ACTIVE;
+            else if (e.IsLimited ?? false && e.LimitedCount == e.UsedCount)
+                status = PromotionStatus.LIMITED_REACHED;
+            else
+                status = PromotionStatus.OUT_OF_DATE;
+
+
             return new PromotionResponseDto
             {
                 PromotionId = e.Promotionid,
@@ -132,9 +153,56 @@ namespace TetGift.BLL.Services
                 ExpiryDate = e.Expirydate,
                 IsLimited = e.IsLimited ?? false,
                 LimitedCount = e.LimitedCount,
-                IsActive = e.IsValid()
+                UsedCount = e.UsedCount,
+                Status = status.ToString()
             };
         }
 
+        public async Task<IEnumerable<PromotionResponseDto>> GetByAccount(int accountId)
+        {
+            var promoRepo = _unitOfWork.GetRepository<Promotion>();
+            var unlimitedPromos = await promoRepo.FindAsync(p => p.Isdeleted == false && p.IsLimited == false);
+            var accountLimitedPromos = await GetAccountLimitedPromo(accountId, false);
+
+            var promos = unlimitedPromos.Concat(accountLimitedPromos);
+            var results = promos.Select(MapToResponseDto).ToList();
+
+            return [.. results.Where(p =>
+            p.Status.Equals(PromotionStatus.WAIT_FOR_ACTIVE.ToString()) ||
+            p.Status.Equals(PromotionStatus.ACTIVE.ToString()))];
+        }
+
+        private async Task<IEnumerable<Promotion>> GetAccountLimitedPromo(int accountId, bool getAll)
+        {
+            var accountRepo = _unitOfWork.GetRepository<Account>();
+            var account = await accountRepo.FindAsync(a => a.Accountid == accountId,
+                a => a.Include(a => a.AccountPromotions).ThenInclude(ap => ap.Promotion));
+
+            if (account == null)
+                throw new Exception("Tài khoản không tồn tại hoặc chưa có tài khoản để xem");
+
+            var promos = account.AccountPromotions.Where(ap => ap.Promotion.IsLimited == true);
+
+            if (!getAll)
+            {
+                promos = account.AccountPromotions.Where(ap => !ap.IsUsed());
+            }
+
+            return promos.Select(p => p.Promotion);
+        }
+
+        public async Task<Promotion> GetCodeAsync(string code)
+        {
+            var repo = _unitOfWork.GetRepository<Promotion>();
+            var promos = await repo.FindAsync(p => p.Code.Equals(code));
+            if (!promos.Any()) throw new Exception("Không tìm thấy mã giảm giá.");
+
+            var promo = promos.FirstOrDefault();
+
+            if (promo == null || promo.Isdeleted == true)
+                throw new Exception("Không tìm thấy mã giảm giá.");
+
+            return promo;
+        }
     }
 }

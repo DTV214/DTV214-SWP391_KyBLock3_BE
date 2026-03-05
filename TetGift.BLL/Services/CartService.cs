@@ -221,9 +221,9 @@ public class CartService : ICartService
 
         // Validate promotion code bằng cách sử dụng PromotionService (kế thừa code cũ)
         var allPromotions = await _promotionService.GetAllAsync();
-        var promotion = allPromotions.FirstOrDefault(p => 
-            p.Code.Equals(request.PromotionCode, StringComparison.OrdinalIgnoreCase) && 
-            p.IsActive);
+        var promotion = allPromotions.FirstOrDefault(p =>
+            p.Code.Equals(request.PromotionCode, StringComparison.OrdinalIgnoreCase) &&
+            p.Status.Equals(PromotionStatus.ACTIVE));
 
         if (promotion == null)
             throw new Exception("Mã giảm giá không hợp lệ hoặc đã hết hạn.");

@@ -6,7 +6,7 @@ namespace TetGift.Controllers
 {
     [ApiController]
     [Route("api/promotions")]
-    public class PromotionsController(IPromotionService promotionService) : ControllerBase
+    public class PromotionsController(IPromotionService promotionService) : BaseApiController
     {
         private readonly IPromotionService _promotionService = promotionService;
 
@@ -27,14 +27,14 @@ namespace TetGift.Controllers
         [HttpGet("limited")]
         public async Task<IActionResult> GetAllLimited()
         {
-            var result = await _promotionService.GetAllAsync(true);
+            var result = await _promotionService.GetAllAsync(true, GetAccountId());
             return Ok(result);
         }
 
-        [HttpGet("unlimited")]
-        public async Task<IActionResult> GetAllUnLimited()
+        [HttpGet("accounts")]
+        public async Task<IActionResult> GetAccountPromos()
         {
-            var result = await _promotionService.GetAllAsync(false);
+            var result = await _promotionService.GetByAccount(GetAccountId());
             return Ok(result);
         }
 

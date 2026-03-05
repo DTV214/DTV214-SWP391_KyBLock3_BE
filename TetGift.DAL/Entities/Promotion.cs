@@ -38,6 +38,18 @@ public partial class Promotion
         return true;
     }
 
+    public bool StillNotYet()
+    {
+        var now = DateTime.Now;
+        // Kiểm tra cơ bản: chưa xóa, trước thời hạn hiệu lực
+        bool basicCheck = (Isdeleted != true)
+                          && (StartTime.HasValue && now <= StartTime.Value);
+
+        if (!basicCheck) return false;
+
+        return true;
+    }
+
     public (double appliedPrice, bool isApplied, string message) ApplyPromotion(double price)
     {
         // 1. Kiểm tra điều kiện cơ bản (Thời gian, Trạng thái xóa)

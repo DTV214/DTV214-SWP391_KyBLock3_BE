@@ -225,6 +225,7 @@ namespace TetGift
             builder.Services.AddScoped<IStoreLocationService, StoreLocationService>();
             builder.Services.AddScoped<IDirectionsService, DirectionsService>();
             builder.Services.AddScoped<IAccountAddressService, AccountAddressService>();
+            builder.Services.AddScoped<IAccountPromotionService, AccountPromotionService>();
 
             builder.Services.AddSignalR();
 

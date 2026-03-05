@@ -41,6 +41,7 @@ namespace TetGift.BLL.Dtos
         public bool IsLimited { get; set; }
         public int? LimitedCount { get; set; }
         public int? UsedCount { get; set; }
-        public bool IsActive { get; set; }
+        public string? Status { get; set; }
+        public bool IsAlreadySave { get; set; }
     }
 }

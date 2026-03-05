@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Common.Constraint;
 
 namespace TetGift.Controllers
@@ -20,6 +20,12 @@ namespace TetGift.Controllers
         {
             var role = User.FindFirstValue(ClaimTypes.Role) ?? UserRole.CUSTOMER;
             return role.ToUpper(); // Normalize to uppercase
+        }
+
+        protected int GetId()
+        {
+            var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0";
+            return int.Parse(id);
         }
     }
 }
