@@ -31,32 +31,6 @@ public class OrderService : IOrderService
         if (cart.ItemCount == 0)
             throw new Exception("Giỏ hàng trống, không thể tạo đơn hàng.");
 
-        // 2. Validate và apply Promotion nếu có
-        //int? promotionId = null;
-        //decimal discountValue = 0;
-        //if (!string.IsNullOrWhiteSpace(request.PromotionCode))
-        //{
-        //    try
-        //    {
-        //        var promotionResult = await _cartService.ApplyPromotionAsync(accountId, new ApplyPromotionRequest
-        //        {
-        //            PromotionCode = request.PromotionCode
-        //        });
-        //        discountValue = promotionResult.DiscountValue ?? 0;
-
-        //        // Lấy promotionId từ promotion service
-        //        var allPromotions = await _promotionService.GetAllAsync();
-        //        var promotion = allPromotions.FirstOrDefault(p =>
-        //            p.Code.Equals(request.PromotionCode, StringComparison.OrdinalIgnoreCase));
-        //        if (promotion != null)
-        //            promotionId = promotion.PromotionId;
-        //    }
-        //    catch
-        //    {
-        //        throw new Exception("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
-        //    }
-        //}
-
         var discountValue = 0d;
         var promoId = 0;
 
