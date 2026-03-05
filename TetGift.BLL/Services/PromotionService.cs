@@ -51,6 +51,13 @@ namespace TetGift.BLL.Services
             return entities.Select(MapToResponseDto);
         }
 
+        public async Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited)
+        {
+            var promoRepo = _unitOfWork.GetRepository<Promotion>();
+            var entities = await promoRepo.FindAsync(p => p.Isdeleted != true && p.IsLimited == isLimited);
+            return entities.Select(MapToResponseDto);
+        }
+
 
         public async Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited, int accountId)
         {

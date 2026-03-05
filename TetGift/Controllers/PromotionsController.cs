@@ -31,6 +31,13 @@ namespace TetGift.Controllers
             return Ok(result);
         }
 
+        [HttpGet("limited/public")]
+        public async Task<IActionResult> GetAllPublicLimited()
+        {
+            var result = await _promotionService.GetAllAsync(true);
+            return Ok(result);
+        }
+
         [HttpGet("accounts")]
         public async Task<IActionResult> GetAccountPromos()
         {

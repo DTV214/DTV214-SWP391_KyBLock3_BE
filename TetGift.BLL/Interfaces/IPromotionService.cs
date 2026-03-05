@@ -7,6 +7,7 @@ namespace TetGift.BLL.Interfaces
     {
         Task<PromotionResponseDto> CreateAsync(PromotionRequest req);
         Task<IEnumerable<PromotionResponseDto>> GetAllAsync();
+        Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited);
         Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited, int accountId);
         Task<PromotionResponseDto> GetByIdAsync(int id);
         Task<PromotionResponseDto> GetByCodeAsync(string code);
