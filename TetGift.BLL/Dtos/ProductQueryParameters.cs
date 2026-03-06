@@ -3,6 +3,7 @@
 public class ProductQueryParameters
 {
     public string? Search { get; set; }
+    public bool? IsSingleProduct { get; set; }
     public List<int>? Categories { get; set; }
     public string? Sort { get; set; }
     public decimal MinPrice { get; set; }

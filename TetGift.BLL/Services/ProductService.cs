@@ -483,8 +483,8 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         );
         var requestor = requestorList.FirstOrDefault();
 
-        bool requestorIsCustomer      = requestor?.Role.Equals(UserRole.CUSTOMER) == true;
-        bool requestorIsAdminOrStaff  = requestor?.Role.Equals(UserRole.ADMIN) == true
+        bool requestorIsCustomer = requestor?.Role.Equals(UserRole.CUSTOMER) == true;
+        bool requestorIsAdminOrStaff = requestor?.Role.Equals(UserRole.ADMIN) == true
                                      || requestor?.Role.Equals(UserRole.STAFF) == true;
 
         // ─── 2. Fetch the basket (customers may only see their own) ─────────────
@@ -512,7 +512,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         //   isCustomerBasket  = basket was created by a customer (cloned from template or self-composed)
         //   isAdminBasket     = basket was created by admin / staff (includes templates)
         bool isCustomerBasket = product.Account?.Role.Equals(UserRole.CUSTOMER) == true;
-        bool isAdminBasket    = !isCustomerBasket;
+        bool isAdminBasket = !isCustomerBasket;
 
         // ─── 4. Access-control ───────────────────────────────────────────────────
         // Admin/Staff must NOT touch customer baskets — those belong to the customer.
@@ -603,9 +603,9 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                     }
                 }
 
-                var quantity       = detail.Quantity ?? 1;
-                var productWeight  = childProduct.Unit ?? 0;
-                totalWeight       += productWeight * quantity;
+                var quantity = detail.Quantity ?? 1;
+                var productWeight = childProduct.Unit ?? 0;
+                totalWeight += productWeight * quantity;
 
                 // For customers only: out-of-stock guard for large quantities
                 if (requestorIsCustomer && quantity > 10)
@@ -1114,6 +1114,12 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         if (productQuery.MaxPrice > 0 && productQuery.MaxPrice >= productQuery.MinPrice)
         {
             query = query.Where(p => p.Price <= productQuery.MaxPrice);
+        }
+
+        // 5. Filter sản phẩm đơn
+        if (productQuery.IsSingleProduct ?? false)
+        {
+            query = query.Where(p => p.Configid == null);
         }
 
         #endregion
