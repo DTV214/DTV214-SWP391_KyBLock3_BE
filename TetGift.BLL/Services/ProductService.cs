@@ -1165,6 +1165,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             // Phân trang
             int skip = (productQuery.PageNumber!.Value - 1) * productQuery.PageSize!.Value;
             products = await query
+                .Include(p => p.Stocks)
                 .Skip(skip)
                 .Take(productQuery.PageSize.Value)
                 .ToListAsync();
@@ -1192,9 +1193,15 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 Price = p.Price,
                 Status = p.Status,
                 Unit = p.Unit,
+                TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
                 ImageUrl = p.ImageUrl
             };
         });
+
+        if (productQuery.IsNotShowAll ?? false)
+        {
+            dtos = dtos.Where(p => p.TotalQuantity > 0);
+        }
 
         #endregion
 
