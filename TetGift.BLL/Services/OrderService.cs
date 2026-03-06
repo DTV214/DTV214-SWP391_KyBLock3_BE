@@ -80,8 +80,7 @@ public class OrderService : IOrderService
         var order = new Order
         {
             Accountid = accountId,
-            Promotionid = promoId,
-            Totalprice = (decimal)discountValue,
+            Totalprice = discountValue == 0 ? cart.TotalPrice : (decimal)discountValue,
             Status = OrderStatus.PENDING,
             Customername = request.CustomerName,
             Customerphone = request.CustomerPhone,
@@ -90,6 +89,10 @@ public class OrderService : IOrderService
             Note = request.Note,
             Orderdatetime = DateTime.Now
         };
+
+        if (promoId != 0)
+            order.Promotionid = promoId;
+
         await orderRepo.AddAsync(order);
         await _uow.SaveAsync();
 
