@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace TetGift.DAL.Entities;
+﻿namespace TetGift.DAL.Entities;
 
 public partial class Account
 {
@@ -42,6 +39,7 @@ public partial class Account
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 
     public virtual ICollection<Quotation> Quotations { get; set; } = new List<Quotation>();
+    public virtual ICollection<AccountPromotion> AccountPromotions { get; set; } = new List<AccountPromotion>();
 
     public virtual Conversation? Conversation { get; set; }
 

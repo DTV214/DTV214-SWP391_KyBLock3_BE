@@ -101,7 +101,7 @@ namespace TetGift.BLL.Dtos
         [Required(ErrorMessage = "Tên sản phẩm không được để trống")]
         public string Productname { get; set; } = null!;
 
-        public string Category { get; set; }
+        public string? Category { get; set; }
 
         public string? Description { get; set; }
 

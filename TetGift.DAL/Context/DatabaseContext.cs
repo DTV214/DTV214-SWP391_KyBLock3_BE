@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using TetGift.DAL.Entities;
 
 namespace TetGift.DAL.Context;
@@ -469,8 +467,11 @@ public partial class DatabaseContext : DbContext
                 .HasPrecision(18, 2)
                 .HasColumnName("discountvalue");
             entity.Property(e => e.Expirydate)
-                .HasColumnType("timestamp without time zone")
+                .HasColumnType("timestamp with time zone")
                 .HasColumnName("expirydate");
+            entity.Property(e => e.StartTime)
+    .HasColumnType("timestamp with time zone")
+    .HasColumnName("StartTime");
             entity.Property(e => e.Isdeleted)
                 .HasDefaultValue(false)
                 .HasColumnName("isdeleted");

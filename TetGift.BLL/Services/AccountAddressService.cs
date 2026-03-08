@@ -54,7 +54,10 @@ namespace TetGift.BLL.Services
                 Latitude = req.Latitude,
                 Longitude = req.Longitude,
                 IsDefault = req.IsDefault,
-                IsActive = req.IsActive
+                IsActive = req.IsActive,
+                Customername = req.Customername,
+                Customerphone = req.Customerphone,
+                Customeremail = req.Customeremail
             };
 
             await repo.AddAsync(entity);
@@ -83,6 +86,9 @@ namespace TetGift.BLL.Services
             entity.Longitude = req.Longitude;
             entity.IsDefault = req.IsDefault;
             entity.IsActive = req.IsActive;
+            entity.Customername = req.Customername;
+            entity.Customerphone = req.Customerphone;
+            entity.Customeremail = req.Customeremail;
 
             await repo.UpdateAsync(entity);
             await _uow.SaveAsync();
@@ -143,7 +149,11 @@ namespace TetGift.BLL.Services
             Latitude = x.Latitude,
             Longitude = x.Longitude,
             IsDefault = x.IsDefault,
-            IsActive = x.IsActive
+            IsActive = x.IsActive,
+
+            Customername = x.Customername,
+            Customerphone = x.Customerphone,
+            Customeremail = x.Customeremail
         };
     }
 }

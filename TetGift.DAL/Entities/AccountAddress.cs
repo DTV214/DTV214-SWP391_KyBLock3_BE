@@ -14,6 +14,9 @@
 
         public bool IsDefault { get; set; }
         public bool IsActive { get; set; } = true;
+        public string? Customername { get; set; }
+        public string? Customerphone { get; set; }
+        public string? Customeremail { get; set; }
 
         public virtual Account Account { get; set; } = null!;
     }

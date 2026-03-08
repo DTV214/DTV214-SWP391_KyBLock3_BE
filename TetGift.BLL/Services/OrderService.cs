@@ -12,14 +12,16 @@ public class OrderService : IOrderService
     private readonly IUnitOfWork _uow;
     private readonly ICartService _cartService;
     private readonly IPromotionService _promotionService;
+    private readonly IAccountPromotionService _accountPromotionService;
     private readonly IWalletService _walletService;
 
-    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IWalletService walletService)
+    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IWalletService walletService, IAccountPromotionService accountPromotionService)
     {
         _uow = uow;
         _cartService = cartService;
         _promotionService = promotionService;
         _walletService = walletService;
+        _accountPromotionService = accountPromotionService;
     }
 
     public async Task<OrderResponseDto> CreateOrderFromCartAsync(int accountId, CreateOrderRequest request)
@@ -29,29 +31,32 @@ public class OrderService : IOrderService
         if (cart.ItemCount == 0)
             throw new Exception("Giỏ hàng trống, không thể tạo đơn hàng.");
 
-        // 2. Validate và apply Promotion nếu có
-        int? promotionId = null;
-        decimal discountValue = 0;
+        var discountValue = 0d;
+        var promoId = 0;
+
         if (!string.IsNullOrWhiteSpace(request.PromotionCode))
         {
-            try
-            {
-                var promotionResult = await _cartService.ApplyPromotionAsync(accountId, new ApplyPromotionRequest
-                {
-                    PromotionCode = request.PromotionCode
-                });
-                discountValue = promotionResult.DiscountValue ?? 0;
+            var promoRepo = _uow.GetRepository<Promotion>();
+            var promoResult = (0d, false, "");
+            var promo = await _promotionService.GetCodeAsync(request.PromotionCode);
 
-                // Lấy promotionId từ promotion service
-                var allPromotions = await _promotionService.GetAllAsync();
-                var promotion = allPromotions.FirstOrDefault(p =>
-                    p.Code.Equals(request.PromotionCode, StringComparison.OrdinalIgnoreCase));
-                if (promotion != null)
-                    promotionId = promotion.PromotionId;
-            }
-            catch
+            promoResult = promo.ApplyPromotion((double)cart.TotalPrice);
+            if (promoResult.Item2 == false)
             {
-                throw new Exception("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
+                throw new Exception(promoResult.Item3);
+            }
+
+            promoId = promo.Promotionid;
+            discountValue = promoResult.Item1;
+
+            // Nếu là limited thì chỉnh bảng
+            if (promo.IsLimited ?? false)
+            {
+                var isApplied = await _accountPromotionService.UsePromotionAsync(accountId, promoId);
+                if (!isApplied)
+                    throw new Exception("Lỗi khi áp dụng mã giảm giá");
+                promo.UsedCount++;
+                await promoRepo.UpdateAsync(promo);
             }
         }
 
@@ -75,8 +80,7 @@ public class OrderService : IOrderService
         var order = new Order
         {
             Accountid = accountId,
-            Promotionid = promotionId,
-            Totalprice = cart.TotalPrice - discountValue,
+            Totalprice = discountValue == 0 ? cart.TotalPrice : (decimal)discountValue,
             Status = OrderStatus.PENDING,
             Customername = request.CustomerName,
             Customerphone = request.CustomerPhone,
@@ -85,6 +89,10 @@ public class OrderService : IOrderService
             Note = request.Note,
             Orderdatetime = DateTime.Now
         };
+
+        if (promoId != 0)
+            order.Promotionid = promoId;
+
         await orderRepo.AddAsync(order);
         await _uow.SaveAsync();
 
@@ -503,7 +511,20 @@ public class OrderService : IOrderService
         var promotionCode = "";
         if (order.Promotion != null)
         {
-            discountValue = order.Promotion.Discountvalue ?? 0;
+            if (order.Promotion.IsPercentage ?? false)
+            {
+                discountValue = order.Totalprice ?? 0 * (order.Promotion.Discountvalue ?? 0 / 100);
+            }
+            else
+            {
+                discountValue = order.Promotion.Discountvalue ?? 0;
+            }
+
+            if (discountValue > order.Promotion.MaxDiscountPrice)
+            {
+                discountValue = order.Promotion.MaxDiscountPrice ?? 0;
+            }
+
             promotionCode = order.Promotion.Code ?? "";
         }
 

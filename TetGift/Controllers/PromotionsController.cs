@@ -6,27 +6,45 @@ namespace TetGift.Controllers
 {
     [ApiController]
     [Route("api/promotions")]
-    public class PromotionsController : ControllerBase
+    public class PromotionsController(IPromotionService promotionService) : BaseApiController
     {
-        private readonly IPromotionService _promotionService;
-        public PromotionsController(IPromotionService promotionService)
-        {
-            _promotionService = promotionService;
-        }
+        private readonly IPromotionService _promotionService = promotionService;
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreatePromotionRequest req)
+        public async Task<IActionResult> Create([FromBody] PromotionRequest req)
         {
             var result = await _promotionService.CreateAsync(req);
-            // ApiResponseWrapper sẽ tự bọc result
             return Ok(result);
         }
+
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
             var result = await _promotionService.GetAllAsync();
             return Ok(result);
         }
+
+        [HttpGet("limited")]
+        public async Task<IActionResult> GetAllLimited()
+        {
+            var result = await _promotionService.GetAllAsync(true, GetAccountId());
+            return Ok(result);
+        }
+
+        [HttpGet("limited/public")]
+        public async Task<IActionResult> GetAllPublicLimited()
+        {
+            var result = await _promotionService.GetAllAsync(true);
+            return Ok(result);
+        }
+
+        [HttpGet("accounts")]
+        public async Task<IActionResult> GetAccountPromos()
+        {
+            var result = await _promotionService.GetByAccount(GetAccountId());
+            return Ok(result);
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -49,7 +67,7 @@ namespace TetGift.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdatePromotionRequest req)
+        public async Task<IActionResult> Update(int id, [FromBody] PromotionRequest req)
         {
             await _promotionService.UpdateAsync(id, req);
             return Ok(new { message = "Cập nhật thành công." });
