@@ -13,9 +13,13 @@ public partial class Blog
 
     public string? Content { get; set; }
 
+
+
     public DateTime? Creationdate { get; set; }
 
     public bool? Isdeleted { get; set; }
+    public string? ImageUrl { get; set; } // Lưu đường dẫn ảnh
+    public string? VideoUrl { get; set; } // Lưu đường dẫn video
 
     public virtual Account? Account { get; set; }
 }
