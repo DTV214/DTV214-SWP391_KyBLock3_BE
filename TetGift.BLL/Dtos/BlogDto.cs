@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http; // BẮT BUỘC THÊM THƯ VIỆN NÀY
 
 namespace TetGift.BLL.Dtos
 {
@@ -12,10 +10,14 @@ namespace TetGift.BLL.Dtos
         public int BlogId { get; set; }
         public string Title { get; set; } = null!;
         public string Content { get; set; } = null!;
-        public string? AuthorName { get; set; } // Tên người viết (lấy từ Account)
+        public string? AuthorName { get; set; }
         public DateTime? CreationDate { get; set; }
+
+        // Trả về URL để Frontend hiển thị
+        public string? ImageUrl { get; set; }
+        public string? VideoUrl { get; set; }
     }
-    // DTO dùng để Tạo mới
+
     public class CreateBlogRequest
     {
         [Required(ErrorMessage = "Tiêu đề không được để trống")]
@@ -24,9 +26,12 @@ namespace TetGift.BLL.Dtos
 
         [Required(ErrorMessage = "Nội dung không được để trống")]
         public string Content { get; set; } = null!;
+
+        // Thêm 2 property nhận file từ Frontend
+        public IFormFile? ImageFile { get; set; }
+        public IFormFile? VideoFile { get; set; }
     }
 
-    // DTO dùng để Cập nhật
     public class UpdateBlogRequest
     {
         [Required(ErrorMessage = "Tiêu đề không được để trống")]
@@ -35,5 +40,9 @@ namespace TetGift.BLL.Dtos
 
         [Required(ErrorMessage = "Nội dung không được để trống")]
         public string Content { get; set; } = null!;
+
+        // Thêm 2 property nhận file từ Frontend
+        public IFormFile? ImageFile { get; set; }
+        public IFormFile? VideoFile { get; set; }
     }
 }
