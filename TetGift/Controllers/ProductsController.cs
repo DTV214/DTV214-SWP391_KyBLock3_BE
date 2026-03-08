@@ -77,8 +77,8 @@ public class ProductsController(IProductService service) : BaseApiController
     public async Task<IActionResult> CreateCustom([FromBody] CreateComboProductRequest dto)
     {
         dto.Accountid = GetAccountId();
-        await _service.CreateCustomAsync(dto);
-        return Ok(new { message = "Tạo giỏ quà tùy chỉnh thành công" });
+        var productId = await _service.CreateCustomAsync(dto);
+        return Ok(new { productid = productId, message = "Tạo giỏ quà tùy chỉnh thành công" });
     }
 
     /// <summary>
@@ -177,6 +177,17 @@ public class ProductsController(IProductService service) : BaseApiController
     }
 
     /// <summary>
+    /// Get admin/staff ACTIVE gift baskets for shop browsing (public)
+    /// Only returns baskets with ACTIVE status, for customers to browse and buy
+    /// </summary>
+    [HttpGet("shop")]
+    public async Task<IActionResult> GetShopBaskets()
+    {
+        var baskets = await _service.GetShopBasketsAsync();
+        return Ok(baskets);
+    }
+
+    /// <summary>
     /// Clone a template basket to customer's account
     /// Creates a copy of Product + all ProductDetails
     /// </summary>
@@ -213,6 +224,24 @@ public class ProductsController(IProductService service) : BaseApiController
     {
         await _service.RemoveTemplateAsync(id);
         return Ok(new { message = "Đã xóa trạng thái template." });
+    }
+
+    /// <summary>
+    /// Admin: Hard delete a template product along with all its ProductDetails (child items)
+    /// </summary>
+    [HttpDelete("{id}/hard")]
+    //[Authorize(Roles = "ADMIN,STAFF")]
+    public async Task<IActionResult> HardDeleteTemplate(int id)
+    {
+        try
+        {
+            await _service.HardDeleteTemplateAsync(id);
+            return Ok(new { message = "Xóa vĩnh viễn template thành công." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpGet]

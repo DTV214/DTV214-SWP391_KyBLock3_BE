@@ -237,5 +237,51 @@ namespace TetGift.BLL.Services
 
             return await GetAllAsync();
         }
+
+        public async Task<IEnumerable<ProductConfigDto>> HardDeleteAsync(int id)
+        {
+            var configRepo = _uow.GetRepository<ProductConfig>();
+            var config = await configRepo.FindAsync(
+                pc => pc.Configid == id,
+                include: q => q
+                    .Include(pc => pc.ConfigDetails)
+                    .Include(pc => pc.Products)
+                        .ThenInclude(p => p.ProductDetailProductparents)
+            );
+
+            if (config == null)
+                throw new Exception("Không tìm thấy cấu hình.");
+
+            // 1. Xóa tất cả ProductDetail của các product thuộc config này
+            var productDetailRepo = _uow.GetRepository<ProductDetail>();
+            foreach (var product in config.Products)
+            {
+                if (product.ProductDetailProductparents != null && product.ProductDetailProductparents.Count != 0)
+                {
+                    productDetailRepo.DeleteRange(product.ProductDetailProductparents.ToList());
+                }
+            }
+
+            // 2. Xóa tất cả Product thuộc config này
+            var productRepo = _uow.GetRepository<Product>();
+            if (config.Products.Count != 0)
+            {
+                productRepo.DeleteRange(config.Products.ToList());
+            }
+
+            // 3. Xóa tất cả ConfigDetail của config này
+            var configDetailRepo = _uow.GetRepository<ConfigDetail>();
+            if (config.ConfigDetails.Count != 0)
+            {
+                configDetailRepo.DeleteRange(config.ConfigDetails.ToList());
+            }
+
+            // 4. Xóa vĩnh viễn ProductConfig
+            configRepo.Delete(config);
+
+            await _uow.SaveAsync();
+
+            return await GetAllAsync();
+        }
     }
 }

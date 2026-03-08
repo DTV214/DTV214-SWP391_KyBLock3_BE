@@ -26,6 +26,8 @@ public class CartService : ICartService
             include: q => q
                 .Include(c => c.CartDetails)
                 .ThenInclude(cd => cd.Product)
+                .ThenInclude(p => p!.ProductDetailProductparents)
+                .ThenInclude(pd => pd.Product)
         );
 
         if (cart == null)
@@ -55,14 +57,23 @@ public class CartService : ICartService
 
     public async Task<CartResponseDto> AddItemAsync(int accountId, AddToCartRequest request)
     {
-        // Validate Product
+        // Validate Product (include ProductDetails to calculate price for combo products)
         var productRepo = _uow.GetRepository<Product>();
-        var product = await productRepo.GetByIdAsync(request.ProductId);
+        var product = await productRepo.FindAsync(
+            p => p.Productid == request.ProductId,
+            include: q => q
+                .Include(p => p.ProductDetailProductparents)
+                .ThenInclude(pd => pd!.Product)
+        );
         if (product == null)
             throw new Exception("Sản phẩm không tồn tại.");
 
-        if (product.Status != ProductStatus.ACTIVE)
+        // Allow ACTIVE products (public catalog) and DRAFT products (customer's own custom baskets)
+        if (product.Status != ProductStatus.ACTIVE && product.Status != ProductStatus.DRAFT)
             throw new Exception("Sản phẩm không khả dụng.");
+
+        // Tính giá động từ các sản phẩm con (nếu là combo)
+        product.CalculateTotalPrice();
 
         if (product.Price == null || product.Price <= 0)
             throw new Exception("Giá sản phẩm không hợp lệ.");
@@ -120,6 +131,8 @@ public class CartService : ICartService
             include: q => q
                 .Include(c => c.CartDetails)
                 .ThenInclude(cd => cd.Product)
+                .ThenInclude(p => p!.ProductDetailProductparents)
+                .ThenInclude(pd => pd.Product)
         );
 
         return MapToCartResponseDto(updatedCart!);
@@ -151,6 +164,8 @@ public class CartService : ICartService
             include: q => q
                 .Include(c => c.CartDetails)
                 .ThenInclude(cd => cd.Product)
+                .ThenInclude(p => p!.ProductDetailProductparents)
+                .ThenInclude(pd => pd.Product)
         );
 
         return MapToCartResponseDto(cart!);
@@ -196,6 +211,8 @@ public class CartService : ICartService
             include: q => q
                 .Include(c => c.CartDetails)
                 .ThenInclude(cd => cd.Product)
+                .ThenInclude(p => p!.ProductDetailProductparents)
+                .ThenInclude(pd => pd.Product)
         );
 
         return MapToCartResponseDto(cart!);
@@ -276,15 +293,20 @@ public class CartService : ICartService
         var cartDetailRepo = _uow.GetRepository<CartDetail>();
         var cartDetails = await cartDetailRepo.GetAllAsync(
             cd => cd.Cartid == cartId,
-            include: q => q.Include(cd => cd.Product)
+            include: q => q
+                .Include(cd => cd.Product)
+                .ThenInclude(p => p!.ProductDetailProductparents)
+                .ThenInclude(pd => pd!.Product)
         );
 
         decimal total = 0;
         foreach (var detail in cartDetails)
         {
-            if (detail.Product != null && detail.Product.Price.HasValue && detail.Quantity.HasValue)
+            if (detail.Product != null && detail.Quantity.HasValue)
             {
-                total += detail.Product.Price.Value * detail.Quantity.Value;
+                detail.Product.CalculateTotalPrice();
+                if (detail.Product.Price.HasValue)
+                    total += detail.Product.Price.Value * detail.Quantity.Value;
             }
         }
 
@@ -308,6 +330,8 @@ public class CartService : ICartService
             {
                 if (detail.Product != null)
                 {
+                    // Tính giá động từ sản phẩm con (nếu là combo/basket)
+                    detail.Product.CalculateTotalPrice();
                     var price = detail.Product.Price ?? 0;
                     var quantity = detail.Quantity ?? 0;
                     var subTotal = price * quantity;
