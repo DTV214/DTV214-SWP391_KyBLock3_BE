@@ -36,7 +36,7 @@ namespace TetGift.Controllers
 
         // POST: api/blogs
         [HttpPost]
-        // [Authorize(Roles = "Admin,Staff")] // <--- ĐÃ COMMENT ĐỂ TEST
+        [Authorize(Roles = "ADMIN,STAFF")] // <--- ĐÃ COMMENT ĐỂ TEST
         public async Task<IActionResult> Create([FromForm] CreateBlogRequest req) // <--- ĐÃ SỬA: [FromBody] -> [FromForm]
         {
             // --- ĐÃ COMMENT LOGIC LẤY TỪ TOKEN ---
@@ -64,7 +64,7 @@ namespace TetGift.Controllers
 
         // PUT: api/blogs/{id}
         [HttpPut("{id}")]
-        // [Authorize(Roles = "Admin,Staff")] // <--- ĐÃ COMMENT ĐỂ TEST
+         [Authorize(Roles = "ADMIN,STAFF")] // <--- ĐÃ COMMENT ĐỂ TEST
         public async Task<IActionResult> Update(int id, [FromForm] UpdateBlogRequest req) // <--- ĐÃ SỬA: [FromBody] -> [FromForm]
         {
             await _blogService.UpdateAsync(id, req);
@@ -73,7 +73,7 @@ namespace TetGift.Controllers
 
         // DELETE: api/blogs/{id}
         [HttpDelete("{id}")]
-        // [Authorize(Roles = "Admin,Staff")] // <--- ĐÃ COMMENT ĐỂ TEST
+        [Authorize(Roles = "ADMIN,STAFF")] // <--- ĐÃ COMMENT ĐỂ TEST
         public async Task<IActionResult> Delete(int id)
         {
             await _blogService.DeleteAsync(id);
