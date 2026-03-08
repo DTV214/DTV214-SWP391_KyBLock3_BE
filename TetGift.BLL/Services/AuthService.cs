@@ -33,7 +33,7 @@ namespace TetGift.BLL.Services
             _cache = cache;
         }
 
-        // --- CÁC HÀM LOGIN / REGISTER GIỮ NGUYÊN NHƯ CŨ ---
+        // --- CÁC HÀM LOGIN / REGISTER GIỮ NGUYÊN ---
         public async Task RequestRegisterOtpAsync(RegisterRequest req)
         {
             var username = (req.Username ?? "").Trim();
@@ -95,29 +95,19 @@ namespace TetGift.BLL.Services
                 throw new Exception("Username/OTP is required.");
 
             var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
-            var maxFail = int.TryParse(_cfg["Otp:MaxFail"], out var mf) ? mf : 5;
             var repo = _uow.GetRepository<Account>();
             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
 
             if (acc == null) throw new Exception("Account not found.");
-            if (acc.Status == AccountStatus.ACTIVE) throw new Exception("Account already verified.");
-            if (acc.RegisterOtpExpiresAt == null || acc.RegisterOtpExpiresAt < DateTime.Now) throw new Exception("OTP expired.");
-            if (acc.RegisterOtpFailCount >= maxFail) throw new Exception("Too many failed OTP attempts.");
 
             var inputHash = OtpHelper.HashOtp(otp, otpSecret);
             if (!OtpHelper.FixedEqualsBase64(acc.RegisterOtpHash ?? "", inputHash))
-            {
-                acc.RegisterOtpFailCount++;
-                repo.Update(acc);
-                await _uow.SaveAsync();
                 throw new Exception("OTP invalid.");
-            }
 
             acc.Status = AccountStatus.ACTIVE;
             acc.RegisterOtpVerifiedAt = DateTime.Now;
             acc.RegisterOtpHash = null;
             acc.RegisterOtpExpiresAt = null;
-            acc.RegisterOtpFailCount = 0;
 
             repo.Update(acc);
             await _uow.SaveAsync();
@@ -137,39 +127,66 @@ namespace TetGift.BLL.Services
             return new AuthResultDto { Token = _jwt.Generate(acc), AccountId = acc.Accountid, Username = acc.Username, Email = acc.Email, Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper() };
         }
 
-        // --- ĐÃ TỐI ƯU: FORGET PASSWORD (XỬ LÝ 1 EMAIL NHIỀU ACC) ---
+        // --- CẬP NHẬT THÔNG MINH: FORGET PASSWORD (XỬ LÝ ĐA TÀI KHOẢN) ---
 
         public async Task RequestForgotPasswordOtpAsync(ForgotPasswordRequest req)
         {
             var email = (req.Email ?? "").Trim().ToLowerInvariant();
-            var username = (req.Username ?? "").Trim();
+            var usernameInput = (req.Username ?? "").Trim();
 
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(username))
-                throw new Exception("Vui lòng nhập đầy đủ Email và Tên đăng nhập.");
+            if (string.IsNullOrWhiteSpace(email))
+                throw new Exception("Vui lòng nhập Email liên kết.");
 
             var repo = _uow.GetRepository<Account>();
 
-            // Tìm chính xác tài khoản khớp cả Email VÀ Username
-            var acc = (await repo.FindAsync(a =>
-                a.Email == email &&
-                a.Username == username &&
-                a.Status == AccountStatus.ACTIVE)).FirstOrDefault();
+            // 1. Lấy tất cả tài khoản ACTIVE liên kết với Email này
+            var accounts = (await repo.FindAsync(a => a.Email == email && a.Status == AccountStatus.ACTIVE)).ToList();
 
-            if (acc == null)
-                throw new Exception("Thông tin tài khoản không chính xác hoặc tài khoản chưa kích hoạt.");
+            if (accounts.Count == 0)
+                throw new Exception("Email này không tồn tại trên hệ thống hoặc chưa được kích hoạt.");
 
+            Account? targetAcc = null;
+
+            // 2. Logic xử lý đa tài khoản
+            if (accounts.Count > 1 && string.IsNullOrWhiteSpace(usernameInput))
+            {
+                // TRƯỜNG HỢP: Quên Username khi có nhiều acc
+                var usernameList = string.Join(", ", accounts.Select(a => a.Username));
+                var reminderMsg = $"<div style='font-family: sans-serif;'> " +
+                                  $"<p>Chào bạn, Email của bạn hiện đang liên kết với <b>{accounts.Count} tài khoản</b>:</p>" +
+                                  $"<ul style='color: #d32f2f; font-weight: bold;'> {string.Join("", accounts.Select(a => $"<li>{a.Username}</li>"))} </ul>" +
+                                  $"<p>Vui lòng quay lại trang Quên mật khẩu và nhập chính xác <b>Tên đăng nhập</b> bạn muốn khôi phục.</p></div>";
+
+                await _email.SendAsync(email, "TetGift - Nhắc nhở danh sách Tên đăng nhập", reminderMsg);
+
+                // Trả về lỗi đặc biệt để FE biết và yêu cầu user nhập Username
+                throw new Exception("Email liên kết với nhiều tài khoản. Chúng tôi đã gửi danh sách Tên đăng nhập vào Email của bạn, hãy kiểm tra và thử lại.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(usernameInput))
+            {
+                targetAcc = accounts.FirstOrDefault(a => a.Username.Equals(usernameInput, StringComparison.OrdinalIgnoreCase));
+                if (targetAcc == null) throw new Exception("Tên đăng nhập không khớp với Email đã cung cấp.");
+            }
+            else
+            {
+                // Chỉ có 1 tài khoản duy nhất gắn với Email
+                targetAcc = accounts.First();
+            }
+
+            // 3. Tạo và lưu OTP vào Redis
             var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
             var otpMinutes = int.TryParse(_cfg["Otp:ExpireMinutes"], out var m) ? m : 5;
 
             var otp = OtpHelper.Generate6();
             var otpHash = OtpHelper.HashOtp(otp, otpSecret);
 
-            // Key Redis chứa cả Email và Username để tránh xung đột
-            var cacheKey = $"pwd_reset_otp_{email}_{username}";
+            var cacheKey = $"pwd_reset_otp_{email}_{targetAcc.Username}";
             await _cache.SetAsync(cacheKey, otpHash, TimeSpan.FromMinutes(otpMinutes));
 
+            // 4. Gửi mã OTP
             var html = _tpl.RenderOtp(otp, otpMinutes);
-            await _email.SendAsync(email, "TetGift - Mã xác thực khôi phục mật khẩu", html);
+            await _email.SendAsync(email, $"TetGift - Mã khôi phục mật khẩu cho tài khoản: {targetAcc.Username}", html);
         }
 
         public async Task ResetPasswordAsync(ResetPasswordRequest req)
@@ -180,30 +197,27 @@ namespace TetGift.BLL.Services
             var newPwd = req.NewPassword ?? "";
 
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(otp) || string.IsNullOrWhiteSpace(newPwd))
-                throw new Exception("Vui lòng điền đầy đủ các thông tin yêu cầu.");
+                throw new Exception("Vui lòng nhập đầy đủ các thông tin để đặt lại mật khẩu.");
 
-            // 1. Kiểm tra OTP từ Redis theo tổ hợp Email + Username
             var cacheKey = $"pwd_reset_otp_{email}_{username}";
             var savedHash = await _cache.GetAsync<string>(cacheKey);
 
             if (string.IsNullOrWhiteSpace(savedHash))
-                throw new Exception("Mã xác thực đã hết hạn hoặc không tồn tại.");
+                throw new Exception("Mã xác thực đã hết hạn hoặc bạn chưa yêu cầu cấp mã.");
 
             var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
             if (!OtpHelper.FixedEqualsBase64(savedHash, OtpHelper.HashOtp(otp, otpSecret)))
-                throw new Exception("Mã xác thực không chính xác.");
+                throw new Exception("Mã xác thực không đúng.");
 
-            // 2. Cập nhật mật khẩu
             var repo = _uow.GetRepository<Account>();
             var acc = (await repo.FindAsync(a => a.Email == email && a.Username == username)).FirstOrDefault();
 
-            if (acc == null) throw new Exception("Tài khoản không tồn tại.");
+            if (acc == null) throw new Exception("Hệ thống không tìm thấy tài khoản tương ứng.");
 
             acc.Password = PasswordHasher.Hash(newPwd);
             repo.Update(acc);
             await _uow.SaveAsync();
 
-            // 3. Xóa cache sau khi thành công
             await _cache.RemoveByPrefixAsync(cacheKey);
         }
     }
