@@ -99,5 +99,28 @@ namespace TetGift.Controllers
                 Data = configs
             });
         }
+
+        [HttpDelete("{id}/hard")]
+        [Authorize]
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<ProductConfigDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponse<IEnumerable<ProductConfigDto>>>> HardDelete(int id)
+        {
+            try
+            {
+                var configs = await _service.HardDeleteAsync(id);
+                return Ok(new ApiResponse<IEnumerable<ProductConfigDto>>
+                {
+                    Status = 200,
+                    Msg = "Xóa vĩnh viễn thành công",
+                    Data = configs
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

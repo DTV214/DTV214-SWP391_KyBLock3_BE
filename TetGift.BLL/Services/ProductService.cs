@@ -34,7 +34,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         await _cacheService.IncreaseVersionAsync("Products");
     }
 
-    public async Task CreateCustomAsync(CreateComboProductRequest dto)
+    public async Task<int> CreateCustomAsync(CreateComboProductRequest dto)
     {
         // Validate required fields
         if (string.IsNullOrWhiteSpace(dto.Productname))
@@ -151,6 +151,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         }
 
         await _cacheService.IncreaseVersionAsync("Products");
+        return entity.Productid;
     }
 
     public async Task<IEnumerable<ProductDto>> GetAllAsync()
@@ -376,6 +377,30 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
 
             await _cacheService.IncreaseVersionAsync("Products");
         }
+    }
+
+    public async Task HardDeleteTemplateAsync(int id)
+    {
+        var productRepo = _uow.GetRepository<Product>();
+        var productDetailRepo = _uow.GetRepository<ProductDetail>();
+
+        var product = await productRepo.FindAsync(
+            p => p.Productid == id,
+            include: q => q.Include(p => p.ProductDetailProductparents)
+        );
+
+        if (product == null)
+            throw new Exception("Không tìm thấy sản phẩm.");
+
+        // Xóa tất cả ProductDetail liên kết (child items) của template này
+        if (product.ProductDetailProductparents?.Count > 0)
+            productDetailRepo.DeleteRange(product.ProductDetailProductparents.ToList());
+
+        // Xóa vĩnh viễn sản phẩm template
+        productRepo.Delete(product);
+        await _uow.SaveAsync();
+
+        await _cacheService.IncreaseVersionAsync("Products");
     }
 
     private async Task ValidateForeignKeys(int? accountId, int? configId, int? categoryId)
@@ -914,11 +939,73 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         }).ToList();
     }
 
+    /// <summary>
+    /// Lấy giỏ quà ACTIVE của admin/staff cho trang shop (khách hàng duyệt)
+    /// </summary>
+    public async Task<IEnumerable<ProductDto>> GetShopBasketsAsync()
+    {
+        var baskets = await _uow.GetRepository<Product>().GetAllAsync(
+            p => p.Configid.HasValue
+                && (p.Account == null || !p.Account.Role.Equals(UserRole.CUSTOMER))
+                && p.Status.Equals(ProductStatus.ACTIVE),
+            include: p => p
+                .Include(p => p.Config)
+                .Include(p => p.Account)
+                .Include(p => p.Stocks)
+                .Include(p => p.ProductDetailProductparents)
+                    .ThenInclude(pd => pd.Product)
+                    .ThenInclude(prod => prod.Stocks)
+        );
+
+        return baskets.Select(p =>
+        {
+            p.CalculateUnit();
+            p.CalculateTotalPrice();
+
+            return new ProductDto
+            {
+                Productid = p.Productid,
+                Categoryid = p.Categoryid,
+                Configid = p.Configid,
+                Accountid = p.Accountid,
+                Sku = p.Sku,
+                Productname = p.Productname,
+                Description = p.Description,
+                Price = p.Price,
+                TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                Status = p.Status,
+                Unit = p.Unit,
+                ImageUrl = p.ImageUrl,
+                IsCustom = true,
+                ProductDetails = p.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
+                {
+                    Productdetailid = pd.Productdetailid,
+                    Productid = pd.Productid,
+                    Quantity = pd.Quantity,
+                    ChildProduct = pd.Product != null ? new ProductDto
+                    {
+                        Productid = pd.Product.Productid,
+                        Categoryid = pd.Product.Categoryid,
+                        Sku = pd.Product.Sku,
+                        Productname = pd.Product.Productname,
+                        Description = pd.Product.Description,
+                        Price = pd.Product.Price,
+                        TotalQuantity = pd.Product.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                        Status = pd.Product.Status,
+                        Unit = pd.Product.Unit,
+                        ImageUrl = pd.Product.ImageUrl
+                    } : null
+                }).ToList()
+            };
+        }).ToList();
+    }
+
     public async Task<ProductDto> CloneBasketAsync(int templateId, int customerId, string? customName)
     {
-        // Validate template exists and is actually a template
+        // Validate template exists and is ACTIVE or TEMPLATE status
         var template = await _uow.GetRepository<Product>().FindAsync(
-            p => p.Productid == templateId && p.Status == ProductStatus.TEMPLATE,
+            p => p.Productid == templateId
+                && (p.Status == ProductStatus.ACTIVE || p.Status == ProductStatus.TEMPLATE),
             include: q => q
                 .Include(p => p.Config)
                     .ThenInclude(c => c.ConfigDetails)
@@ -927,10 +1014,10 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         );
 
         if (template == null)
-            throw new Exception("Template giỏ quà không tồn tại hoặc không khả dụng.");
+            throw new Exception("Giỏ quà không tồn tại hoặc không khả dụng.");
 
         if (!template.Configid.HasValue)
-            throw new Exception("Template không hợp lệ (thiếu cấu hình).");
+            throw new Exception("Giỏ quà không hợp lệ (thiếu cấu hình).");
 
         // Validate customer account exists
         await ValidateForeignKeys(customerId, null, null);
