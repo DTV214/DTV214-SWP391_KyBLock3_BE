@@ -10,6 +10,7 @@ using TetGift.BLL.Common;
 using TetGift.BLL.Hubs;
 using TetGift.BLL.Interfaces;
 using TetGift.BLL.Services;
+using TetGift.BLL.Settings;
 using TetGift.DAL.Context;
 using TetGift.DAL.Interfaces;
 using TetGift.DAL.Repositories;
@@ -229,7 +230,11 @@ namespace TetGift
             builder.Services.AddScoped<IAccountPromotionService, AccountPromotionService>();
 
             builder.Services.AddSignalR();
+            // Đăng ký cấu hình CloudinarySettings
+            builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
 
+            // Đăng ký MediaService
+            builder.Services.AddScoped<IMediaService, MediaService>();
 
 
             // --- CHATBOT SERVICES ---
@@ -264,7 +269,7 @@ namespace TetGift
 
             app.UseAuthentication();
             app.UseAuthorization();
-
+            app.UseStaticFiles();
             app.MapControllers();
 
             app.Run();
