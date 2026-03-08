@@ -1,4 +1,4 @@
-﻿    using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,5 +21,9 @@ namespace TetGift.DAL.Interfaces
         Task<Product?> GetProductBySkuAsync(string sku);
         Task UpdateProductAsync(Product product);
         Task DeleteProductAsync(int productId);
+
+        // Chatbot methods
+        Task<List<Product>> SearchAsync(string? keyword, string? category, decimal? maxPrice);
+        Task<List<Product>> GetByIdsAsync(List<int> ids);
     }
 }

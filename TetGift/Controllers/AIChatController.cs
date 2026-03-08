@@ -8,7 +8,7 @@ namespace TetGift.Controllers
     [ApiController]
     [Route("api/aichat")]
     [Authorize]
-    public class AIChatController : ControllerBase
+    public class AIChatController : BaseApiController
     {
         private readonly GeminiChatService _geminiChatService;
 
@@ -28,7 +28,8 @@ namespace TetGift.Controllers
                 });
             }
 
-            var response = await _geminiChatService.ChatAsync(request.History, request.Message);
+            var response = await _geminiChatService.ChatAsync(request.Message);
+
             return Ok(response);
         }
     }
