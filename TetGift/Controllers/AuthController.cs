@@ -35,5 +35,21 @@ namespace TetGift.Controllers
             var result = await _auth.LoginAsync(req);
             return Ok(result);
         }
+
+        // --- NEW: FORGET PASSWORD ENDPOINTS ---
+
+        [HttpPost("forgot-password/request-otp")]
+        public async Task<IActionResult> ForgotPasswordRequestOtp([FromBody] ForgotPasswordRequest req)
+        {
+            await _auth.RequestForgotPasswordOtpAsync(req);
+            return Ok(new { message = "Mã OTP khôi phục mật khẩu đã được gửi qua email." });
+        }
+
+        [HttpPost("forgot-password/reset")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest req)
+        {
+            await _auth.ResetPasswordAsync(req);
+            return Ok(new { message = "Mật khẩu đã được cập nhật thành công." });
+        }
     }
 }

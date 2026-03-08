@@ -15,38 +15,37 @@ namespace TetGift.BLL.Services
         private readonly IEmailSender _email;
         private readonly IEmailTemplateRenderer _tpl;
         private readonly IJwtTokenGenerator _jwt;
+        private readonly ICacheService _cache;
 
         public AuthService(
             IUnitOfWork uow,
             IConfiguration cfg,
             IEmailSender email,
             IEmailTemplateRenderer tpl,
-            IJwtTokenGenerator jwt)
+            IJwtTokenGenerator jwt,
+            ICacheService cache)
         {
             _uow = uow;
             _cfg = cfg;
             _email = email;
             _tpl = tpl;
             _jwt = jwt;
+            _cache = cache;
         }
 
+        // --- CÁC HÀM LOGIN / REGISTER GIỮ NGUYÊN NHƯ CŨ ---
         public async Task RequestRegisterOtpAsync(RegisterRequest req)
         {
             var username = (req.Username ?? "").Trim();
             var email = (req.Email ?? "").Trim().ToLowerInvariant();
             var password = req.Password ?? "";
 
-            if (string.IsNullOrWhiteSpace(username) ||
-                string.IsNullOrWhiteSpace(email) ||
-                string.IsNullOrWhiteSpace(password))
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
                 throw new Exception("Username/Email/Password is required.");
 
             var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
             var otpMinutes = int.TryParse(_cfg["Otp:ExpireMinutes"], out var m) ? m : 5;
-
             var repo = _uow.GetRepository<Account>();
-
-            // Không dùng FirstOrDefaultAsync để BLL không cần EF Core package
             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
 
             if (acc != null && acc.Status == AccountStatus.ACTIVE)
@@ -64,18 +63,15 @@ namespace TetGift.BLL.Services
                     Role = UserRole.CUSTOMER,
                     Status = AccountStatus.PENDING
                 };
-
                 await repo.AddAsync(acc);
             }
             else
             {
-                // Resend OTP cho account Pending
                 acc.Email = email;
                 acc.Fullname = req.Fullname ?? acc.Fullname;
                 acc.Phone = req.Phone ?? acc.Phone;
                 acc.Password = PasswordHasher.Hash(password);
                 acc.Status = AccountStatus.PENDING;
-
                 repo.Update(acc);
             }
 
@@ -86,7 +82,6 @@ namespace TetGift.BLL.Services
             acc.RegisterOtpVerifiedAt = null;
 
             await _uow.SaveAsync();
-
             var html = _tpl.RenderOtp(otp, otpMinutes);
             await _email.SendAsync(email, "TetGift - OTP xác thực đăng ký", html);
         }
@@ -101,27 +96,16 @@ namespace TetGift.BLL.Services
 
             var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
             var maxFail = int.TryParse(_cfg["Otp:MaxFail"], out var mf) ? mf : 5;
-
             var repo = _uow.GetRepository<Account>();
             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
 
             if (acc == null) throw new Exception("Account not found.");
-            if (acc.Status == AccountStatus.ACTIVE)
-                throw new Exception("Account already verified.");
-
-            if (acc.RegisterOtpExpiresAt == null || acc.RegisterOtpExpiresAt < DateTime.Now)
-                throw new Exception("OTP expired.");
-
-            if (acc.RegisterOtpFailCount >= maxFail)
-                throw new Exception("Too many failed OTP attempts.");
-
-            if (string.IsNullOrWhiteSpace(acc.RegisterOtpHash))
-                throw new Exception("OTP not requested.");
+            if (acc.Status == AccountStatus.ACTIVE) throw new Exception("Account already verified.");
+            if (acc.RegisterOtpExpiresAt == null || acc.RegisterOtpExpiresAt < DateTime.Now) throw new Exception("OTP expired.");
+            if (acc.RegisterOtpFailCount >= maxFail) throw new Exception("Too many failed OTP attempts.");
 
             var inputHash = OtpHelper.HashOtp(otp, otpSecret);
-            var ok = OtpHelper.FixedEqualsBase64(acc.RegisterOtpHash, inputHash);
-
-            if (!ok)
+            if (!OtpHelper.FixedEqualsBase64(acc.RegisterOtpHash ?? "", inputHash))
             {
                 acc.RegisterOtpFailCount++;
                 repo.Update(acc);
@@ -137,47 +121,90 @@ namespace TetGift.BLL.Services
 
             repo.Update(acc);
             await _uow.SaveAsync();
-
-            var token = _jwt.Generate(acc);
-
-            return new AuthResultDto
-            {
-                Token = token,
-                AccountId = acc.Accountid,
-                Username = acc.Username,
-                Email = acc.Email,
-                Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper()
-            };
+            return new AuthResultDto { Token = _jwt.Generate(acc), AccountId = acc.Accountid, Username = acc.Username, Email = acc.Email, Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper() };
         }
 
         public async Task<AuthResultDto> LoginAsync(LoginRequest req)
         {
             var username = (req.Username ?? "").Trim();
             var password = req.Password ?? "";
-
-            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-                throw new Exception("Username/Password is required.");
-
             var repo = _uow.GetRepository<Account>();
             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
 
-            if (acc == null) throw new Exception("Invalid credentials.");
-            if (acc.Status != AccountStatus.ACTIVE)
-                throw new Exception("Account not verified.");
+            if (acc == null || acc.Status != AccountStatus.ACTIVE || !PasswordHasher.Verify(password, acc.Password))
+                throw new Exception("Invalid credentials or account not verified.");
 
-            if (!PasswordHasher.Verify(password, acc.Password))
-                throw new Exception("Invalid credentials.");
+            return new AuthResultDto { Token = _jwt.Generate(acc), AccountId = acc.Accountid, Username = acc.Username, Email = acc.Email, Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper() };
+        }
 
-            var token = _jwt.Generate(acc);
+        // --- ĐÃ TỐI ƯU: FORGET PASSWORD (XỬ LÝ 1 EMAIL NHIỀU ACC) ---
 
-            return new AuthResultDto
-            {
-                Token = token,
-                AccountId = acc.Accountid,
-                Username = acc.Username,
-                Email = acc.Email,
-                Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper()
-            };
+        public async Task RequestForgotPasswordOtpAsync(ForgotPasswordRequest req)
+        {
+            var email = (req.Email ?? "").Trim().ToLowerInvariant();
+            var username = (req.Username ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(username))
+                throw new Exception("Vui lòng nhập đầy đủ Email và Tên đăng nhập.");
+
+            var repo = _uow.GetRepository<Account>();
+
+            // Tìm chính xác tài khoản khớp cả Email VÀ Username
+            var acc = (await repo.FindAsync(a =>
+                a.Email == email &&
+                a.Username == username &&
+                a.Status == AccountStatus.ACTIVE)).FirstOrDefault();
+
+            if (acc == null)
+                throw new Exception("Thông tin tài khoản không chính xác hoặc tài khoản chưa kích hoạt.");
+
+            var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
+            var otpMinutes = int.TryParse(_cfg["Otp:ExpireMinutes"], out var m) ? m : 5;
+
+            var otp = OtpHelper.Generate6();
+            var otpHash = OtpHelper.HashOtp(otp, otpSecret);
+
+            // Key Redis chứa cả Email và Username để tránh xung đột
+            var cacheKey = $"pwd_reset_otp_{email}_{username}";
+            await _cache.SetAsync(cacheKey, otpHash, TimeSpan.FromMinutes(otpMinutes));
+
+            var html = _tpl.RenderOtp(otp, otpMinutes);
+            await _email.SendAsync(email, "TetGift - Mã xác thực khôi phục mật khẩu", html);
+        }
+
+        public async Task ResetPasswordAsync(ResetPasswordRequest req)
+        {
+            var email = (req.Email ?? "").Trim().ToLowerInvariant();
+            var username = (req.Username ?? "").Trim();
+            var otp = (req.Otp ?? "").Trim();
+            var newPwd = req.NewPassword ?? "";
+
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(otp) || string.IsNullOrWhiteSpace(newPwd))
+                throw new Exception("Vui lòng điền đầy đủ các thông tin yêu cầu.");
+
+            // 1. Kiểm tra OTP từ Redis theo tổ hợp Email + Username
+            var cacheKey = $"pwd_reset_otp_{email}_{username}";
+            var savedHash = await _cache.GetAsync<string>(cacheKey);
+
+            if (string.IsNullOrWhiteSpace(savedHash))
+                throw new Exception("Mã xác thực đã hết hạn hoặc không tồn tại.");
+
+            var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
+            if (!OtpHelper.FixedEqualsBase64(savedHash, OtpHelper.HashOtp(otp, otpSecret)))
+                throw new Exception("Mã xác thực không chính xác.");
+
+            // 2. Cập nhật mật khẩu
+            var repo = _uow.GetRepository<Account>();
+            var acc = (await repo.FindAsync(a => a.Email == email && a.Username == username)).FirstOrDefault();
+
+            if (acc == null) throw new Exception("Tài khoản không tồn tại.");
+
+            acc.Password = PasswordHasher.Hash(newPwd);
+            repo.Update(acc);
+            await _uow.SaveAsync();
+
+            // 3. Xóa cache sau khi thành công
+            await _cache.RemoveByPrefixAsync(cacheKey);
         }
     }
 }
