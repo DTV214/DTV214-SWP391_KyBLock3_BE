@@ -116,7 +116,7 @@ public class OrderController : ControllerBase
     // ========== ADMIN ENDPOINTS ==========
 
     [HttpGet()]
-    [Authorize(Roles = "ADMIN")]
+    [Authorize(Roles = "ADMIN,STAFF")]
     public async Task<IActionResult> GetAllOrders([FromQuery] string? status = null)
     {
         try
@@ -131,7 +131,7 @@ public class OrderController : ControllerBase
     }
 
     [HttpGet("/{orderId}")]
-    [Authorize(Roles = "ADMIN")]
+    [Authorize(Roles = "ADMIN,STAFF")]
     public async Task<IActionResult> GetOrderByIdForAdmin(int orderId)
     {
         try
@@ -146,7 +146,7 @@ public class OrderController : ControllerBase
     }
 
     [HttpPut("/{orderId}/status")]
-    [Authorize(Roles = "ADMIN")]
+    [Authorize(Roles = "ADMIN,STAFF")]
     public async Task<IActionResult> UpdateOrderStatus(int orderId, [FromBody] UpdateOrderStatusRequest request)
     {
         try
