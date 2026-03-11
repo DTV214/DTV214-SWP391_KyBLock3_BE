@@ -9,7 +9,6 @@ namespace TetGift.Controllers
     [ApiController]
     [Route("api/admin/accounts")]
     // Chỉ định quyền Admin mới được phép gọi các API này
-    [Authorize(Roles = "ADMIN")]
     public class AdminAccountsController : ControllerBase
     {
         private readonly IAdminAccountService _adminAccountService;
@@ -19,6 +18,7 @@ namespace TetGift.Controllers
             _adminAccountService = adminAccountService;
         }
 
+        [Authorize(Roles = "ADMIN,STAFF")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -26,6 +26,7 @@ namespace TetGift.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "ADMIN,STAFF")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -33,6 +34,7 @@ namespace TetGift.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "ADMIN")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateAccountAdminRequest req)
         {
@@ -41,6 +43,7 @@ namespace TetGift.Controllers
         }
 
         // Khóa chặt việc Update bằng hàm PATCH hoặc PUT nhưng body chỉ có Status
+        [Authorize(Roles = "ADMIN")]
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateAccountStatusRequest req)
         {
@@ -48,6 +51,7 @@ namespace TetGift.Controllers
             return Ok(new { message = "Cập nhật trạng thái thành công." });
         }
 
+        [Authorize(Roles = "ADMIN")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
