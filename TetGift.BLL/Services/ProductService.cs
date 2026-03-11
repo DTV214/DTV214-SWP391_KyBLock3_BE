@@ -7,10 +7,11 @@ using TetGift.DAL.Interfaces;
 
 namespace TetGift.BLL.Services;
 
-public class ProductService(IUnitOfWork uow, IInventoryService inventoryService, ICacheService cacheService) : IProductService
+public class ProductService(IUnitOfWork uow, IInventoryService inventoryService, ICacheService cacheService, IMediaService mediaService) : IProductService
 {
     private readonly IUnitOfWork _uow = uow;
     private readonly ICacheService _cacheService = cacheService;
+    private readonly IMediaService _mediaService = mediaService;
 
     public async Task CreateNormalAsync(CreateSingleProductRequest dto)
     {
@@ -482,6 +483,9 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
 
         #endregion
 
+        if (!string.IsNullOrWhiteSpace(dto.ImageUrl))
+            entity.ImageUrl = dto.ImageUrl;
+
         repo.Update(entity);
         await _uow.SaveAsync();
         await _cacheService.IncreaseVersionAsync("Products");
@@ -580,7 +584,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         if (dto.Description != null)
             product.Description = dto.Description;
 
-        if (dto.ImageUrl != null)
+        if (!string.IsNullOrWhiteSpace(dto.ImageUrl))
             product.ImageUrl = dto.ImageUrl;
 
         // ─── 7. Apply status update ──────────────────────────────────────────────

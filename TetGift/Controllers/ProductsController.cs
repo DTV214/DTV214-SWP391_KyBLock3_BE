@@ -62,7 +62,7 @@ public class ProductsController(IProductService service) : BaseApiController
     /// </summary>
     [HttpPost("normal")]
     //[Authorize(Roles = "ADMIN,STAFF")]
-    public async Task<IActionResult> CreateNormal([FromBody] CreateSingleProductRequest dto)
+    public async Task<IActionResult> CreateNormal([FromForm] CreateSingleProductRequest dto)
     {
         dto.Accountid = GetAccountId();
         await _service.CreateNormalAsync(dto);
@@ -74,7 +74,7 @@ public class ProductsController(IProductService service) : BaseApiController
     /// </summary>
     [HttpPost("custom")]
     //[Authorize(Roles = "CUSTOMER")]
-    public async Task<IActionResult> CreateCustom([FromBody] CreateComboProductRequest dto)
+    public async Task<IActionResult> CreateCustom([FromForm] CreateComboProductRequest dto)
     {
         dto.Accountid = GetAccountId();
         var productId = await _service.CreateCustomAsync(dto);
@@ -86,7 +86,7 @@ public class ProductsController(IProductService service) : BaseApiController
     /// </summary>
     [HttpPost("templates")]
     //[Authorize(Roles = "ADMIN,STAFF")]
-    public async Task<IActionResult> CreateTemplate([FromBody] CreateComboProductRequest dto)
+    public async Task<IActionResult> CreateTemplate([FromForm] CreateComboProductRequest dto)
     {
         dto.Accountid = GetAccountId();
         await _service.CreateCustomAsync(dto);
@@ -98,7 +98,7 @@ public class ProductsController(IProductService service) : BaseApiController
     /// </summary>
     [HttpPut("normal/{id}")]
     //[Authorize(Roles = "ADMIN,STAFF")]
-    public async Task<IActionResult> UpdateNormal(int id, [FromBody] ProductDto dto)
+    public async Task<IActionResult> UpdateNormal(int id, [FromForm] ProductDto dto)
     {
         dto.Productid = id;
         var result = await _service.UpdateNormalAsync(dto);
@@ -112,7 +112,7 @@ public class ProductsController(IProductService service) : BaseApiController
     /// </summary>
     [HttpPut("{id}/custom")]
     //[Authorize]
-    public async Task<IActionResult> UpdateCustom(int id, [FromBody] UpdateComboProductRequest dto)
+    public async Task<IActionResult> UpdateCustom(int id, [FromForm] UpdateComboProductRequest dto)
     {
         int? accountId = GetAccountId();
         var result = await _service.UpdateCustomAsync(id, dto, accountId);
