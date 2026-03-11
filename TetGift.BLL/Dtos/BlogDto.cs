@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Http; // BẮT BUỘC THÊM THƯ VIỆN NÀY
+// BỎ dòng using Microsoft.AspNetCore.Http; đi vì không cần IFormFile nữa
 
 namespace TetGift.BLL.Dtos
 {
@@ -13,7 +13,6 @@ namespace TetGift.BLL.Dtos
         public string? AuthorName { get; set; }
         public DateTime? CreationDate { get; set; }
 
-        // Trả về URL để Frontend hiển thị
         public string? ImageUrl { get; set; }
         public string? VideoUrl { get; set; }
     }
@@ -27,9 +26,9 @@ namespace TetGift.BLL.Dtos
         [Required(ErrorMessage = "Nội dung không được để trống")]
         public string Content { get; set; } = null!;
 
-        // Thêm 2 property nhận file từ Frontend
-        public IFormFile? ImageFile { get; set; }
-        public IFormFile? VideoFile { get; set; }
+        // ĐỔI SANG KIỂU STRING ĐỂ NHẬN URL TỪ CLOUD
+        public string? ImageUrl { get; set; }
+        public string? VideoUrl { get; set; }
     }
 
     public class UpdateBlogRequest
@@ -41,8 +40,8 @@ namespace TetGift.BLL.Dtos
         [Required(ErrorMessage = "Nội dung không được để trống")]
         public string Content { get; set; } = null!;
 
-        // Thêm 2 property nhận file từ Frontend
-        public IFormFile? ImageFile { get; set; }
-        public IFormFile? VideoFile { get; set; }
+        // ĐỔI SANG KIỂU STRING ĐỂ NHẬN URL TỪ CLOUD
+        public string? ImageUrl { get; set; }
+        public string? VideoUrl { get; set; }
     }
 }
