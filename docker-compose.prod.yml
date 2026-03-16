@@ -18,6 +18,8 @@ services:
       - Otp__Secret=${OTP_SECRET:-SuperPowerOfGodSecretADIDACHUA}
       - Otp__ExpireMinutes=5
       - Otp__DeletePendingAfterMinutes=30
+      - Gemini__ApiKey=${GEMINI_API_KEY}
+      - Gemini__Model=gemini-2.5-flash
     restart: unless-stopped
     logging:
       driver: "json-file"

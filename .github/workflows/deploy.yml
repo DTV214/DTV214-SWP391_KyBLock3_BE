@@ -56,6 +56,7 @@ jobs:
             DB_CONNECTION_STRING=${{ secrets.DB_CONNECTION_STRING }}
             JWT_KEY=${{ secrets.JWT_KEY }}
             RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             EOF
             
             # Run new container
