@@ -1,15 +1,13 @@
-﻿using Microsoft.AspNetCore.Http; // Bắt buộc để nhận diện IFormFile
-using System.IO; // Bắt buộc để xử lý thư mục và lưu file vật lý
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
 using TetGift.DAL.Interfaces;
+// Đã bỏ using Microsoft.AspNetCore.Http và System.IO vì không xử lý file vật lý nữa
 
 namespace TetGift.BLL.Services
 {
@@ -22,44 +20,17 @@ namespace TetGift.BLL.Services
             _unitOfWork = unitOfWork;
         }
 
-        // --- HÀM HỖ TRỢ LƯU FILE ---
-        private async Task<string?> SaveFileAsync(IFormFile? file, string subFolder)
-        {
-            if (file == null || file.Length == 0) return null;
-
-            // Đường dẫn lưu file: wwwroot/uploads/[subFolder]
-            var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", subFolder);
-            if (!Directory.Exists(folderPath))
-            {
-                Directory.CreateDirectory(folderPath);
-            }
-
-            // Tạo tên file ngẫu nhiên để không bị trùng lặp
-            var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
-            var filePath = Path.Combine(folderPath, fileName);
-
-            // Tiến hành copy file vào server
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-
-            // Trả về đường dẫn để lưu vào Database
-            return $"/uploads/{subFolder}/{fileName}";
-        }
-        // ---------------------------
+        // ĐÃ XÓA hàm SaveFileAsync ở đây vì không cần lưu file local nữa
 
         public async Task<IEnumerable<BlogDto>> GetAllAsync()
         {
             var blogRepo = _unitOfWork.GetRepository<Blog>();
 
-            // Lấy tất cả bài chưa xóa, kèm thông tin người viết (Account)
             var blogs = await blogRepo.GetAllAsync(
                 predicate: b => b.Isdeleted != true,
                 include: q => q.Include(b => b.Account)
             );
 
-            // Sắp xếp bài mới nhất lên đầu và map sang DTO
             return blogs.OrderByDescending(b => b.Creationdate)
                         .Select(b => new BlogDto
                         {
@@ -68,8 +39,8 @@ namespace TetGift.BLL.Services
                             Content = b.Content ?? "",
                             AuthorName = b.Account?.Fullname ?? b.Account?.Username ?? "Unknown",
                             CreationDate = b.Creationdate,
-                            ImageUrl = b.ImageUrl, // Lấy đường dẫn ảnh
-                            VideoUrl = b.VideoUrl  // Lấy đường dẫn video
+                            ImageUrl = b.ImageUrl,
+                            VideoUrl = b.VideoUrl
                         });
         }
 
@@ -77,7 +48,6 @@ namespace TetGift.BLL.Services
         {
             var blogRepo = _unitOfWork.GetRepository<Blog>();
 
-            // Tìm bài viết theo ID và include Account
             var blog = await blogRepo.FindAsync(
                 predicate: b => b.Blogid == id && b.Isdeleted != true,
                 include: q => q.Include(b => b.Account)
@@ -92,8 +62,8 @@ namespace TetGift.BLL.Services
                 Content = blog.Content ?? "",
                 AuthorName = blog.Account?.Fullname ?? blog.Account?.Username ?? "Unknown",
                 CreationDate = blog.Creationdate,
-                ImageUrl = blog.ImageUrl, // Lấy đường dẫn ảnh
-                VideoUrl = blog.VideoUrl  // Lấy đường dẫn video
+                ImageUrl = blog.ImageUrl,
+                VideoUrl = blog.VideoUrl
             };
         }
 
@@ -103,13 +73,14 @@ namespace TetGift.BLL.Services
 
             var newBlog = new Blog
             {
-                Accountid = accountId, // Gán người tạo từ Token/Mock
+                Accountid = accountId,
                 Title = req.Title,
                 Content = req.Content,
                 Creationdate = DateTime.Now,
                 Isdeleted = false,
-                ImageUrl = await SaveFileAsync(req.ImageFile, "blogs/images"), // Lưu file ảnh và lấy URL
-                VideoUrl = await SaveFileAsync(req.VideoFile, "blogs/videos")  // Lưu file video và lấy URL
+                // Gán trực tiếp URL string nhận được từ Frontend vào Database
+                ImageUrl = req.ImageUrl,
+                VideoUrl = req.VideoUrl
             };
 
             await blogRepo.AddAsync(newBlog);
@@ -120,7 +91,7 @@ namespace TetGift.BLL.Services
                 BlogId = newBlog.Blogid,
                 Title = newBlog.Title,
                 Content = newBlog.Content,
-                AuthorName = "You (Just created)", // Frontend sẽ reload lại list để thấy tên
+                AuthorName = "You (Just created)",
                 CreationDate = newBlog.Creationdate,
                 ImageUrl = newBlog.ImageUrl,
                 VideoUrl = newBlog.VideoUrl
@@ -138,22 +109,20 @@ namespace TetGift.BLL.Services
             blog.Title = req.Title;
             blog.Content = req.Content;
 
-            // Chỉ cập nhật ảnh nếu có file mới được đẩy lên
-            if (req.ImageFile != null)
+            // Nếu FE gửi URL ảnh mới lên thì cập nhật
+            if (!string.IsNullOrWhiteSpace(req.ImageUrl))
             {
-                blog.ImageUrl = await SaveFileAsync(req.ImageFile, "blogs/images");
+                blog.ImageUrl = req.ImageUrl;
             }
 
-            // Chỉ cập nhật video nếu có file mới được đẩy lên
-            if (req.VideoFile != null)
+            // Nếu FE gửi URL video mới lên thì cập nhật
+            if (!string.IsNullOrWhiteSpace(req.VideoUrl))
             {
-                blog.VideoUrl = await SaveFileAsync(req.VideoFile, "blogs/videos");
+                blog.VideoUrl = req.VideoUrl;
             }
-
-            // Không cập nhật CreationDate, giữ nguyên người tạo
 
             await blogRepo.UpdateAsync(blog);
-            await _unitOfWork.SaveAsync(); // Bắt buộc gọi để lưu xuống DB
+            await _unitOfWork.SaveAsync();
         }
 
         public async Task DeleteAsync(int id)
@@ -164,10 +133,9 @@ namespace TetGift.BLL.Services
             if (blog == null || blog.Isdeleted == true)
                 throw new Exception("Bài viết không tồn tại.");
 
-            // Soft Delete
             blog.Isdeleted = true;
             await blogRepo.UpdateAsync(blog);
-            await _unitOfWork.SaveAsync(); // Bắt buộc gọi để lưu xuống DB
+            await _unitOfWork.SaveAsync();
         }
     }
 }
