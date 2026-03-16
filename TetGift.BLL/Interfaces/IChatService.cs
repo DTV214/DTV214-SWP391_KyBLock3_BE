@@ -15,5 +15,7 @@ namespace TetGift.BLL.Interfaces
 
         // Mới: staff/admin reply cho 1 conversation
         Task<Message> ReplyToConversationAsync(int staffId, int conversationId, int? orderId, string content);
+
+        Task<bool> CanAccessConversationAsync(int conversationId, int userId, string role);
     }
 }

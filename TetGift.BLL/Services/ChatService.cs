@@ -12,8 +12,7 @@ namespace TetGift.BLL.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IHubContext<ChatHub> _hubContext;
 
-        public ChatService(IUnitOfWork unitOfWork,
-                           IHubContext<ChatHub> hubContext)
+        public ChatService(IUnitOfWork unitOfWork, IHubContext<ChatHub> hubContext)
         {
             _unitOfWork = unitOfWork;
             _hubContext = hubContext;
@@ -23,19 +22,29 @@ namespace TetGift.BLL.Services
         {
             var conversationRepo = _unitOfWork.GetRepository<Conversation>();
 
-            var conversation = await conversationRepo
-                .FindAsync(x => x.UserId == userId);
+            var conversation = await conversationRepo.FindAsync(x => x.UserId == userId);
 
             if (conversation.Any())
                 return conversation.First();
 
             var newConversation = new Conversation
             {
-                UserId = userId
+                UserId = userId,
+                LastMessageAt = DateTime.UtcNow
             };
 
             await conversationRepo.AddAsync(newConversation);
             await _unitOfWork.SaveAsync();
+
+            // notify staff/admin conversation list
+            await _hubContext.Clients.Group("staff_conversations")
+                .SendAsync("ConversationUpdated", new
+                {
+                    ConversationId = newConversation.Id,
+                    UserId = newConversation.UserId,
+                    LastMessageAt = newConversation.LastMessageAt,
+                    HasNewMessage = false
+                });
 
             return newConversation;
         }
@@ -46,8 +55,7 @@ namespace TetGift.BLL.Services
 
             return await messageRepo.GetAllAsync(
                 x => x.ConversationId == conversationId,
-                include: q => q
-                    .OrderBy(m => m.CreatedAt)
+                include: q => q.OrderBy(m => m.CreatedAt)
             );
         }
 
@@ -86,20 +94,21 @@ namespace TetGift.BLL.Services
                         throw new InvalidOperationException($"Order with ID {orderId.Value} does not exist.");
                 }
 
-                var conversation = (await conversationRepo
-                    .FindAsync(x => x.UserId == senderId))
-                    .FirstOrDefault();
+                var conversation = (await conversationRepo.FindAsync(x => x.UserId == senderId)).FirstOrDefault();
 
                 if (conversation == null)
                 {
                     conversation = new Conversation
                     {
-                        UserId = senderId
+                        UserId = senderId,
+                        LastMessageAt = DateTime.UtcNow
                     };
 
                     await conversationRepo.AddAsync(conversation);
                     await _unitOfWork.SaveAsync();
                 }
+
+                var now = DateTime.UtcNow;
 
                 var message = new Message
                 {
@@ -107,18 +116,18 @@ namespace TetGift.BLL.Services
                     SenderId = senderId,
                     OrderId = orderId,
                     Content = content,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = now,
+                    IsRead = false
                 };
 
                 await messageRepo.AddAsync(message);
 
-                conversation.LastMessageAt = DateTime.UtcNow;
+                conversation.LastMessageAt = now;
                 await conversationRepo.UpdateAsync(conversation);
 
                 await _unitOfWork.SaveAsync();
                 _unitOfWork.CommitTransaction();
 
-                // Map sang DTO trước khi push realtime (tránh đưa entity EF có navigation)
                 var pushDto = new MessageResponse
                 {
                     Id = message.Id,
@@ -130,9 +139,23 @@ namespace TetGift.BLL.Services
                     CreatedAt = message.CreatedAt
                 };
 
+                // push message to conversation members
                 await _hubContext.Clients
                     .Group($"conversation_{conversation.Id}")
                     .SendAsync("ReceiveMessage", pushDto);
+
+                // push update to staff/admin list screen
+                await _hubContext.Clients
+                    .Group("staff_conversations")
+                    .SendAsync("ConversationUpdated", new
+                    {
+                        ConversationId = conversation.Id,
+                        UserId = conversation.UserId,
+                        LastMessageAt = conversation.LastMessageAt,
+                        LastMessage = message.Content,
+                        LastSenderId = message.SenderId,
+                        HasNewMessage = true
+                    });
 
                 return message;
             }
@@ -164,18 +187,21 @@ namespace TetGift.BLL.Services
                         throw new InvalidOperationException($"Order with ID {orderId.Value} does not exist.");
                 }
 
+                var now = DateTime.UtcNow;
+
                 var message = new Message
                 {
                     ConversationId = conversationId,
                     SenderId = staffId,
                     OrderId = orderId,
                     Content = content,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = now,
+                    IsRead = false
                 };
 
                 await messageRepo.AddAsync(message);
 
-                conversation.LastMessageAt = DateTime.UtcNow;
+                conversation.LastMessageAt = now;
                 await conversationRepo.UpdateAsync(conversation);
 
                 await _unitOfWork.SaveAsync();
@@ -192,9 +218,23 @@ namespace TetGift.BLL.Services
                     CreatedAt = message.CreatedAt
                 };
 
+                // push message to members in this conversation
                 await _hubContext.Clients
                     .Group($"conversation_{conversationId}")
                     .SendAsync("ReceiveMessage", pushDto);
+
+                // push update to staff/admin list screen
+                await _hubContext.Clients
+                    .Group("staff_conversations")
+                    .SendAsync("ConversationUpdated", new
+                    {
+                        ConversationId = conversation.Id,
+                        UserId = conversation.UserId,
+                        LastMessageAt = conversation.LastMessageAt,
+                        LastMessage = message.Content,
+                        LastSenderId = message.SenderId,
+                        HasNewMessage = true
+                    });
 
                 return message;
             }
@@ -224,13 +264,52 @@ namespace TetGift.BLL.Services
                      !x.IsRead
             );
 
+            var updatedMessageIds = new List<int>();
+
             foreach (var msg in messages)
             {
                 msg.IsRead = true;
+                updatedMessageIds.Add(msg.Id);
                 await messageRepo.UpdateAsync(msg);
             }
 
             await _unitOfWork.SaveAsync();
+
+            // realtime read receipt
+            if (updatedMessageIds.Any())
+            {
+                await _hubContext.Clients
+                    .Group($"conversation_{conversationId}")
+                    .SendAsync("MessagesRead", new
+                    {
+                        ConversationId = conversationId,
+                        ReaderId = readerId,
+                        MessageIds = updatedMessageIds
+                    });
+
+                await _hubContext.Clients
+                    .Group("staff_conversations")
+                    .SendAsync("ConversationReadUpdated", new
+                    {
+                        ConversationId = conversationId,
+                        ReaderId = readerId,
+                        MessageIds = updatedMessageIds
+                    });
+            }
+        }
+
+        public async Task<bool> CanAccessConversationAsync(int conversationId, int userId, string role)
+        {
+            var conversationRepo = _unitOfWork.GetRepository<Conversation>();
+            var conversation = await conversationRepo.GetByIdAsync(conversationId);
+
+            if (conversation == null)
+                return false;
+
+            if (role == "STAFF" || role == "ADMIN")
+                return true;
+
+            return conversation.UserId == userId;
         }
     }
 }
