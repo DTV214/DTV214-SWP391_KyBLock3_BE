@@ -14,12 +14,16 @@ public class PaymentService : IPaymentService
     private readonly IUnitOfWork _uow;
     private readonly IWalletService _walletService;
     private readonly IConfiguration _configuration;
+    private readonly IEmailSender _emailSender;
+    private readonly IEmailTemplateRenderer _templateRenderer;
 
-    public PaymentService(IUnitOfWork uow, IWalletService walletService, IConfiguration configuration)
+    public PaymentService(IUnitOfWork uow, IWalletService walletService, IConfiguration configuration, IEmailSender emailSender, IEmailTemplateRenderer templateRenderer)
     {
         _uow = uow;
         _walletService = walletService;
         _configuration = configuration;
+        _emailSender = emailSender;
+        _templateRenderer = templateRenderer;
     }
 
     public async Task<PaymentResponseDto> CreatePaymentAsync(int orderId, int accountId, string? clientIp = null, string? paymentMethod = null)
@@ -195,6 +199,9 @@ public class PaymentService : IPaymentService
             };
         }
 
+        bool justConfirmedOrder = false;
+        Order? confirmedOrder = null;
+
         // ORDER_PAYMENT - xử lý như cũ
         // Kiểm tra payment đã được xử lý chưa
         if (payment.Status == PaymentStatus.SUCCESS)
@@ -232,10 +239,24 @@ public class PaymentService : IPaymentService
             {
                 order.Status = OrderStatus.CONFIRMED;
                 orderRepo.Update(order);
+                justConfirmedOrder = true;
+                confirmedOrder = order;
             }
         }
 
         await _uow.SaveAsync();
+
+        if (justConfirmedOrder && confirmedOrder != null)
+        {
+            try
+            {
+                await SendOrderPaymentSuccessEmailAsync(confirmedOrder);
+            }
+            catch(Exception ex)
+            {
+                throw new Exception("Payment success nhưng gửi email lỗi: " + ex.Message);
+            }
+        }
 
         return new PaymentResultDto
         {
@@ -336,6 +357,9 @@ public class PaymentService : IPaymentService
             payment.Transactionno = vnpTransactionNo;
             paymentRepo.Update(payment);
 
+            bool justConfirmedOrder = false;
+            Order? confirmedOrder = null;
+
             // Cập nhật Order status nếu payment thành công
             if (payment.Order != null)
             {
@@ -345,10 +369,24 @@ public class PaymentService : IPaymentService
                 {
                     order.Status = OrderStatus.CONFIRMED;
                     orderRepo.Update(order);
+                    justConfirmedOrder = true;
+                    confirmedOrder = order;
                 }
             }
 
             await _uow.SaveAsync();
+
+            if (justConfirmedOrder && confirmedOrder != null)
+            {
+                try
+                {
+                    await SendOrderPaymentSuccessEmailAsync(confirmedOrder);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception("Payment success nhưng gửi email lỗi: " + ex.Message);
+                }
+            }
         }
         else if (!success && payment.Status != PaymentStatus.FAILED)
         {
@@ -435,5 +473,39 @@ public class PaymentService : IPaymentService
     public async Task<PaymentResultDto> ProcessWalletDepositReturnAsync(Dictionary<string, string> queryParams)
     {
         return await _walletService.ProcessDepositReturnAsync(queryParams);
+    }
+
+    // send email
+    private static string FormatVnd(decimal amount)
+    {
+        return string.Format("{0:N0} VNĐ", amount);
+    }
+
+    private async Task SendOrderPaymentSuccessEmailAsync(Order order)
+    {
+        if (string.IsNullOrWhiteSpace(order.Customeremail))
+            throw new Exception($"Order #{order.Orderid} không có Customeremail.");
+
+        var customerName = string.IsNullOrWhiteSpace(order.Customername)
+            ? "quý khách"
+            : order.Customername;
+
+        var orderLink = "http://14.225.207.221/account/orders";
+
+        var htmlBody = _templateRenderer.RenderOrderPaymentSuccess(
+            customerName,
+            order.Orderid,
+            FormatVnd(order.Totalprice ?? 0),
+            orderLink
+        );
+
+        if (string.IsNullOrWhiteSpace(htmlBody))
+            throw new Exception("Render email body bị rỗng.");
+
+        await _emailSender.SendAsync(
+            order.Customeremail,
+            $"TetGift - Thanh toán đơn hàng #{order.Orderid} thành công",
+            htmlBody
+        );
     }
 }

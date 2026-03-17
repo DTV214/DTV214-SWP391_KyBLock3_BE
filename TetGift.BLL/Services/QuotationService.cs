@@ -12,11 +12,15 @@ namespace TetGift.BLL.Services
     {
         private readonly IUnitOfWork _uow;
         private readonly IOrderFromQuotationService _orderSvc;
+        private readonly IEmailSender _emailSender;
+        private readonly IEmailTemplateRenderer _emailTemplateRenderer;
 
-        public QuotationService(IUnitOfWork uow, IOrderFromQuotationService orderSvc)
+        public QuotationService(IUnitOfWork uow, IOrderFromQuotationService orderSvc, IEmailSender emailSender, IEmailTemplateRenderer emailTemplateRenderer)
         {
             _uow = uow;
             _orderSvc = orderSvc;
+            _emailSender = emailSender;
+            _emailTemplateRenderer = emailTemplateRenderer;
         }
 
         // =========================
@@ -812,6 +816,17 @@ namespace TetGift.BLL.Services
 
             // TODO: send email to customer if you want (reuse your email sender)
             await _uow.SaveAsync();
+
+            var link = $"http://14.225.207.221/quotation/status/{q.Quotationid}";
+            var customerName = string.IsNullOrWhiteSpace(q.Company) ? "quý khách" : q.Company;
+
+            var htmlBody = _emailTemplateRenderer.RenderQuotationApproved(customerName, q.Quotationid, link);
+
+            await _emailSender.SendAsync(
+                q.Email,
+                $"Báo giá #{q.Quotationid} đã được duyệt",
+                htmlBody
+            );
         }
 
         public async Task AdminRejectAsync(int quotationId, AdminDecisionRequest req)
@@ -1375,5 +1390,7 @@ namespace TetGift.BLL.Services
                 }
             };
         }
+
+
     }
 }
