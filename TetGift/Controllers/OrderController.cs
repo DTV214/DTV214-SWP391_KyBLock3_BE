@@ -146,7 +146,7 @@ public class OrderController : ControllerBase
     }
 
     [HttpPut("{orderId}/status")]
-    [Authorize(Roles = "ADMIN,STAFF")]
+    [Authorize(Roles = "ADMIN,STAFF,CUSTOMER")]
     public async Task<IActionResult> UpdateOrderStatus(int orderId, [FromBody] UpdateOrderStatusRequest request)
     {
         try
