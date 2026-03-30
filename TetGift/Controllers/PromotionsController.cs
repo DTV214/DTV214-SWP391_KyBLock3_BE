@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -11,6 +12,7 @@ namespace TetGift.Controllers
         private readonly IPromotionService _promotionService = promotionService;
 
         [HttpPost]
+        [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> Create([FromBody] PromotionRequest req)
         {
             var result = await _promotionService.CreateAsync(req);
@@ -18,6 +20,7 @@ namespace TetGift.Controllers
         }
 
         [HttpGet]
+        [Authorize(Roles = "ADMIN,STAFF,CUSTOEMR")]
         public async Task<IActionResult> GetAll()
         {
             var result = await _promotionService.GetAllAsync();
@@ -25,6 +28,7 @@ namespace TetGift.Controllers
         }
 
         [HttpGet("limited")]
+        [Authorize(Roles = "ADMIN,STAFF,CUSTOEMR")]
         public async Task<IActionResult> GetAllLimited()
         {
             var result = await _promotionService.GetAllAsync(true, GetAccountId());
@@ -39,6 +43,7 @@ namespace TetGift.Controllers
         }
 
         [HttpGet("accounts")]
+        [Authorize(Roles = "CUSTOMER")]
         public async Task<IActionResult> GetAccountPromos()
         {
             var result = await _promotionService.GetByAccount(GetAccountId());
@@ -67,6 +72,7 @@ namespace TetGift.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> Update(int id, [FromBody] PromotionRequest req)
         {
             await _promotionService.UpdateAsync(id, req);

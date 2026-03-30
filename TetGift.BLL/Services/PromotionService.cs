@@ -54,7 +54,11 @@ namespace TetGift.BLL.Services
         public async Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited)
         {
             var promoRepo = _unitOfWork.GetRepository<Promotion>();
-            var entities = await promoRepo.FindAsync(p => p.Isdeleted != true && p.IsLimited == isLimited);
+            var entities = await promoRepo.FindAsync(
+                p => p.Isdeleted != true
+                && p.IsLimited == isLimited
+                && p.Expirydate.Value > DateTime.UtcNow.AddHours(7)
+                );
             return entities.Select(MapToResponseDto);
         }
 
@@ -62,7 +66,11 @@ namespace TetGift.BLL.Services
         public async Task<IEnumerable<PromotionResponseDto>> GetAllAsync(bool isLimited, int accountId)
         {
             var promoRepo = _unitOfWork.GetRepository<Promotion>();
-            var entities = await promoRepo.FindAsync(p => p.Isdeleted != true && p.IsLimited.Equals(isLimited));
+            var entities = await promoRepo.FindAsync(
+                p => p.Isdeleted != true
+                && p.IsLimited.Equals(isLimited)
+                && p.Expirydate.Value > DateTime.UtcNow.AddHours(7)
+                );
 
             var limitedPromos = GetAccountLimitedPromo(accountId, true).Result.ToList();
 
@@ -78,13 +86,8 @@ namespace TetGift.BLL.Services
             var promoRepo = _unitOfWork.GetRepository<Promotion>();
             var entity = await promoRepo.GetByIdAsync(id) ?? throw new Exception("Không tìm thấy mã giảm giá.");
 
-            // Soft Delete
             entity.Isdeleted = true;
             await promoRepo.UpdateAsync(entity);
-            // SaveAsync đã được gọi bên trong UpdateAsync nếu repo implement như vậy, 
-            // nhưng theo GenericRepository của bạn thì UpdateAsync có gọi SaveChangesAsync.
-            // Tuy nhiên hàm UpdateAsync trong GenericRepo mẫu bạn gửi có gọi SaveChangesAsync.
-            // Nếu dùng _unitOfWork thì thường ta gọi _unitOfWork.SaveAsync() cuối cùng cho chắc.
         }
 
         public async Task<PromotionResponseDto> GetByIdAsync(int id)
@@ -132,7 +135,6 @@ namespace TetGift.BLL.Services
 
             return MapToResponseDto(promo);
         }
-        // ----------------
 
         private PromotionResponseDto MapToResponseDto(Promotion e)
         {
