@@ -38,16 +38,18 @@ public partial class Promotion
         return true;
     }
 
+    public bool IsOutOfDate()
+    {
+        var now = DateTime.UtcNow.AddHours(7);
+        return Expirydate <= now;
+    }
+
     public bool StillNotYet()
     {
         var now = DateTime.Now;
-        // Kiểm tra cơ bản: chưa xóa, trước thời hạn hiệu lực
-        bool basicCheck = (Isdeleted != true)
-                          && (StartTime.HasValue && now <= StartTime.Value);
-
-        if (!basicCheck) return false;
-
-        return true;
+        return Isdeleted != true
+                          && StartTime.HasValue
+                          && now < StartTime.Value;
     }
 
     public (double appliedPrice, bool isApplied, string message) ApplyPromotion(double price)

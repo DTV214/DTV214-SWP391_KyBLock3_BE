@@ -13,7 +13,7 @@ namespace TetGift.BLL.Services
 
         public async Task<PromotionResponseDto> CreateAsync(PromotionRequest req)
         {
-            // Logic kiểm tra thời gian
+            // Kiểm tra thời gian
             if (req.StartTime >= req.ExpiryDate)
             {
                 throw new Exception("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.");
@@ -112,10 +112,8 @@ namespace TetGift.BLL.Services
             promo.MinPriceToApply = req.MinPriceToApply;
             promo.Discountvalue = req.DiscountValue;
             promo.MaxDiscountPrice = req.MaxDiscountPrice;
-            promo.IsPercentage = req.IsPercentage;
             promo.StartTime = DateTime.SpecifyKind(req.StartTime, DateTimeKind.Utc);
             promo.Expirydate = DateTime.SpecifyKind(req.ExpiryDate, DateTimeKind.Utc);
-            promo.IsLimited = req.IsLimited;
             promo.LimitedCount = req.LimitedCount;
 
             await repo.UpdateAsync(promo);
@@ -142,6 +140,8 @@ namespace TetGift.BLL.Services
 
             if (e.StillNotYet())
                 status = PromotionStatus.WAIT_FOR_ACTIVE;
+            else if (e.IsOutOfDate())
+                status = PromotionStatus.OUT_OF_DATE;
             else if (e.IsValid())
                 status = PromotionStatus.ACTIVE;
             else if (e.IsLimited ?? false && e.LimitedCount == e.UsedCount)

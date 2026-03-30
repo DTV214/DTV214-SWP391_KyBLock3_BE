@@ -1,7 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
-using System.Threading.Tasks;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -38,7 +37,7 @@ namespace TetGift.Controllers
         // POST: api/blogs
         [HttpPost]
         [Authorize(Roles = "ADMIN,STAFF")]
-        public async Task<IActionResult> Create([FromForm] CreateBlogRequest req)
+        public async Task<IActionResult> Create([FromBody] CreateBlogRequest req)
         {
             // Bóc tách AccountId từ Token của người đang đăng nhập
             var accountIdClaim = User.FindFirst("AccountId") ?? User.FindFirst(ClaimTypes.NameIdentifier);
@@ -60,7 +59,7 @@ namespace TetGift.Controllers
         // PUT: api/blogs/{id}
         [HttpPut("{id}")]
         [Authorize(Roles = "ADMIN,STAFF")]
-        public async Task<IActionResult> Update(int id, [FromForm] UpdateBlogRequest req)
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateBlogRequest req)
         {
             await _blogService.UpdateAsync(id, req);
             return Ok(new { message = "Cập nhật bài viết thành công." });
