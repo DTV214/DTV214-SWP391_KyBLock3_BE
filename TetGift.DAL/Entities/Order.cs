@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace TetGift.DAL.Entities;
@@ -27,6 +27,8 @@ public partial class Order
 
     public string? Note { get; set; }
     public int? isQuotation { get;set; } // 0 or null for normal order, 1 for quotation converted order
+
+    public DateTime? Shippeddate { get; set; }
 
     public virtual Account? Account { get; set; }
 

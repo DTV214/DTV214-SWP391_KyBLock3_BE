@@ -1,4 +1,4 @@
-﻿using TetGift.BLL.Dtos;
+using TetGift.BLL.Dtos;
 
 namespace TetGift.BLL.Interfaces;
 
@@ -14,7 +14,7 @@ public interface IOrderService
     // Admin endpoints
     Task<PagedResponse<OrderResponseDto>> GetAllOrdersAsync(OrderQueryParameters queryParams);
     Task<OrderResponseDto> GetOrderByIdForAdminAsync(int orderId);
-    Task<OrderResponseDto> UpdateOrderStatusAsync(int orderId, UpdateOrderStatusRequest request);
+    Task<OrderResponseDto> UpdateOrderStatusAsync(int orderId, UpdateOrderStatusRequest request, int accountId, string userRole);
 
     //New Ko bik đặt gì
     Task TryAllocateStockAfterPaymentAsync(int orderId);

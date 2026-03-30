@@ -136,7 +136,9 @@ public class OrderController : ControllerBase
     {
         try
         {
-            var result = await _orderService.UpdateOrderStatusAsync(orderId, request);
+            var accountId = GetCurrentAccountId();
+            var userRole = GetCurrentUserRole();
+            var result = await _orderService.UpdateOrderStatusAsync(orderId, request, accountId, userRole);
             return Ok(result);
         }
         catch (Exception ex)

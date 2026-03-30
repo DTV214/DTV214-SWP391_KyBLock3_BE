@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -185,6 +185,7 @@ namespace TetGift
 
             // Đăng ký Background Services
             builder.Services.AddHostedService<PendingAccountCleanupService>();
+            builder.Services.AddHostedService<AutoConfirmDeliveryService>();
 
             // Đăng ký các Repository
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

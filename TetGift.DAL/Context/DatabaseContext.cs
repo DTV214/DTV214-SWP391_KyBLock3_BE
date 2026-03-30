@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using TetGift.DAL.Entities;
 
 namespace TetGift.DAL.Context;
@@ -288,6 +288,9 @@ public partial class DatabaseContext : DbContext
                 .HasColumnName("totalprice");
             entity.Property(e => e.isQuotation)
                 .HasColumnName("isquotation");
+            entity.Property(e => e.Shippeddate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("shippeddate");
 
             entity.HasOne(d => d.Account).WithMany(p => p.Orders)
                 .HasForeignKey(d => d.Accountid)

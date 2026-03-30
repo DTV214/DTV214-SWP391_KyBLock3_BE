@@ -283,7 +283,7 @@ public class OrderService : IOrderService
         return MapToOrderResponseDto(order);
     }
 
-    public async Task<OrderResponseDto> UpdateOrderStatusAsync(int orderId, UpdateOrderStatusRequest request)
+    public async Task<OrderResponseDto> UpdateOrderStatusAsync(int orderId, UpdateOrderStatusRequest request, int accountId, string userRole)
     {
         var orderRepo = _uow.GetRepository<Order>();
         var order = await orderRepo.FindAsync(
@@ -298,6 +298,19 @@ public class OrderService : IOrderService
 
         var currentStatus = order.Status ?? OrderStatus.PENDING;
         var newStatus = request.Status.ToUpper();
+        var normalizedRole = userRole.ToUpper();
+
+        // === CUSTOMER: chỉ được xác nhận đã nhận hàng (SHIPPED → DELIVERED) ===
+        if (normalizedRole == "CUSTOMER")
+        {
+            // Validate ownership: chỉ chủ đơn hàng
+            if (order.Accountid != accountId)
+                throw new Exception("Bạn không có quyền thao tác với đơn hàng này.");
+
+            // Customer chỉ được phép: SHIPPED → DELIVERED
+            if (currentStatus != OrderStatus.SHIPPED || newStatus != OrderStatus.DELIVERED)
+                throw new Exception("Bạn chỉ có thể xác nhận đã nhận hàng khi đơn hàng đang ở trạng thái đang giao.");
+        }
 
         // Validate status transition
         if (!IsValidStatusTransition(currentStatus, newStatus))
@@ -315,6 +328,13 @@ public class OrderService : IOrderService
         }
 
         order.Status = newStatus;
+
+        // Ghi nhận thời điểm giao hàng để auto-confirm sau 3 ngày
+        if (newStatus == OrderStatus.SHIPPED)
+        {
+            order.Shippeddate = DateTime.Now;
+        }
+
         orderRepo.Update(order);
         await _uow.SaveAsync(); // Save tất cả thay đổi (bao gồm cả stock đã được restore)
 
@@ -549,6 +569,7 @@ public class OrderService : IOrderService
             CustomerAddress = order.Customeraddress,
             Note = order.Note,
             PromotionCode = !string.IsNullOrEmpty(promotionCode) ? promotionCode : null,
+            ShippedDate = order.Shippeddate,
             Items = items
         };
     }
