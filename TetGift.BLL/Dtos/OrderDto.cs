@@ -50,6 +50,8 @@ public class OrderDetailResponseDto
     public decimal? Price { get; set; }
     public decimal Amount { get; set; }
     public string? ImageUrl { get; set; }
+
+    public List<ProductDetailResponse>? ProductDetails { get; set; }
 }
 
 public class OrderResponseDto

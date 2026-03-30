@@ -51,19 +51,13 @@ public class OrderController : ControllerBase
         }
     }
 
-    [HttpGet("my-orders")]
-    public async Task<IActionResult> GetMyOrders()
+    [HttpGet("me")]
+    [Authorize(Roles = "CUSTOMER")]
+    public async Task<IActionResult> GetMyOrders([FromQuery] OrderQueryParameters queryParams)
     {
-        try
-        {
-            var accountId = GetCurrentAccountId();
-            var result = await _orderService.GetOrdersByAccountIdAsync(accountId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        queryParams.AccountId = GetCurrentAccountId();
+        var result = await _orderService.GetAllOrdersAsync(queryParams);
+        return Ok(result);
     }
 
     [HttpGet("{orderId}")]
@@ -113,21 +107,12 @@ public class OrderController : ControllerBase
         }
     }
 
-    // ========== ADMIN ENDPOINTS ==========
-
     [HttpGet()]
     [Authorize(Roles = "ADMIN,STAFF")]
-    public async Task<IActionResult> GetAllOrders([FromQuery] string? status = null)
+    public async Task<IActionResult> GetAllOrders([FromQuery] OrderQueryParameters queryParams)
     {
-        try
-        {
-            var result = await _orderService.GetAllOrdersAsync(status);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var result = await _orderService.GetAllOrdersAsync(queryParams);
+        return Ok(result);
     }
 
     [HttpGet("/{orderId}")]

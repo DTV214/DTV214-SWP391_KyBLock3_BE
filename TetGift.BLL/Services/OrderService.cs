@@ -163,18 +163,39 @@ public class OrderService : IOrderService
         return MapToOrderResponseDto(fullOrder!);
     }
 
-    public async Task<IEnumerable<OrderResponseDto>> GetOrdersByAccountIdAsync(int accountId)
+    public async Task<PagedResponse<OrderResponseDto>> GetAllOrdersAsync(OrderQueryParameters queryParams)
     {
         var orderRepo = _uow.GetRepository<Order>();
-        var orders = await orderRepo.GetAllAsync(
-            o => o.Accountid == accountId,
-            include: q => q
-                .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
-                .Include(o => o.Promotion)
-        );
+        var query = orderRepo.Entities.AsQueryable();
 
-        return orders.Select(o => MapToOrderResponseDto(o));
+        #region Filter
+
+        // Account Id
+        if (queryParams.AccountId != 0)
+            query = query.Where(o => o.Accountid == queryParams.AccountId);
+
+        // Status
+        if (!string.IsNullOrWhiteSpace(queryParams.Status))
+            query = query.Where(o => o.Status == queryParams.Status);
+
+        #endregion
+
+        #region Paging
+
+        var totalItems = query.Count();
+        var pageNumber = queryParams.PageNumber ?? 1;
+        var pageSize = queryParams.PageSize ?? 10;
+        var orders = await query
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product).ThenInclude(p => p.ProductDetailProductparents)
+            .OrderByDescending(o => o.Orderdatetime)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+        var pagedOrders = orders.Select(o => MapToOrderResponseDto(o)).ToList();
+
+        #endregion
+
+        return new PagedResponse<OrderResponseDto>(pagedOrders, totalItems, pageNumber, pageSize);
     }
 
     public async Task<OrderResponseDto> UpdateOrderShippingInfoAsync(int orderId, int accountId, string userRole, UpdateOrderShippingRequest request)
@@ -242,37 +263,6 @@ public class OrderService : IOrderService
             throw new Exception("Không tìm thấy đơn hàng hoặc bạn không có quyền xem đơn hàng này.");
 
         return MapToOrderResponseDto(order);
-    }
-
-    public async Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync(string? status = null)
-    {
-        var orderRepo = _uow.GetRepository<Order>();
-
-        IEnumerable<Order> orders;
-        if (!string.IsNullOrWhiteSpace(status))
-        {
-            orders = await orderRepo.GetAllAsync(
-                o => o.Status == status,
-                include: q => q
-                    .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                    .Include(o => o.Promotion)
-                    .Include(o => o.Account)
-            );
-        }
-        else
-        {
-            orders = await orderRepo.GetAllAsync(
-                null,
-                include: q => q
-                    .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                    .Include(o => o.Promotion)
-                    .Include(o => o.Account)
-            );
-        }
-
-        return orders.Select(o => MapToOrderResponseDto(o));
     }
 
     public async Task<OrderResponseDto> GetOrderByIdForAdminAsync(int orderId)
@@ -499,7 +489,20 @@ public class OrderService : IOrderService
                         Quantity = quantity,
                         Price = price,
                         Amount = amount,
-                        ImageUrl = detail.Product.ImageUrl
+                        ImageUrl = detail.Product.ImageUrl,
+                        ProductDetails = detail.Product.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
+                        {
+                            Productdetailid = pd.Productdetailid,
+                            Productparentid = pd.Productparentid,
+                            Productid = pd.Productid,
+                            Categoryid = pd.Product?.Categoryid,
+                            Productname = pd.Product?.Productname,
+                            Unit = pd.Product?.Unit,
+                            Price = pd.Product?.Price,
+                            Imageurl = pd.Product?.ImageUrl,
+                            Quantity = pd.Quantity,
+                            ChildProduct = null
+                        }).ToList()
                     });
 
                     totalPrice += amount;

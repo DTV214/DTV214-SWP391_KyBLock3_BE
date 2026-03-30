@@ -6,13 +6,13 @@ public interface IOrderService
 {
     // Customer endpoints
     Task<OrderResponseDto> CreateOrderFromCartAsync(int accountId, CreateOrderRequest request);
-    Task<IEnumerable<OrderResponseDto>> GetOrdersByAccountIdAsync(int accountId);
+    //Task<IEnumerable<OrderResponseDto>> GetOrdersByAccountIdAsync(int accountId);
     Task<OrderResponseDto> GetOrderByIdAsync(int orderId, int accountId);
     Task<OrderResponseDto> CancelOrderAsync(int orderId, int accountId, string userRole);
     Task<OrderResponseDto> UpdateOrderShippingInfoAsync(int orderId, int accountId, string userRole, UpdateOrderShippingRequest request);
 
     // Admin endpoints
-    Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync(string? status = null);
+    Task<PagedResponse<OrderResponseDto>> GetAllOrdersAsync(OrderQueryParameters queryParams);
     Task<OrderResponseDto> GetOrderByIdForAdminAsync(int orderId);
     Task<OrderResponseDto> UpdateOrderStatusAsync(int orderId, UpdateOrderStatusRequest request);
 
