@@ -186,6 +186,7 @@ namespace TetGift
             // Đăng ký Background Services
             builder.Services.AddHostedService<PendingAccountCleanupService>();
             builder.Services.AddHostedService<AutoConfirmDeliveryService>();
+            builder.Services.AddHostedService<ExpiredStockCleanupService>();
 
             // Đăng ký các Repository
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
