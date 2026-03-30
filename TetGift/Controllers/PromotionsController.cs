@@ -20,7 +20,7 @@ namespace TetGift.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = "ADMIN,STAFF,CUSTOEMR")]
+        [Authorize(Roles = "ADMIN,STAFF,CUSTOMER")]
         public async Task<IActionResult> GetAll()
         {
             var result = await _promotionService.GetAllAsync();
@@ -28,7 +28,7 @@ namespace TetGift.Controllers
         }
 
         [HttpGet("limited")]
-        [Authorize(Roles = "ADMIN,STAFF,CUSTOEMR")]
+        [Authorize(Roles = "ADMIN,STAFF,CUSTOMER")]
         public async Task<IActionResult> GetAllLimited()
         {
             var result = await _promotionService.GetAllAsync(true, GetAccountId());
