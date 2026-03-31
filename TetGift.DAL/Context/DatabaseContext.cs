@@ -65,7 +65,8 @@ public partial class DatabaseContext : DbContext
     public virtual DbSet<Message> Messages { get; set; }
     public virtual DbSet<StoreLocation> StoreLocations { get; set; }
     public virtual DbSet<AccountAddress> AccountAddresses { get; set; }
-
+    // Tìm đoạn khai báo các DbSet và thêm dòng này vào:
+    public virtual DbSet<RequestContact> RequestContacts { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -155,6 +156,41 @@ public partial class DatabaseContext : DbContext
                 .HasConstraintName("blog_accountid_fkey");
         });
 
+        modelBuilder.Entity<RequestContact>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("request_contact_pkey");
+
+            entity.ToTable("request_contact");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+
+            entity.Property(e => e.CustomerName)
+                .IsRequired()
+                .HasMaxLength(255)
+                .HasColumnName("customer_name");
+
+            entity.Property(e => e.Phone)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasColumnName("phone");
+
+            entity.Property(e => e.Email)
+                .IsRequired()
+                .HasMaxLength(255)
+                .HasColumnName("email");
+
+            entity.Property(e => e.Note)
+                .HasColumnName("note");
+
+            entity.Property(e => e.IsContacted)
+                
+                .HasColumnName("is_contacted");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+        });
         modelBuilder.Entity<Cart>(entity =>
         {
             entity.HasKey(e => e.Cartid).HasName("cart_pkey");

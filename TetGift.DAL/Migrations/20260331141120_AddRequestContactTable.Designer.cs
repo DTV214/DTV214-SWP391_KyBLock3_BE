@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TetGift.DAL.Context;
@@ -11,9 +12,11 @@ using TetGift.DAL.Context;
 namespace TetGift.DAL.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260331141120_AddRequestContactTable")]
+    partial class AddRequestContactTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1162,50 +1165,6 @@ namespace TetGift.DAL.Migrations
                     b.HasIndex("Quotationid");
 
                     b.ToTable("quotation_message", (string)null);
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.RequestContact", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("CustomerName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("customer_name");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("email");
-
-                    b.Property<bool>("IsContacted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_contacted");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("text")
-                        .HasColumnName("note");
-
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("phone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("request_contact");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Stock", b =>

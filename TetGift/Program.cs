@@ -24,6 +24,7 @@ namespace TetGift
     {
         public static void Main(string[] args)
         {
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             var builder = WebApplication.CreateBuilder(args);
 
             // ConnectionString
@@ -232,7 +233,7 @@ namespace TetGift
             builder.Services.AddScoped<IAccountPromotionService, AccountPromotionService>();
             builder.Services.AddScoped<IInvoiceService, InvoiceService>();
             builder.Services.AddScoped<IFeedbackService, FeedbackService>();
-
+            builder.Services.AddScoped<IContactService, ContactService>();
             builder.Services.AddSignalR();
             // Đăng ký cấu hình CloudinarySettings
             builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
