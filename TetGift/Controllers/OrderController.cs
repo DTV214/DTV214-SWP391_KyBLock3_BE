@@ -151,8 +151,8 @@ public class OrderController : ControllerBase
     [Authorize(Roles = "ADMIN,STAFF")]
     public async Task<IActionResult> AllocateStock(int orderId)
     {
-        try
-        {
+        //try
+        //{
             var accountIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(accountIdClaim) || !int.TryParse(accountIdClaim, out var actorId))
                 return Unauthorized(new { message = "Không thể xác định người dùng." });
@@ -162,11 +162,11 @@ public class OrderController : ControllerBase
             await _orderService.ForceAllocateStockAsync(orderId, actorId, role);
 
             return Ok(new { message = "Allocate stock executed." });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        //}
+        //catch (Exception ex)
+        //{
+        //    return BadRequest(new { message = ex.Message });
+        //}
     }
 
 }

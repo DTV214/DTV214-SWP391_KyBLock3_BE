@@ -620,9 +620,9 @@ public class OrderService : IOrderService
             {
                 order.Status = OrderStatus.PAID_WAITING_STOCK;
 
-                order.Note = string.IsNullOrWhiteSpace(order.Note)
-                    ? $"[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {qty}."
-                    : $"{order.Note}\n[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {qty}.";
+                //order.Note = string.IsNullOrWhiteSpace(order.Note)
+                //    ? $"[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {qty}."
+                //    : $"{order.Note}\n[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {qty}.";
 
                 orderRepo.Update(order);
                 await _uow.SaveAsync();
@@ -680,9 +680,9 @@ public class OrderService : IOrderService
             }
 
             order.Status = OrderStatus.PROCESSING;
-            order.Note = string.IsNullOrWhiteSpace(order.Note)
-                ? $"[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
-                : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+            //order.Note = string.IsNullOrWhiteSpace(order.Note)
+            //    ? $"[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+            //    : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
 
             orderRepo.Update(order);
 
@@ -695,9 +695,9 @@ public class OrderService : IOrderService
 
             // nếu fail thì PAID_WAITING_STOCK
             order.Status = OrderStatus.PAID_WAITING_STOCK;
-            order.Note = string.IsNullOrWhiteSpace(order.Note)
-                ? $"[PAID_WAITING_STOCK] {ex.Message}"
-                : $"{order.Note}\n[PAID_WAITING_STOCK] {ex.Message}";
+            //order.Note = string.IsNullOrWhiteSpace(order.Note)
+            //    ? $"[PAID_WAITING_STOCK] {ex.Message}"
+            //    : $"{order.Note}\n[PAID_WAITING_STOCK] {ex.Message}";
 
             orderRepo.Update(order);
             await _uow.SaveAsync();
@@ -773,9 +773,9 @@ public class OrderService : IOrderService
             {
                 // vẫn có thể set PAID_WAITING_STOCK để lưu trạng thái
                 order.Status = OrderStatus.PAID_WAITING_STOCK;
-                order.Note = string.IsNullOrWhiteSpace(order.Note)
-                    ? $"[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {need}."
-                    : $"{order.Note}\n[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {need}.";
+                //order.Note = string.IsNullOrWhiteSpace(order.Note)
+                //    ? $"[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {need}."
+                //    : $"{order.Note}\n[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {need}.";
 
                 orderRepo.Update(order);
                 await _uow.SaveAsync();
