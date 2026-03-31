@@ -230,6 +230,7 @@ namespace TetGift
             builder.Services.AddScoped<IDirectionsService, DirectionsService>();
             builder.Services.AddScoped<IAccountAddressService, AccountAddressService>();
             builder.Services.AddScoped<IAccountPromotionService, AccountPromotionService>();
+            builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 
             builder.Services.AddSignalR();
             // Đăng ký cấu hình CloudinarySettings

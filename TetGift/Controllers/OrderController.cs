@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
+using TetGift.BLL.Common.Constraint;
 
 namespace TetGift.Controllers;
 
@@ -12,10 +13,12 @@ namespace TetGift.Controllers;
 public class OrderController : ControllerBase
 {
     private readonly IOrderService _orderService;
+    private readonly IInvoiceService _invoiceService;
 
-    public OrderController(IOrderService orderService)
+    public OrderController(IOrderService orderService, IInvoiceService invoiceService)
     {
         _orderService = orderService;
+        _invoiceService = invoiceService;
     }
 
     private int GetCurrentAccountId()
@@ -168,5 +171,34 @@ public class OrderController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+    
+    // ========== INVOICE ENDPOINT ==========
 
+    /// <summary>
+    /// Tải xuống hóa đơn PDF cho đơn hàng
+    /// GET /api/orders/{orderId}/invoice
+    /// </summary>
+    [HttpGet("{orderId}/invoice")]
+    [Authorize]
+    public async Task<IActionResult> DownloadInvoice(int orderId)
+    {
+        try
+        {
+            var role = GetCurrentUserRole();
+            int? accountId = null;
+
+            // Customer chỉ được tải invoice của mình; Admin/Staff được tải mọi invoice
+            if (role != UserRole.ADMIN && role != UserRole.STAFF)
+            {
+                accountId = GetCurrentAccountId();
+            }
+
+            var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(orderId, accountId);
+            return File(pdfBytes, "application/pdf", $"HoaDon_{orderId:D6}.pdf");
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

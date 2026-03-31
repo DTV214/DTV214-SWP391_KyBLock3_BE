@@ -1,0 +1,34 @@
+﻿
+D:\PRN232\PRN232_ProjectG
+roup\TetGift\Controllers\
+OrderController.cs(182,5)
+: error CS0106: The 
+modifier 'public' is not 
+valid for this item [D:\P
+RN232\PRN232_ProjectGroup
+\TetGift\TetGift.csproj]
+D:\PRN232\PRN232_ProjectG
+roup\TetGift\Controllers\
+OrderController.cs(203,2)
+: error CS1513: } 
+expected [D:\PRN232\PRN23
+2_ProjectGroup\TetGift\Te
+tGift.csproj]
+D:\PRN232\PRN232_ProjectG
+roup\TetGift\Controllers\
+OrderController.cs(182,5)
+: error CS0106: The 
+modifier 'public' is not 
+valid for this item [D:\P
+RN232\PRN232_ProjectGroup
+\TetGift\TetGift.csproj]
+D:\PRN232\PRN232_ProjectG
+roup\TetGift\Controllers\
+OrderController.cs(203,2)
+: error CS1513: } 
+expected [D:\PRN232\PRN23
+2_ProjectGroup\TetGift\Te
+tGift.csproj]
+    2 Error(s)
+
+
