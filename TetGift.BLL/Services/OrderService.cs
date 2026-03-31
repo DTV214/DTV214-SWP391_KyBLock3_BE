@@ -167,6 +167,7 @@ public class OrderService : IOrderService
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
                 .Include(o => o.Promotion)
+                .Include(o => o.Feedbacks)
         );
 
         return MapToOrderResponseDto(fullOrder!);
@@ -196,6 +197,7 @@ public class OrderService : IOrderService
         var pageSize = queryParams.PageSize ?? 10;
         var orders = await query
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product).ThenInclude(p => p.ProductDetailProductparents)
+            .Include(o => o.Feedbacks)
             .OrderByDescending(o => o.Orderdatetime)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
@@ -284,6 +286,7 @@ public class OrderService : IOrderService
                 .ThenInclude(od => od.Product)
                 .Include(o => o.Promotion)
                 .Include(o => o.Account)
+                .Include(o => o.Feedbacks)
         );
 
         if (order == null)
@@ -365,6 +368,7 @@ public class OrderService : IOrderService
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
                 .Include(o => o.Promotion)
+                .Include(o => o.Feedbacks)
         );
 
         return MapToOrderResponseDto(updatedOrder!);
@@ -439,6 +443,7 @@ public class OrderService : IOrderService
                 .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
                 .Include(o => o.Promotion)
+                .Include(o => o.Feedbacks)
         );
 
         return MapToOrderResponseDto(updatedOrder!);
@@ -591,6 +596,14 @@ public class OrderService : IOrderService
             PromotionCode = !string.IsNullOrEmpty(promotionCode) ? promotionCode : null,
             ShippedDate = order.Shippeddate,
             isQuotation = order.isQuotation,
+            Feedback = order.Feedbacks != null && order.Feedbacks.Any() && order.Feedbacks.First().Isdeleted != true ? new FeedbackResponseDto
+            {
+                FeedbackId = order.Feedbacks.First().Feedbackid,
+                OrderId = order.Orderid,
+                Rating = order.Feedbacks.First().Rating ?? 0,
+                Comment = order.Feedbacks.First().Comment,
+                CustomerName = null // Mặc định trong OrderResponseDto không cần lấy tên, nếu cần thì phải Join với Account
+            } : null,
             Items = items
         };
     }

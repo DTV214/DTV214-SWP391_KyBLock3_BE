@@ -71,5 +71,9 @@ public class OrderResponseDto
     public string? PromotionCode { get; set; }
     public DateTime? ShippedDate { get; set; }
     public int? isQuotation { get; set; }
+    
+    // Thêm trường Feedback
+    public FeedbackResponseDto? Feedback { get; set; }
+
     public List<OrderDetailResponseDto> Items { get; set; } = new();
 }
