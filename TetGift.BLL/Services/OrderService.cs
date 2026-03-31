@@ -878,10 +878,10 @@ public class OrderService : IOrderService
         return (status ?? "").ToUpper() switch
         {
             OrderStatus.PENDING => "Chờ xác nhận",
-            OrderStatus.CONFIRMED => "Đã xác nhận",
+            OrderStatus.CONFIRMED => "Đã thanh toán",
             OrderStatus.PROCESSING => "Đang xử lý",
-            OrderStatus.SHIPPED => "Đang giao",
-            OrderStatus.DELIVERED => "Đã giao",
+            OrderStatus.SHIPPED => "Đã giao",
+            OrderStatus.DELIVERED => "Đã nhận",
             OrderStatus.CANCELLED => "Đã hủy",
             OrderStatus.PAID_WAITING_STOCK => "Đã thanh toán - chờ nhập kho",
             _ => status
