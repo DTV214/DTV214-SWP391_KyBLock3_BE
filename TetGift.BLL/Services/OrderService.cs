@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -14,14 +15,22 @@ public class OrderService : IOrderService
     private readonly IPromotionService _promotionService;
     private readonly IAccountPromotionService _accountPromotionService;
     private readonly IWalletService _walletService;
+    private readonly IEmailSender _emailSender;
+    private readonly IEmailTemplateRenderer _emailTemplateRenderer;
+    private readonly IConfiguration _configuration;
 
-    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IWalletService walletService, IAccountPromotionService accountPromotionService)
+    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IWalletService walletService, IAccountPromotionService accountPromotionService, IEmailSender emailSender,
+        IEmailTemplateRenderer emailTemplateRenderer,
+        IConfiguration configuration)
     {
         _uow = uow;
         _cartService = cartService;
         _promotionService = promotionService;
         _walletService = walletService;
         _accountPromotionService = accountPromotionService;
+        _emailSender = emailSender;
+        _emailTemplateRenderer = emailTemplateRenderer;
+        _configuration = configuration;
     }
 
     public async Task<OrderResponseDto> CreateOrderFromCartAsync(int accountId, CreateOrderRequest request)
@@ -337,6 +346,17 @@ public class OrderService : IOrderService
 
         orderRepo.Update(order);
         await _uow.SaveAsync(); // Save tất cả thay đổi (bao gồm cả stock đã được restore)
+
+        // Gửi mail sau khi update thành công
+        try
+        {
+            await SendOrderStatusChangedEmailAsync(order);
+        }
+        catch
+        {
+            // Không throw để tránh update status thành công nhưng bị fail chỉ vì email
+            // Sau này có thể log lại bằng ILogger nếu muốn
+        }
 
         // Load lại với đầy đủ thông tin
         var updatedOrder = await orderRepo.FindAsync(
@@ -840,6 +860,81 @@ public class OrderService : IOrderService
         throw new Exception("Allocate failed unexpectedly. Please check stock data and allocation logic.");
     }
 
+    private string GetFriendlyOrderStatus(string status)
+    {
+        return (status ?? "").ToUpper() switch
+        {
+            OrderStatus.PENDING => "Chờ xác nhận",
+            OrderStatus.CONFIRMED => "Đã xác nhận",
+            OrderStatus.PROCESSING => "Đang xử lý",
+            OrderStatus.SHIPPED => "Đang giao",
+            OrderStatus.DELIVERED => "Đã giao",
+            OrderStatus.CANCELLED => "Đã hủy",
+            OrderStatus.PAID_WAITING_STOCK => "Đã thanh toán - chờ nhập kho",
+            _ => status
+        };
+    }
 
+    private async Task SendOrderStatusChangedEmailAsync(Order order)
+    {
+        if (order == null) return;
+        if (string.IsNullOrWhiteSpace(order.Customeremail)) return;
+
+        var customerName = string.IsNullOrWhiteSpace(order.Customername)
+            ? "Quý khách"
+            : order.Customername;
+
+        var friendlyStatus = GetFriendlyOrderStatus(order.Status ?? string.Empty);
+
+        var orderBaseUrl = _configuration["AppUrls:OrderDetail"];
+        var orderLink = string.IsNullOrWhiteSpace(orderBaseUrl)
+            ? $"http://14.225.207.221/account/orders/{order.Orderid}"
+            : $"{orderBaseUrl.TrimEnd('/')}/{order.Orderid}";
+
+        var orderItemsHtml = BuildOrderItemsHtml(order);
+
+        var subject = $"[TetGift] Đơn hàng #{order.Orderid} đã được cập nhật trạng thái";
+        var htmlBody = _emailTemplateRenderer.RenderOrderStatusChanged(
+            customerName,
+            order.Orderid,
+            friendlyStatus,
+            orderLink,
+            orderItemsHtml
+        );
+
+        await _emailSender.SendAsync(order.Customeremail, subject, htmlBody);
+    }
+
+    private string BuildOrderItemsHtml(Order order)
+    {
+        if (order.OrderDetails == null || !order.OrderDetails.Any())
+        {
+            return @"<p style='margin:0; color:#777777; font-size:14px; line-height:1.6;'>
+                    Không có thông tin sản phẩm.
+                 </p>";
+        }
+
+        var rows = order.OrderDetails
+            .Where(x => x.Product != null)
+            .Select(detail =>
+            {
+                var productName = detail.Product?.Productname ?? "Sản phẩm";
+                var quantity = detail.Quantity ?? 0;
+                var amount = detail.Amount ?? 0;
+
+                return $@"
+                <div style='padding: 14px 0; border-bottom: 1px solid #F1D9D9;'>
+                    <div style='font-size: 15px; font-weight: 700; color: #690000; margin-bottom: 6px;'>
+                        {System.Net.WebUtility.HtmlEncode(productName)}
+                    </div>
+                    <div style='font-size: 14px; color: #666666; line-height: 1.7;'>
+                        Số lượng: {quantity}<br/>
+                        Thành tiền: {amount:N0} VNĐ
+                    </div>
+                </div>";
+            });
+
+        return string.Join("", rows);
+    }
 
 }

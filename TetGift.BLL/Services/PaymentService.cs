@@ -490,7 +490,10 @@ public class PaymentService : IPaymentService
             ? "quý khách"
             : order.Customername;
 
-        var orderLink = "http://14.225.207.221/account/orders";
+        var orderBaseUrl = _configuration["AppUrls:OrderDetail"];
+        var orderLink = string.IsNullOrWhiteSpace(orderBaseUrl)
+            ? $"http://14.225.207.221/account/orders/{order.Orderid}"
+            : $"{orderBaseUrl.TrimEnd('/')}/{order.Orderid}";
 
         var htmlBody = _templateRenderer.RenderOrderPaymentSuccess(
             customerName,

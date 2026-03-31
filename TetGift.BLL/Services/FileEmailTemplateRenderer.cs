@@ -109,5 +109,42 @@ namespace TetGift.BLL.Services
                        .Replace("{{AMOUNT}}", amount)
                        .Replace("{{ORDER_LINK}}", orderLink);
         }
+
+        public string RenderOrderStatusChanged(string customerName, int orderId, string orderStatus, string orderLink, string orderItemsHtml)
+        {
+            var possiblePaths = new[]
+            {
+        Path.Combine(AppContext.BaseDirectory, "EmailTemplates", "OrderStatusChangedEmail.html"),
+        Path.Combine(Directory.GetCurrentDirectory(), "EmailTemplates", "OrderStatusChangedEmail.html"),
+        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EmailTemplates", "OrderStatusChangedEmail.html")
+    };
+
+            string? path = null;
+            foreach (var possiblePath in possiblePaths)
+            {
+                if (File.Exists(possiblePath))
+                {
+                    path = possiblePath;
+                    break;
+                }
+            }
+
+            if (path == null || !File.Exists(path))
+            {
+                var searchedPaths = string.Join(", ", possiblePaths);
+                throw new FileNotFoundException(
+                    $"Email template 'OrderStatusChangedEmail.html' not found. Searched paths: {searchedPaths}. " +
+                    $"Current directory: {Directory.GetCurrentDirectory()}, " +
+                    $"Base directory: {AppContext.BaseDirectory}");
+            }
+
+            var html = File.ReadAllText(path);
+
+            return html.Replace("{{CUSTOMER_NAME}}", customerName)
+                       .Replace("{{ORDER_ID}}", orderId.ToString())
+                       .Replace("{{ORDER_STATUS}}", orderStatus)
+                       .Replace("{{ORDER_LINK}}", orderLink)
+                       .Replace("{{ORDER_ITEMS}}", orderItemsHtml);
+        }
     }
 }
