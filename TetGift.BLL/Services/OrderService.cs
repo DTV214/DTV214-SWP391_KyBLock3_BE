@@ -570,6 +570,7 @@ public class OrderService : IOrderService
             Note = order.Note,
             PromotionCode = !string.IsNullOrEmpty(promotionCode) ? promotionCode : null,
             ShippedDate = order.Shippeddate,
+            isQuotation = order.isQuotation,
             Items = items
         };
     }

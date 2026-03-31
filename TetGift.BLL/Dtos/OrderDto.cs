@@ -70,5 +70,6 @@ public class OrderResponseDto
     public string? Note { get; set; }
     public string? PromotionCode { get; set; }
     public DateTime? ShippedDate { get; set; }
+    public int? isQuotation { get; set; }
     public List<OrderDetailResponseDto> Items { get; set; } = new();
 }

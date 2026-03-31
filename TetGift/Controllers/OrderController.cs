@@ -52,7 +52,7 @@ public class OrderController : ControllerBase
     }
 
     [HttpGet("me")]
-    [Authorize(Roles = "CUSTOMER")]
+    [Authorize]
     public async Task<IActionResult> GetMyOrders([FromQuery] OrderQueryParameters queryParams)
     {
         queryParams.AccountId = GetCurrentAccountId();
