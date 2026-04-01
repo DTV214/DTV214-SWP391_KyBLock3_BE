@@ -158,8 +158,8 @@ namespace TetGift.BLL.Services
             );
 
             return stocks
-                .Where(s => s.Product != null)
-                .GroupBy(s => (int)s.Productid)
+                .Where(s => s.Product != null && s.Productid.HasValue)
+                .GroupBy(s => s.Productid!.Value)
                 .Select(g =>
                 {
                     // LÔGIC MỚI: Chỉ tính tổng số lượng của các lô hàng CÓ THỂ BÁN ĐƯỢC (ACTIVE)
@@ -188,13 +188,14 @@ namespace TetGift.BLL.Services
         {
             var movementRepo = _unitOfWork.GetRepository<StockMovement>();
             var movements = await movementRepo.GetAllAsync(
-                include: q => q.Include(m => m.Stock).ThenInclude(s => s.Product)
+                include: q => q.Include(m => m.Stock!).ThenInclude(s => s.Product!)
             );
 
             return movements.Select(m => new StockMovementDto
             {
                 Stockmovementid = m.Stockmovementid,
                 Stockid = m.Stockid,
+                Productid = m.Stock?.Productid ?? 0,
                 Orderid = m.Orderid,
                 Quantity = m.Quantity,
                 Movementdate = m.Movementdate,
