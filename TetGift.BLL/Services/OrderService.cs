@@ -606,17 +606,19 @@ public class OrderService : IOrderService
         var orderRepo = _uow.GetRepository<Order>();
         var stockRepo = _uow.GetRepository<Stock>();
         var movementRepo = _uow.GetRepository<StockMovement>();
+        var productRepo = _uow.GetRepository<Product>();
 
-        // load order + details
+        // load order + details + product (bao gồm cả ProductDetail cho sản phẩm giỏ)
         var order = await orderRepo.FindAsync(
             o => o.Orderid == orderId,
             include: q => q.Include(x => x.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.ProductDetailProductparents)
         );
 
         if (order == null) throw new Exception("Order not found.");
         if (order.OrderDetails == null || order.OrderDetails.Count == 0)
             throw new Exception("Order has no details.");
-
 
         var status = (order.Status ?? OrderStatus.PENDING).ToUpper();
 
@@ -637,20 +639,46 @@ public class OrderService : IOrderService
             var qty = d.Quantity ?? 0;
             if (pid <= 0 || qty <= 0) continue;
 
-            var stocks = await stockRepo.FindAsync(s => s.Productid == pid && s.Status == StockStatus.ACTIVE);
-            var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+            var product = d.Product;
 
-            if (totalStock < qty)
+            // Sản phẩm giỏ: check stock từng sản phẩm con
+            if (product != null && product.Configid != null && product.Configid != 0)
             {
-                order.Status = OrderStatus.PAID_WAITING_STOCK;
+                var childProducts = product.ProductDetailProductparents;
+                if (childProducts != null)
+                {
+                    foreach (var child in childProducts)
+                    {
+                        var childPid = child.Productid ?? 0;
+                        var childNeed = (child.Quantity ?? 0) * qty; // số lượng con * số giỏ
+                        if (childPid <= 0 || childNeed <= 0) continue;
 
-                //order.Note = string.IsNullOrWhiteSpace(order.Note)
-                //    ? $"[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {qty}."
-                //    : $"{order.Note}\n[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {qty}.";
+                        var stocks = await stockRepo.FindAsync(s => s.Productid == childPid && s.Status == StockStatus.ACTIVE);
+                        var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
 
-                orderRepo.Update(order);
-                await _uow.SaveAsync();
-                return;
+                        if (totalStock < childNeed)
+                        {
+                            order.Status = OrderStatus.PAID_WAITING_STOCK;
+                            orderRepo.Update(order);
+                            await _uow.SaveAsync();
+                            return;
+                        }
+                    }
+                }
+            }
+            // Sản phẩm thường: check stock trực tiếp
+            else
+            {
+                var stocks = await stockRepo.FindAsync(s => s.Productid == pid && s.Status == StockStatus.ACTIVE);
+                var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+
+                if (totalStock < qty)
+                {
+                    order.Status = OrderStatus.PAID_WAITING_STOCK;
+                    orderRepo.Update(order);
+                    await _uow.SaveAsync();
+                    return;
+                }
             }
         }
 
@@ -661,53 +689,109 @@ public class OrderService : IOrderService
             foreach (var d in order.OrderDetails)
             {
                 var pid = d.Productid ?? 0;
-                var need = d.Quantity ?? 0;
-                if (pid <= 0 || need <= 0) continue;
+                var qty = d.Quantity ?? 0;
+                if (pid <= 0 || qty <= 0) continue;
 
-                var availableStocks = (await stockRepo.FindAsync(
-                        s => s.Productid == pid && s.Status == StockStatus.ACTIVE
-                    ))
-                    .OrderBy(s => s.Productiondate) // FIFO
-                    .ToList();
+                var product = d.Product;
 
-                var remaining = need;
-
-                foreach (var stock in availableStocks)
+                // Sản phẩm giỏ: trừ stock từng sản phẩm con
+                if (product != null && product.Configid != null && product.Configid != 0)
                 {
-                    if (remaining <= 0) break;
-
-                    var stockQty = stock.Stockquantity ?? 0;
-                    if (stockQty <= 0) continue;
-
-                    var deduct = Math.Min(remaining, stockQty);
-
-                    stock.Stockquantity = stockQty - deduct;
-                    if ((stock.Stockquantity ?? 0) <= 0)
-                        stock.Status = StockStatus.OUT_OF_STOCK;
-
-                    stockRepo.Update(stock);
-
-                    await movementRepo.AddAsync(new StockMovement
+                    var childProducts = product.ProductDetailProductparents;
+                    if (childProducts != null)
                     {
-                        Stockid = stock.Stockid,
-                        Orderid = order.Orderid,
-                        Quantity = -deduct,
-                        Movementdate = DateTime.Now,
-                        Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
-                    });
+                        foreach (var child in childProducts)
+                        {
+                            var childPid = child.Productid ?? 0;
+                            var childNeed = (child.Quantity ?? 0) * qty;
+                            if (childPid <= 0 || childNeed <= 0) continue;
 
-                    remaining -= deduct;
+                            var availableStocks = (await stockRepo.FindAsync(
+                                    s => s.Productid == childPid && s.Status == StockStatus.ACTIVE
+                                ))
+                                .OrderBy(s => s.Productiondate) // FIFO
+                                .ToList();
+
+                            var remaining = childNeed;
+
+                            foreach (var stock in availableStocks)
+                            {
+                                if (remaining <= 0) break;
+
+                                var stockQty = stock.Stockquantity ?? 0;
+                                if (stockQty <= 0) continue;
+
+                                var deduct = Math.Min(remaining, stockQty);
+
+                                stock.Stockquantity = stockQty - deduct;
+                                if ((stock.Stockquantity ?? 0) <= 0)
+                                    stock.Status = StockStatus.OUT_OF_STOCK;
+
+                                stockRepo.Update(stock);
+
+                                await movementRepo.AddAsync(new StockMovement
+                                {
+                                    Stockid = stock.Stockid,
+                                    Orderid = order.Orderid,
+                                    Quantity = -deduct,
+                                    Movementdate = DateTime.Now,
+                                    Note = $"Xuất kho sản phẩm con (ProductId={childPid}) cho đơn hàng #{order.Orderid}"
+                                });
+
+                                remaining -= deduct;
+                            }
+
+                            if (remaining > 0)
+                                throw new Exception($"Unexpected thiếu hàng khi xuất kho sản phẩm con (ProductId={childPid}).");
+                        }
+                    }
                 }
+                // Sản phẩm thường: trừ stock trực tiếp
+                else
+                {
+                    var need = qty;
 
-                if (remaining > 0)
-                    throw new Exception($"Unexpected thiếu hàng khi xuất kho (ProductId={pid}).");
+                    var availableStocks = (await stockRepo.FindAsync(
+                            s => s.Productid == pid && s.Status == StockStatus.ACTIVE
+                        ))
+                        .OrderBy(s => s.Productiondate) // FIFO
+                        .ToList();
+
+                    var remaining = need;
+
+                    foreach (var stock in availableStocks)
+                    {
+                        if (remaining <= 0) break;
+
+                        var stockQty = stock.Stockquantity ?? 0;
+                        if (stockQty <= 0) continue;
+
+                        var deduct = Math.Min(remaining, stockQty);
+
+                        stock.Stockquantity = stockQty - deduct;
+                        if ((stock.Stockquantity ?? 0) <= 0)
+                            stock.Status = StockStatus.OUT_OF_STOCK;
+
+                        stockRepo.Update(stock);
+
+                        await movementRepo.AddAsync(new StockMovement
+                        {
+                            Stockid = stock.Stockid,
+                            Orderid = order.Orderid,
+                            Quantity = -deduct,
+                            Movementdate = DateTime.Now,
+                            Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
+                        });
+
+                        remaining -= deduct;
+                    }
+
+                    if (remaining > 0)
+                        throw new Exception($"Unexpected thiếu hàng khi xuất kho (ProductId={pid}).");
+                }
             }
 
             // Status giữ nguyên CONFIRMED — Staff/Admin sẽ chuyển sang PROCESSING thủ công
-            //order.Note = string.IsNullOrWhiteSpace(order.Note)
-            //    ? $"[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
-            //    : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
-
             orderRepo.Update(order);
 
             await _uow.SaveAsync();
@@ -719,10 +803,6 @@ public class OrderService : IOrderService
 
             // nếu fail thì PAID_WAITING_STOCK
             order.Status = OrderStatus.PAID_WAITING_STOCK;
-            //order.Note = string.IsNullOrWhiteSpace(order.Note)
-            //    ? $"[PAID_WAITING_STOCK] {ex.Message}"
-            //    : $"{order.Note}\n[PAID_WAITING_STOCK] {ex.Message}";
-
             orderRepo.Update(order);
             await _uow.SaveAsync();
         }
