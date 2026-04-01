@@ -7,6 +7,7 @@ namespace TetGift.BLL.Dtos
     {
         public int Stockmovementid { get; set; }
         public int? Stockid { get; set; }
+        public int? Productid { get; set; }
         public int? Orderid { get; set; }
         public int? Quantity { get; set; }
         public DateTime? Movementdate { get; set; }

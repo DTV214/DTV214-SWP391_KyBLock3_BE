@@ -58,6 +58,13 @@ namespace TetGift.Controllers
             return Ok(result);
         }
 
+        [HttpGet("stocks/movements")]
+        public async Task<IActionResult> GetAllMovements()
+        {
+            var result = await _inventoryService.GetAllMovementsAsync();
+            return Ok(result);
+        }
+
         [HttpDelete("stocks/{id}")]
         public async Task<IActionResult> DeleteStock(int id)
         {
