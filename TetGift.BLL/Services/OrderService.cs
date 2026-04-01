@@ -703,7 +703,7 @@ public class OrderService : IOrderService
                     throw new Exception($"Unexpected thiếu hàng khi xuất kho (ProductId={pid}).");
             }
 
-            order.Status = OrderStatus.PROCESSING;
+            // Status giữ nguyên CONFIRMED — Staff/Admin sẽ chuyển sang PROCESSING thủ công
             //order.Note = string.IsNullOrWhiteSpace(order.Note)
             //    ? $"[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
             //    : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
