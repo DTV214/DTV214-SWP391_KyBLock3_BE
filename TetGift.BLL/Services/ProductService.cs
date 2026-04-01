@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -658,9 +658,9 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             // ── Replace ProductDetails (delete old, insert new) ──────────────────
             var detailRepo = _uow.GetRepository<ProductDetail>();
             var oldDetails = product.ProductDetailProductparents.ToList();
-            foreach (var oldDetail in oldDetails)
+            if (oldDetails.Any())
             {
-                await detailRepo.DeleteAsync(oldDetail);
+                await detailRepo.DeleteRangeAsync(oldDetails);
             }
 
             var newDetails = dto.ProductDetails.Select(d => new ProductDetail
@@ -1009,7 +1009,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         // Validate template exists and is ACTIVE or TEMPLATE status
         var template = await _uow.GetRepository<Product>().FindAsync(
             p => p.Productid == templateId
-                && (p.Status == ProductStatus.ACTIVE || p.Status == ProductStatus.TEMPLATE),
+                && (p.Status == ProductStatus.ACTIVE || p.Status == ProductStatus.TEMPLATE || p.Accountid == customerId),
             include: q => q
                 .Include(p => p.Config)
                     .ThenInclude(c => c.ConfigDetails)
