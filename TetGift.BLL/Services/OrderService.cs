@@ -188,6 +188,7 @@ public class OrderService : IOrderService
         var pageSize = queryParams.PageSize ?? 10;
         var orders = await query
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product).ThenInclude(p => p.ProductDetailProductparents)
+            .Include(o => o.Promotion)
             .Include(o => o.Feedbacks)
             .OrderByDescending(o => o.Orderdatetime)
             .Skip((pageNumber - 1) * pageSize)
@@ -553,31 +554,30 @@ public class OrderService : IOrderService
             if (order.Promotion.IsPercentage ?? false)
             {
                 discountValue = order.Totalprice ?? 0 * (order.Promotion.Discountvalue ?? 0 / 100);
+
+                if (discountValue > order.Promotion.MaxDiscountPrice)
+                {
+                    discountValue = order.Promotion.MaxDiscountPrice ?? 0;
+                }
             }
             else
             {
                 discountValue = order.Promotion.Discountvalue ?? 0;
             }
 
-            if (discountValue > order.Promotion.MaxDiscountPrice)
-            {
-                discountValue = order.Promotion.MaxDiscountPrice ?? 0;
-            }
+
 
             promotionCode = order.Promotion.Code ?? "";
         }
-
-        var finalPrice = totalPrice - discountValue;
-        if (finalPrice < 0) finalPrice = 0;
 
         return new OrderResponseDto
         {
             OrderId = order.Orderid,
             AccountId = order.Accountid ?? 0,
             OrderDateTime = order.Orderdatetime,
-            TotalPrice = order.Totalprice ?? totalPrice,
+            TotalPrice = totalPrice,
             DiscountValue = discountValue > 0 ? discountValue : null,
-            FinalPrice = finalPrice,
+            FinalPrice = order.Totalprice.Value,
             Status = order.Status,
             CustomerName = order.Customername,
             CustomerPhone = order.Customerphone,
