@@ -20,5 +20,8 @@ namespace TetGift.BLL.Interfaces
         Task DeleteStockAsync(int id);
 
         Task<IEnumerable<StockDto>> GetStocksByProductIdAsync(int productId);
+
+        // --- MỚI: Lấy lịch sử biến động kho ---
+        Task<IEnumerable<StockMovementDto>> GetAllMovementsAsync();
     }
 }
