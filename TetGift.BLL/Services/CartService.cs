@@ -345,7 +345,8 @@ public class CartService : ICartService
                         Price = price,
                         Quantity = quantity,
                         SubTotal = subTotal,
-                        ImageUrl = detail.Product.ImageUrl
+                        ImageUrl = detail.Product.ImageUrl,
+                        IsCustomItem = detail.Product.Configid != null && detail.Product.Configid != 0
                     });
 
                     totalPrice += subTotal;

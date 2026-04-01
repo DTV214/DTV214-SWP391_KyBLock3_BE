@@ -78,7 +78,7 @@ public class OrderService : IOrderService
                 ?? throw new Exception($"Sản phẩm '{item.ProductName}' không tồn tại.");
 
             // Xử lí sản phẩm giỏ
-            if (product.Configid == null || product.Configid == 0)
+            if (product.Configid != null && product.Configid != 0)
             {
                 var productDetails = product.ProductDetailProductparents;
                 foreach (var productItem in productDetails)
