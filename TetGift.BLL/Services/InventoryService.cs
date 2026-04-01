@@ -1,8 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -184,6 +180,22 @@ namespace TetGift.BLL.Services
                 .ToList();
         }
 
+        public async Task<IEnumerable<StockMovementDto>> GetMovementsByDetailAsync(int orderId, int productId)
+        {
+            var movementRepo = _unitOfWork.GetRepository<StockMovement>();
+            var stockRepo = _unitOfWork.GetRepository<Stock>();
+
+            var productStocks = await stockRepo.FindAsync(s => s.Productid == productId);
+
+            var stockIds = productStocks.Select(s => s.Stockid).ToList();
+            var movements = await movementRepo.FindAsync(
+                m => m.Orderid == orderId &&
+                stockIds.Contains(m.Stockid.Value)
+                );
+
+            return [.. movements.Select(m => MapMovement(m))];
+        }
+
         // --- HELPER METHODS ---
         private IEnumerable<StockDto> MapToDto(IEnumerable<Stock> stocks)
         {
@@ -210,6 +222,19 @@ namespace TetGift.BLL.Services
                 ExpiryDate = s.Expirydate.HasValue ? s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) : null,
                 ProductionDate = s.Productiondate.HasValue ? s.Productiondate.Value.ToDateTime(TimeOnly.MinValue) : null,
                 Status = s.Status ?? StockStatus.ACTIVE
+            };
+        }
+
+        private StockMovementDto MapMovement(StockMovement movement)
+        {
+            return new StockMovementDto()
+            {
+                Stockid = movement.Stockid,
+                Movementdate = movement.Movementdate,
+                Stockmovementid = movement.Stockmovementid,
+                Orderid = movement.Orderid,
+                Quantity = movement.Quantity,
+                Note = movement.Note
             };
         }
     }

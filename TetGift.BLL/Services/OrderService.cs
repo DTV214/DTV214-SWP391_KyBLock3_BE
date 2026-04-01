@@ -71,16 +71,42 @@ public class OrderService : IOrderService
 
         // 3. Validate Stock availability cho từng sản phẩm
         var stockRepo = _uow.GetRepository<Stock>();
+        var productRepo = _uow.GetRepository<Product>();
         foreach (var item in cart.Items)
         {
-            var stocks = await stockRepo.FindAsync(
-                s => s.Productid == item.ProductId && s.Status == StockStatus.ACTIVE
-            );
+            var product = await productRepo.GetByIdAsync(item.ProductId)
+                ?? throw new Exception($"Sản phẩm '{item.ProductName}' không tồn tại.");
 
-            var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
-            if (totalStock < item.Quantity)
+            // Xử lí sản phẩm giỏ
+            if (product.Configid == null || product.Configid == 0)
             {
-                throw new Exception($"Sản phẩm '{item.ProductName}' không đủ số lượng trong kho. Còn lại: {totalStock}, yêu cầu: {item.Quantity}");
+                var productDetails = product.ProductDetailProductparents;
+                foreach (var productItem in productDetails)
+                {
+                    var stocks = await stockRepo.FindAsync(
+                        s => s.Productid == productItem.Productid && s.Status == StockStatus.ACTIVE
+                        );
+
+                    var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+                    if (totalStock < productItem.Quantity)
+                    {
+                        throw new Exception($"Sản phẩm '{item.ProductName}' không đủ số lượng trong kho. Còn lại: {totalStock}, yêu cầu: {productItem.Quantity}");
+                    }
+                }
+            }
+
+            // Xử lí sản phẩm thường
+            else
+            {
+                var stocks = await stockRepo.FindAsync(
+                    s => s.Productid == item.ProductId && s.Status == StockStatus.ACTIVE
+                );
+
+                var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+                if (totalStock < item.Quantity)
+                {
+                    throw new Exception($"Sản phẩm '{item.ProductName}' không đủ số lượng trong kho. Còn lại: {totalStock}, yêu cầu: {item.Quantity}");
+                }
             }
         }
 

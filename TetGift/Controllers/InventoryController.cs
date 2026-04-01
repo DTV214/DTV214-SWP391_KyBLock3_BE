@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
@@ -63,5 +64,16 @@ namespace TetGift.Controllers
             await _inventoryService.DeleteStockAsync(id);
             return Ok(new { message = "Xóa lô hàng thành công." });
         }
+
+        [HttpGet("movements")]
+        [Authorize(Roles = "ADMIN,STAFF")]
+        public async Task<IActionResult> GetMovementsOfDetail(
+            [FromQuery] int orderId, [FromQuery] int productId
+            )
+        {
+            var result = await _inventoryService.GetMovementsByDetailAsync(orderId, productId);
+            return Ok(result);
+        }
+
     }
 }
