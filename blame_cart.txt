@@ -1,0 +1,342 @@
+﻿72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   1) using Microsoft.EntityFrameworkCore;
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700   2) using TetGift.BLL.Common.Constraint;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   3) using TetGift.BLL.Dtos;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   4) using TetGift.BLL.Interfaces;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   5) using TetGift.DAL.Entities;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   6) using TetGift.DAL.Interfaces;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   7) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   8) namespace TetGift.BLL.Services;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   9) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  10) public class CartService : ICartService
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  11) {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  12)     private readonly IUnitOfWork _uow;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  13)     private readonly IPromotionService _promotionService;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  14) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  15)     public CartService(IUnitOfWork uow, IPromotionService promotionService)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  16)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  17)         _uow = uow;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  18)         _promotionService = promotionService;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  19)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  20) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  21)     public async Task<CartResponseDto> GetCartByAccountIdAsync(int accountId)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  22)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  23)         var cartRepo = _uow.GetRepository<Cart>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  24)         var cart = await cartRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  25)             c => c.Accountid == accountId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  26)             include: q => q
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  27)                 .Include(c => c.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  28)                 .ThenInclude(cd => cd.Product)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  29)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  30) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  31)         if (cart == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  32)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  33)             // Tß║ío cart mß╗øi nß║┐u chã░a c├│
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  34)             var newCart = new Cart
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  35)             {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  36)                 Accountid = accountId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  37)                 Totalprice = 0
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  38)             };
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  39)             await cartRepo.AddAsync(newCart);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  40)             await _uow.SaveAsync();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  41) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  42)             return new CartResponseDto
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  43)             {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  44)                 CartId = newCart.Cartid,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  45)                 AccountId = accountId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  46)                 Items = new List<CartItemResponseDto>(),
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  47)                 TotalPrice = 0,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  48)                 FinalPrice = 0,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  49)                 ItemCount = 0
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  50)             };
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  51)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  52) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  53)         return MapToCartResponseDto(cart);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  54)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  55) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  56)     public async Task<CartResponseDto> AddItemAsync(int accountId, AddToCartRequest request)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  57)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  58)         // Validate Product
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  59)         var productRepo = _uow.GetRepository<Product>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  60)         var product = await productRepo.GetByIdAsync(request.ProductId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  61)         if (product == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  62)             throw new Exception("Sß║ún phß║®m kh├┤ng tß╗ôn tß║íi.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  63) 
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  64)         if (product.Status != ProductStatus.ACTIVE)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  65)             throw new Exception("Sß║ún phß║®m kh├┤ng khß║ú dß╗Ñng.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  66) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  67)         if (product.Price == null || product.Price <= 0)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  68)             throw new Exception("Gi├í sß║ún phß║®m kh├┤ng hß╗úp lß╗ç.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  69) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  70)         // Lß║Ñy hoß║Àc tß║ío Cart
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  71)         var cartRepo = _uow.GetRepository<Cart>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  72)         var cart = await cartRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  73)             c => c.Accountid == accountId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  74)             include: q => q.Include(c => c.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  75)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  76) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  77)         if (cart == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  78)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  79)             cart = new Cart
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  80)             {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  81)                 Accountid = accountId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  82)                 Totalprice = 0
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  83)             };
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  84)             await cartRepo.AddAsync(cart);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  85)             await _uow.SaveAsync();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  86)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  87) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  88)         // Kiß╗âm tra sß║ún phß║®m ─æ├ú c├│ trong cart chã░a
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  89)         var cartDetailRepo = _uow.GetRepository<CartDetail>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  90)         var existingDetail = await cartDetailRepo.FindAsync(
+b5fd629b (<khanhtrantuc2004@gmail.com> 2026-01-31 23:58:43 +0700  91)             cd => cd.Cartid == cart.Cartid && cd.Productid == request.ProductId,
+b5fd629b (<khanhtrantuc2004@gmail.com> 2026-01-31 23:58:43 +0700  92)             include: null
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  93)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  94) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  95)         if (existingDetail != null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  96)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  97)             // Cß╗Öng dß╗ôn quantity
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  98)             existingDetail.Quantity = (existingDetail.Quantity ?? 0) + request.Quantity;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  99)             cartDetailRepo.Update(existingDetail);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 100)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 101)         else
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 102)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 103)             // Tß║ío mß╗øi CartDetail
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 104)             var newDetail = new CartDetail
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 105)             {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 106)                 Cartid = cart.Cartid,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 107)                 Productid = request.ProductId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 108)                 Quantity = request.Quantity
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 109)             };
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 110)             await cartDetailRepo.AddAsync(newDetail);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 111)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 112) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 113)         // T├¡nh lß║íi Totalprice
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 114)         await RecalculateCartTotalAsync(cart.Cartid);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 115)         await _uow.SaveAsync();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 116) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 117)         // Load lß║íi cart vß╗øi ─æß║ºy ─æß╗º th├┤ng tin
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 118)         var updatedCart = await cartRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 119)             c => c.Cartid == cart.Cartid,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 120)             include: q => q
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 121)                 .Include(c => c.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 122)                 .ThenInclude(cd => cd.Product)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 123)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 124) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 125)         return MapToCartResponseDto(updatedCart!);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 126)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 127) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 128)     public async Task<CartResponseDto> UpdateItemAsync(int cartDetailId, UpdateCartItemRequest request)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 129)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 130)         var cartDetailRepo = _uow.GetRepository<CartDetail>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 131)         var cartDetail = await cartDetailRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 132)             cd => cd.Cartdetailid == cartDetailId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 133)             include: q => q.Include(cd => cd.Cart)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 134)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 135) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 136)         if (cartDetail == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 137)             throw new Exception("Kh├┤ng t├¼m thß║Ñy sß║ún phß║®m trong giß╗Å h├áng.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 138) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 139)         // Cß║¡p nhß║¡t quantity
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 140)         cartDetail.Quantity = request.Quantity;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 141)         cartDetailRepo.Update(cartDetail);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 142) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 143)         // T├¡nh lß║íi Totalprice
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 144)         await RecalculateCartTotalAsync(cartDetail.Cart!.Cartid);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 145)         await _uow.SaveAsync();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 146) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 147)         // Load lß║íi cart vß╗øi ─æß║ºy ─æß╗º th├┤ng tin
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 148)         var cartRepo = _uow.GetRepository<Cart>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 149)         var cart = await cartRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 150)             c => c.Cartid == cartDetail.Cart.Cartid,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 151)             include: q => q
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 152)                 .Include(c => c.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 153)                 .ThenInclude(cd => cd.Product)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 154)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 155) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 156)         return MapToCartResponseDto(cart!);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 157)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 158) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 159)     public async Task ValidateCartDetailOwnershipAsync(int cartDetailId, int accountId)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 160)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 161)         var cartDetailRepo = _uow.GetRepository<CartDetail>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 162)         var cartDetail = await cartDetailRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 163)             cd => cd.Cartdetailid == cartDetailId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 164)             include: q => q.Include(cd => cd.Cart)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 165)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 166) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 167)         if (cartDetail == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 168)             throw new Exception("Kh├┤ng t├¼m thß║Ñy sß║ún phß║®m trong giß╗Å h├áng.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 169) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 170)         if (cartDetail.Cart?.Accountid != accountId)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 171)             throw new UnauthorizedAccessException("Bß║ín kh├┤ng c├│ quyß╗ün thao t├íc vß╗øi item n├áy.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 172)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 173) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 174)     public async Task<CartResponseDto> RemoveItemAsync(int cartDetailId)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 175)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 176)         var cartDetailRepo = _uow.GetRepository<CartDetail>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 177)         var cartDetail = await cartDetailRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 178)             cd => cd.Cartdetailid == cartDetailId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 179)             include: q => q.Include(cd => cd.Cart)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 180)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 181) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 182)         if (cartDetail == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 183)             throw new Exception("Kh├┤ng t├¼m thß║Ñy sß║ún phß║®m trong giß╗Å h├áng.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 184) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 185)         var cartId = cartDetail.Cart!.Cartid;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 186)         cartDetailRepo.Delete(cartDetail);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 187) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 188)         // T├¡nh lß║íi Totalprice
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 189)         await RecalculateCartTotalAsync(cartId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 190)         await _uow.SaveAsync();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 191) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 192)         // Load lß║íi cart vß╗øi ─æß║ºy ─æß╗º th├┤ng tin
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 193)         var cartRepo = _uow.GetRepository<Cart>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 194)         var cart = await cartRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 195)             c => c.Cartid == cartId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 196)             include: q => q
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 197)                 .Include(c => c.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 198)                 .ThenInclude(cd => cd.Product)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 199)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 200) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 201)         return MapToCartResponseDto(cart!);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 202)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 203) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 204)     public async Task<CartResponseDto> ApplyPromotionAsync(int accountId, ApplyPromotionRequest request)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 205)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 206)         // Lß║Ñy cart tß╗½ database
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 207)         var cartRepo = _uow.GetRepository<Cart>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 208)         var cart = await cartRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 209)             c => c.Accountid == accountId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 210)             include: q => q
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 211)                 .Include(c => c.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 212)                 .ThenInclude(cd => cd.Product)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 213)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 214) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 215)         if (cart == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 216)             throw new Exception("Giß╗Å h├áng kh├┤ng tß╗ôn tß║íi.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 217) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 218)         var cartDto = MapToCartResponseDto(cart);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 219)         if (cartDto.ItemCount == 0)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 220)             throw new Exception("Giß╗Å h├áng trß╗æng, kh├┤ng thß╗â ├íp dß╗Ñng m├ú giß║úm gi├í.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 221) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 222)         // Validate promotion code bß║▒ng c├ích sß╗¡ dß╗Ñng PromotionService (kß║┐ thß╗½a code c┼®)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 223)         var allPromotions = await _promotionService.GetAllAsync();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 224)         var promotion = allPromotions.FirstOrDefault(p => 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 225)             p.Code.Equals(request.PromotionCode, StringComparison.OrdinalIgnoreCase) && 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 226)             p.IsActive);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 227) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 228)         if (promotion == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 229)             throw new Exception("M├ú giß║úm gi├í kh├┤ng hß╗úp lß╗ç hoß║Àc ─æ├ú hß║┐t hß║ín.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 230) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 231)         // T├¡nh final price vß╗øi discount
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 232)         var finalPrice = cartDto.TotalPrice - promotion.DiscountValue;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 233)         if (finalPrice < 0) finalPrice = 0;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 234) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 235)         cartDto.DiscountValue = promotion.DiscountValue;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 236)         cartDto.FinalPrice = finalPrice;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 237)         cartDto.PromotionCode = promotion.Code;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 238) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 239)         return cartDto;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 240)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 241) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 242)     public async Task<int> GetCartItemCountAsync(int accountId)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 243)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 244)         var cartRepo = _uow.GetRepository<Cart>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 245)         var cart = await cartRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 246)             c => c.Accountid == accountId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 247)             include: q => q.Include(c => c.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 248)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 249) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 250)         if (cart == null || cart.CartDetails == null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 251)             return 0;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 252) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 253)         return cart.CartDetails.Count;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 254)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 255) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 256)     public async Task ClearCartAsync(int accountId)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 257)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 258)         var cartRepo = _uow.GetRepository<Cart>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 259)         var cart = await cartRepo.FindAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 260)             c => c.Accountid == accountId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 261)             include: q => q.Include(c => c.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 262)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 263) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 264)         if (cart != null && cart.CartDetails != null && cart.CartDetails.Any())
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 265)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 266)             var cartDetailRepo = _uow.GetRepository<CartDetail>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 267)             cartDetailRepo.DeleteRange(cart.CartDetails);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 268)             cart.Totalprice = 0;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 269)             cartRepo.Update(cart);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 270)             await _uow.SaveAsync();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 271)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 272)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 273) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 274)     private async Task RecalculateCartTotalAsync(int cartId)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 275)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 276)         var cartDetailRepo = _uow.GetRepository<CartDetail>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 277)         var cartDetails = await cartDetailRepo.GetAllAsync(
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 278)             cd => cd.Cartid == cartId,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 279)             include: q => q.Include(cd => cd.Product)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 280)         );
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 281) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 282)         decimal total = 0;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 283)         foreach (var detail in cartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 284)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 285)             if (detail.Product != null && detail.Product.Price.HasValue && detail.Quantity.HasValue)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 286)             {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 287)                 total += detail.Product.Price.Value * detail.Quantity.Value;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 288)             }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 289)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 290) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 291)         var cartRepo = _uow.GetRepository<Cart>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 292)         var cart = await cartRepo.GetByIdAsync(cartId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 293)         if (cart != null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 294)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 295)             cart.Totalprice = total;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 296)             cartRepo.Update(cart);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 297)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 298)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 299) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 300)     private CartResponseDto MapToCartResponseDto(Cart cart)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 301)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 302)         var items = new List<CartItemResponseDto>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 303)         decimal totalPrice = 0;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 304) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 305)         if (cart.CartDetails != null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 306)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 307)             foreach (var detail in cart.CartDetails)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 308)             {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 309)                 if (detail.Product != null)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 310)                 {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 311)                     var price = detail.Product.Price ?? 0;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 312)                     var quantity = detail.Quantity ?? 0;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 313)                     var subTotal = price * quantity;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 314) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 315)                     items.Add(new CartItemResponseDto
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 316)                     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 317)                         CartDetailId = detail.Cartdetailid,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 318)                         ProductId = detail.Product.Productid,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 319)                         ProductName = detail.Product.Productname,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 320)                         Sku = detail.Product.Sku,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 321)                         Price = price,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 322)                         Quantity = quantity,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 323)                         SubTotal = subTotal,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 324)                         ImageUrl = detail.Product.ImageUrl
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 325)                     });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 326) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 327)                     totalPrice += subTotal;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 328)                 }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 329)             }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 330)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 331) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 332)         return new CartResponseDto
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 333)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 334)             CartId = cart.Cartid,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 335)             AccountId = cart.Accountid ?? 0,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 336)             Items = items,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 337)             TotalPrice = totalPrice,
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 338)             FinalPrice = totalPrice, // Sß║¢ ─æã░ß╗úc cß║¡p nhß║¡t khi apply promotion
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 339)             ItemCount = items.Count
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 340)         };
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 341)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 342) }

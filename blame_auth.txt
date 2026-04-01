@@ -1,0 +1,183 @@
+﻿^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   1) ´╗┐using Microsoft.Extensions.Configuration;
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700   2) using TetGift.BLL.Common.Constraint;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   3) using TetGift.BLL.Common.Securities;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   4) using TetGift.BLL.Dtos;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   5) using TetGift.BLL.Interfaces;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   6) using TetGift.DAL.Entities;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   7) using TetGift.DAL.Interfaces;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   8) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   9) namespace TetGift.BLL.Services
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  10) {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  11)     public class AuthService : IAuthService
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  12)     {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  13)         private readonly IUnitOfWork _uow;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  14)         private readonly IConfiguration _cfg;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  15)         private readonly IEmailSender _email;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  16)         private readonly IEmailTemplateRenderer _tpl;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  17)         private readonly IJwtTokenGenerator _jwt;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  18) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  19)         public AuthService(
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  20)             IUnitOfWork uow,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  21)             IConfiguration cfg,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  22)             IEmailSender email,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  23)             IEmailTemplateRenderer tpl,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  24)             IJwtTokenGenerator jwt)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  25)         {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  26)             _uow = uow;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  27)             _cfg = cfg;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  28)             _email = email;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  29)             _tpl = tpl;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  30)             _jwt = jwt;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  31)         }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  32) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  33)         public async Task RequestRegisterOtpAsync(RegisterRequest req)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  34)         {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  35)             var username = (req.Username ?? "").Trim();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  36)             var email = (req.Email ?? "").Trim().ToLowerInvariant();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  37)             var password = req.Password ?? "";
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  38) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  39)             if (string.IsNullOrWhiteSpace(username) ||
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  40)                 string.IsNullOrWhiteSpace(email) ||
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  41)                 string.IsNullOrWhiteSpace(password))
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  42)                 throw new Exception("Username/Email/Password is required.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  43) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  44)             var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  45)             var otpMinutes = int.TryParse(_cfg["Otp:ExpireMinutes"], out var m) ? m : 5;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  46) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  47)             var repo = _uow.GetRepository<Account>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  48) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  49)             // Kh├┤ng d├╣ng FirstOrDefaultAsync ─æß╗â BLL kh├┤ng cß║ºn EF Core package
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  50)             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  51) 
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  52)             if (acc != null && acc.Status == AccountStatus.ACTIVE)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  53)                 throw new Exception("Account already active.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  54) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  55)             if (acc == null)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  56)             {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  57)                 acc = new Account
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  58)                 {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  59)                     Username = username,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  60)                     Password = PasswordHasher.Hash(password),
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  61)                     Email = email,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  62)                     Fullname = req.Fullname,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  63)                     Phone = req.Phone,
+a58188e2 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:21:27 +0700  64)                     Role = UserRole.CUSTOMER,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  65)                     Status = AccountStatus.PENDING
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  66)                 };
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  67) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  68)                 await repo.AddAsync(acc);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  69)             }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  70)             else
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  71)             {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  72)                 // Resend OTP cho account Pending
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  73)                 acc.Email = email;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  74)                 acc.Fullname = req.Fullname ?? acc.Fullname;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  75)                 acc.Phone = req.Phone ?? acc.Phone;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  76)                 acc.Password = PasswordHasher.Hash(password);
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  77)                 acc.Status = AccountStatus.PENDING;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  78) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  79)                 repo.Update(acc);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  80)             }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  81) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  82)             var otp = OtpHelper.Generate6();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  83)             acc.RegisterOtpHash = OtpHelper.HashOtp(otp, otpSecret);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  84)             acc.RegisterOtpExpiresAt = DateTime.Now.AddMinutes(otpMinutes);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  85)             acc.RegisterOtpFailCount = 0;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  86)             acc.RegisterOtpVerifiedAt = null;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  87) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  88)             await _uow.SaveAsync();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  89) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  90)             var html = _tpl.RenderOtp(otp, otpMinutes);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  91)             await _email.SendAsync(email, "TetGift - OTP x├íc thß╗▒c ─æ─âng k├¢", html);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  92)         }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  93) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  94)         public async Task<AuthResultDto> VerifyRegisterOtpAsync(VerifyOtpRequest req)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  95)         {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  96)             var username = (req.Username ?? "").Trim();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  97)             var otp = (req.Otp ?? "").Trim();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  98) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  99)             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(otp))
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 100)                 throw new Exception("Username/OTP is required.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 101) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 102)             var otpSecret = _cfg["Otp:Secret"] ?? throw new Exception("Missing config: Otp:Secret");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 103)             var maxFail = int.TryParse(_cfg["Otp:MaxFail"], out var mf) ? mf : 5;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 104) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 105)             var repo = _uow.GetRepository<Account>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 106)             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 107) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 108)             if (acc == null) throw new Exception("Account not found.");
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 109)             if (acc.Status == AccountStatus.ACTIVE)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 110)                 throw new Exception("Account already verified.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 111) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 112)             if (acc.RegisterOtpExpiresAt == null || acc.RegisterOtpExpiresAt < DateTime.Now)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 113)                 throw new Exception("OTP expired.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 114) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 115)             if (acc.RegisterOtpFailCount >= maxFail)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 116)                 throw new Exception("Too many failed OTP attempts.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 117) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 118)             if (string.IsNullOrWhiteSpace(acc.RegisterOtpHash))
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 119)                 throw new Exception("OTP not requested.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 120) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 121)             var inputHash = OtpHelper.HashOtp(otp, otpSecret);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 122)             var ok = OtpHelper.FixedEqualsBase64(acc.RegisterOtpHash, inputHash);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 123) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 124)             if (!ok)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 125)             {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 126)                 acc.RegisterOtpFailCount++;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 127)                 repo.Update(acc);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 128)                 await _uow.SaveAsync();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 129)                 throw new Exception("OTP invalid.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 130)             }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 131) 
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 132)             acc.Status = AccountStatus.ACTIVE;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 133)             acc.RegisterOtpVerifiedAt = DateTime.Now;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 134)             acc.RegisterOtpHash = null;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 135)             acc.RegisterOtpExpiresAt = null;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 136)             acc.RegisterOtpFailCount = 0;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 137) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 138)             repo.Update(acc);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 139)             await _uow.SaveAsync();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 140) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 141)             var token = _jwt.Generate(acc);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 142) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 143)             return new AuthResultDto
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 144)             {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 145)                 Token = token,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 146)                 AccountId = acc.Accountid,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 147)                 Username = acc.Username,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 148)                 Email = acc.Email,
+a58188e2 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:21:27 +0700 149)                 Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper()
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 150)             };
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 151)         }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 152) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 153)         public async Task<AuthResultDto> LoginAsync(LoginRequest req)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 154)         {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 155)             var username = (req.Username ?? "").Trim();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 156)             var password = req.Password ?? "";
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 157) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 158)             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 159)                 throw new Exception("Username/Password is required.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 160) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 161)             var repo = _uow.GetRepository<Account>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 162)             var acc = (await repo.FindAsync(a => a.Username == username)).FirstOrDefault();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 163) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 164)             if (acc == null) throw new Exception("Invalid credentials.");
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 165)             if (acc.Status != AccountStatus.ACTIVE)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 166)                 throw new Exception("Account not verified.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 167) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 168)             if (!PasswordHasher.Verify(password, acc.Password))
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 169)                 throw new Exception("Invalid credentials.");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 170) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 171)             var token = _jwt.Generate(acc);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 172) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 173)             return new AuthResultDto
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 174)             {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 175)                 Token = token,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 176)                 AccountId = acc.Accountid,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 177)                 Username = acc.Username,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 178)                 Email = acc.Email,
+a58188e2 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:21:27 +0700 179)                 Role = (acc.Role ?? UserRole.CUSTOMER).ToUpper()
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 180)             };
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 181)         }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 182)     }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 183) }

@@ -1,0 +1,112 @@
+﻿7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   1) using Microsoft.AspNetCore.Authorization;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   2) using Microsoft.AspNetCore.Mvc;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   3) using TetGift.BLL.Dtos;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   4) using TetGift.BLL.Interfaces;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   5) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   6) namespace TetGift.Controllers;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   7) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   8) [ApiController]
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700   9) [Route("api/dashboards")]
+c4cfbf19 (<khanhtrantuc2004@gmail.com> 2026-02-01 13:47:51 +0700  10) [Authorize(Roles = "ADMIN")]
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  11) public class DashboardController : ControllerBase
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  12) {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  13)     private readonly IDashboardService _dashboardService;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  14) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  15)     public DashboardController(IDashboardService dashboardService)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  16)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  17)         _dashboardService = dashboardService;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  18)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  19) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  20)     /// <summary>
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  21)     /// Lß║Ñy dß╗» liß╗çu revenue theo khoß║úng thß╗Øi gian (day/month/year)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  22)     /// </summary>
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  23)     [HttpGet("revenue")]
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  24)     public async Task<IActionResult> GetRevenue([FromQuery] TimeRangeRequest request)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  25)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  26)         try
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  27)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  28)             // Set default period if not provided
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  29)             if (string.IsNullOrWhiteSpace(request.Period))
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  30)                 request.Period = "day";
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  31) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  32)             // Set default date range if not provided (last 30 days)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  33)             if (!request.StartDate.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  34)                 request.StartDate = DateTime.UtcNow.AddHours(7).AddDays(-30);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  35)             if (!request.EndDate.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  36)                 request.EndDate = DateTime.UtcNow.AddHours(7);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  37) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  38)             var result = await _dashboardService.GetRevenueByTimeRangeAsync(request);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  39)             return Ok(result);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  40)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  41)         catch (Exception ex)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  42)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  43)             return BadRequest(new { message = ex.Message });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  44)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  45)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  46) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  47)     /// <summary>
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  48)     /// Lß║Ñy thß╗æng k├¬ k├¬nh thanh to├ín
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  49)     /// </summary>
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  50)     [HttpGet("payment-channels")]
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  51)     public async Task<IActionResult> GetPaymentChannels([FromQuery] TimeRangeRequest? request = null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  52)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  53)         try
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  54)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  55)             var result = await _dashboardService.GetPaymentChannelStatisticsAsync(request);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  56)             return Ok(result);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  57)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  58)         catch (Exception ex)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  59)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  60)             return BadRequest(new { message = ex.Message });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  61)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  62)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  63) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  64)     /// <summary>
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  65)     /// Lß║Ñy danh s├ích giß╗Å h├áng bß╗Å dß╗ƒ
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  66)     /// </summary>
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  67)     [HttpGet("abandoned-carts")]
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  68)     public async Task<IActionResult> GetAbandonedCarts([FromQuery] int? days = null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  69)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  70)         try
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  71)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  72)             var result = await _dashboardService.GetAbandonedCartsAsync(days);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  73)             return Ok(result);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  74)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  75)         catch (Exception ex)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  76)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  77)             return BadRequest(new { message = ex.Message });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  78)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  79)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  80) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  81)     /// <summary>
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  82)     /// Lß║Ñy tß╗òng hß╗úp dashboard (tß║Ñt cß║ú metrics)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  83)     /// </summary>
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  84)     [HttpGet("summary")]
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  85)     public async Task<IActionResult> GetSummary([FromQuery] TimeRangeRequest? request = null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  86)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  87)         try
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  88)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  89)             // Set default to current month if not provided
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  90)             if (request == null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  91)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  92)                 request = new TimeRangeRequest
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  93)                 {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  94)                     Period = "month",
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  95)                     StartDate = new DateTime(DateTime.UtcNow.AddHours(7).Year, DateTime.UtcNow.AddHours(7).Month, 1),
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  96)                     EndDate = DateTime.UtcNow.AddHours(7)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  97)                 };
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  98)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  99)             else if (string.IsNullOrWhiteSpace(request.Period))
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 100)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 101)                 request.Period = "month";
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 102)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 103) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 104)             var result = await _dashboardService.GetDashboardSummaryAsync(request);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 105)             return Ok(result);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 106)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 107)         catch (Exception ex)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 108)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 109)             return BadRequest(new { message = ex.Message });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 110)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 111)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 112) }

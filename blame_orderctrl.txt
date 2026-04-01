@@ -1,0 +1,185 @@
+﻿3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700   1) using System.Security.Claims;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   2) using Microsoft.AspNetCore.Authorization;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   3) using Microsoft.AspNetCore.Mvc;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   4) using TetGift.BLL.Dtos;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   5) using TetGift.BLL.Interfaces;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   6) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   7) namespace TetGift.Controllers;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   8) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   9) [ApiController]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  10) [Route("api/orders")]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  11) [Authorize]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  12) public class OrderController : ControllerBase
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  13) {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  14)     private readonly IOrderService _orderService;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  15) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  16)     public OrderController(IOrderService orderService)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  17)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  18)         _orderService = orderService;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  19)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  20) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  21)     private int GetCurrentAccountId()
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  22)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  23)         var accountIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  24)         if (string.IsNullOrEmpty(accountIdClaim) || !int.TryParse(accountIdClaim, out var accountId))
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  25)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  26)             throw new UnauthorizedAccessException("Kh├┤ng thß╗â x├íc ─æß╗ïnh ngã░ß╗Øi d├╣ng.");
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  27)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  28)         return accountId;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  29)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  30) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  31)     private string GetCurrentUserRole()
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  32)     {
+a58188e2 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:21:27 +0700  33)         var role = User.FindFirst(ClaimTypes.Role)?.Value ?? TetGift.BLL.Common.Constraint.UserRole.CUSTOMER;
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  34)         return role.ToUpper(); // Normalize to uppercase
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  35)     }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  36) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  37)     // ========== CUSTOMER ENDPOINTS ==========
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  38) 
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700  39)     [HttpPost()]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  40)     public async Task<IActionResult> CreateOrderFromCart([FromBody] CreateOrderRequest request)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  41)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  42)         try
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  43)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  44)             var accountId = GetCurrentAccountId();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  45)             var result = await _orderService.CreateOrderFromCartAsync(accountId, request);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  46)             return Ok(result);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  47)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  48)         catch (Exception ex)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  49)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  50)             return BadRequest(new { message = ex.Message });
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  51)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  52)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  53) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  54)     [HttpGet("my-orders")]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  55)     public async Task<IActionResult> GetMyOrders()
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  56)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  57)         try
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  58)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  59)             var accountId = GetCurrentAccountId();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  60)             var result = await _orderService.GetOrdersByAccountIdAsync(accountId);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  61)             return Ok(result);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  62)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  63)         catch (Exception ex)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  64)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  65)             return BadRequest(new { message = ex.Message });
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  66)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  67)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  68) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  69)     [HttpGet("{orderId}")]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  70)     public async Task<IActionResult> GetOrderById(int orderId)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  71)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  72)         try
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  73)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  74)             var accountId = GetCurrentAccountId();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  75)             var result = await _orderService.GetOrderByIdAsync(orderId, accountId);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  76)             return Ok(result);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  77)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  78)         catch (Exception ex)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  79)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  80)             return BadRequest(new { message = ex.Message });
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  81)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  82)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  83) 
+73fd6627 (<nthanhn2491@gmail.com>      2026-02-24 20:19:49 +0700  84)     [HttpDelete("{orderId}/cancel")]
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  85)     public async Task<IActionResult> CancelOrder(int orderId)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  86)     {
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  87)         try
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  88)         {
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  89)             var accountId = GetCurrentAccountId();
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  90)             var userRole = GetCurrentUserRole();
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  91)             var result = await _orderService.CancelOrderAsync(orderId, accountId, userRole);
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  92)             return Ok(result);
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  93)         }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  94)         catch (Exception ex)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  95)         {
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  96)             return BadRequest(new { message = ex.Message });
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  97)         }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  98)     }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700  99) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 100)     [HttpPut("{orderId}/shipping-info")]
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 101)     public async Task<IActionResult> UpdateShippingInfo(int orderId, [FromBody] UpdateOrderShippingRequest request)
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 102)     {
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 103)         try
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 104)         {
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 105)             var accountId = GetCurrentAccountId();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 106)             var userRole = GetCurrentUserRole();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 107)             var result = await _orderService.UpdateOrderShippingInfoAsync(orderId, accountId, userRole, request);
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 108)             return Ok(result);
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 109)         }
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 110)         catch (Exception ex)
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 111)         {
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 112)             return BadRequest(new { message = ex.Message });
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 113)         }
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 114)     }
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 115) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 116)     // ========== ADMIN ENDPOINTS ==========
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 117) 
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700 118)     [HttpGet()]
+c4cfbf19 (<khanhtrantuc2004@gmail.com> 2026-02-01 13:47:51 +0700 119)     [Authorize(Roles = "ADMIN")]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 120)     public async Task<IActionResult> GetAllOrders([FromQuery] string? status = null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 121)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 122)         try
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 123)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 124)             var result = await _orderService.GetAllOrdersAsync(status);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 125)             return Ok(result);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 126)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 127)         catch (Exception ex)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 128)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 129)             return BadRequest(new { message = ex.Message });
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 130)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 131)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 132) 
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700 133)     [HttpGet("/{orderId}")]
+c4cfbf19 (<khanhtrantuc2004@gmail.com> 2026-02-01 13:47:51 +0700 134)     [Authorize(Roles = "ADMIN")]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 135)     public async Task<IActionResult> GetOrderByIdForAdmin(int orderId)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 136)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 137)         try
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 138)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 139)             var result = await _orderService.GetOrderByIdForAdminAsync(orderId);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 140)             return Ok(result);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 141)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 142)         catch (Exception ex)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 143)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 144)             return BadRequest(new { message = ex.Message });
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 145)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 146)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 147) 
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700 148)     [HttpPut("/{orderId}/status")]
+c4cfbf19 (<khanhtrantuc2004@gmail.com> 2026-02-01 13:47:51 +0700 149)     [Authorize(Roles = "ADMIN")]
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 150)     public async Task<IActionResult> UpdateOrderStatus(int orderId, [FromBody] UpdateOrderStatusRequest request)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 151)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 152)         try
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 153)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 154)             var result = await _orderService.UpdateOrderStatusAsync(orderId, request);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 155)             return Ok(result);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 156)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 157)         catch (Exception ex)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 158)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 159)             return BadRequest(new { message = ex.Message });
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 160)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 161)     }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 162) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 163)     [HttpPost("{orderId:int}/allocate-stock")]
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 164)     [Authorize(Roles = "ADMIN,STAFF")]
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 165)     public async Task<IActionResult> AllocateStock(int orderId)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 166)     {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 167)         try
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 168)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 169)             var accountIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 170)             if (string.IsNullOrEmpty(accountIdClaim) || !int.TryParse(accountIdClaim, out var actorId))
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 171)                 return Unauthorized(new { message = "Kh├┤ng thß╗â x├íc ─æß╗ïnh ngã░ß╗Øi d├╣ng." });
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 172) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 173)             var role = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value ?? "";
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 174) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 175)             await _orderService.ForceAllocateStockAsync(orderId, actorId, role);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 176) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 177)             return Ok(new { message = "Allocate stock executed." });
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 178)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 179)         catch (Exception ex)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 180)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 181)             return BadRequest(new { message = ex.Message });
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 182)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 183)     }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 184) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 185) }

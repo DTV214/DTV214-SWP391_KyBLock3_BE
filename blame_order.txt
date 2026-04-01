@@ -1,0 +1,799 @@
+﻿0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   1) using Microsoft.EntityFrameworkCore;
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700   2) using TetGift.BLL.Common.Constraint;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   3) using TetGift.BLL.Dtos;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   4) using TetGift.BLL.Interfaces;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   5) using TetGift.DAL.Entities;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   6) using TetGift.DAL.Interfaces;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   7) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   8) namespace TetGift.BLL.Services;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700   9) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  10) public class OrderService : IOrderService
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  11) {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  12)     private readonly IUnitOfWork _uow;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  13)     private readonly ICartService _cartService;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  14)     private readonly IPromotionService _promotionService;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  15)     private readonly IWalletService _walletService;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  16) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  17)     public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IWalletService walletService)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  18)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  19)         _uow = uow;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  20)         _cartService = cartService;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  21)         _promotionService = promotionService;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  22)         _walletService = walletService;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  23)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  24) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  25)     public async Task<OrderResponseDto> CreateOrderFromCartAsync(int accountId, CreateOrderRequest request)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  26)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  27)         // 1. Lß║Ñy Cart (sß╗¡ dß╗Ñng ICartService - kß║┐ thß╗½a code c┼®)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  28)         var cart = await _cartService.GetCartByAccountIdAsync(accountId);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  29)         if (cart.ItemCount == 0)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  30)             throw new Exception("Giß╗Å h├áng trß╗æng, kh├┤ng thß╗â tß║ío ─æãín h├áng.");
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  31) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  32)         // 2. Validate v├á apply Promotion nß║┐u c├│
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  33)         int? promotionId = null;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  34)         decimal discountValue = 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  35)         if (!string.IsNullOrWhiteSpace(request.PromotionCode))
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  36)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  37)             try
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  38)             {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  39)                 var promotionResult = await _cartService.ApplyPromotionAsync(accountId, new ApplyPromotionRequest
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  40)                 {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  41)                     PromotionCode = request.PromotionCode
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  42)                 });
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  43)                 discountValue = promotionResult.DiscountValue ?? 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  44) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  45)                 // Lß║Ñy promotionId tß╗½ promotion service
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  46)                 var allPromotions = await _promotionService.GetAllAsync();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700  47)                 var promotion = allPromotions.FirstOrDefault(p =>
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  48)                     p.Code.Equals(request.PromotionCode, StringComparison.OrdinalIgnoreCase));
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  49)                 if (promotion != null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  50)                     promotionId = promotion.PromotionId;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  51)             }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  52)             catch
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  53)             {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  54)                 throw new Exception("M├ú giß║úm gi├í kh├┤ng hß╗úp lß╗ç hoß║Àc ─æ├ú hß║┐t hß║ín.");
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  55)             }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  56)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  57) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  58)         // 3. Validate Stock availability cho tß╗½ng sß║ún phß║®m
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  59)         var stockRepo = _uow.GetRepository<Stock>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  60)         foreach (var item in cart.Items)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  61)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  62)             var stocks = await stockRepo.FindAsync(
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  63)                 s => s.Productid == item.ProductId && s.Status == StockStatus.ACTIVE
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  64)             );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  65) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  66)             var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  67)             if (totalStock < item.Quantity)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  68)             {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  69)                 throw new Exception($"Sß║ún phß║®m '{item.ProductName}' kh├┤ng ─æß╗º sß╗æ lã░ß╗úng trong kho. C├▓n lß║íi: {totalStock}, y├¬u cß║ºu: {item.Quantity}");
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  70)             }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  71)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  72) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  73)         // 4. Tß║ío Order
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  74)         var orderRepo = _uow.GetRepository<Order>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  75)         var order = new Order
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  76)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  77)             Accountid = accountId,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  78)             Promotionid = promotionId,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  79)             Totalprice = cart.TotalPrice - discountValue,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  80)             Status = OrderStatus.PENDING,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  81)             Customername = request.CustomerName,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  82)             Customerphone = request.CustomerPhone,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  83)             Customeremail = request.CustomerEmail,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  84)             Customeraddress = request.CustomerAddress,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  85)             Note = request.Note,
+12afc877 (<nthanhn2491@gmail.com>      2026-02-25 08:25:53 +0700  86)             Orderdatetime = DateTime.Now
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  87)         };
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  88)         await orderRepo.AddAsync(order);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  89)         await _uow.SaveAsync();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  90) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  91)         // 5. Tß║ío OrderDetails v├á cß║¡p nhß║¡t Stock
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  92)         var orderDetailRepo = _uow.GetRepository<OrderDetail>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  93)         var stockMovementRepo = _uow.GetRepository<StockMovement>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  94) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  95)         foreach (var cartItem in cart.Items)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  96)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  97)             // Tß║ío OrderDetail
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  98)             var orderDetail = new OrderDetail
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700  99)             {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 100)                 Orderid = order.Orderid,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 101)                 Productid = cartItem.ProductId,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 102)                 Quantity = cartItem.Quantity,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 103)                 Amount = cartItem.SubTotal
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 104)             };
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 105)             await orderDetailRepo.AddAsync(orderDetail);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 106) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 107)             // Cß║¡p nhß║¡t Stock (FIFO - First In First Out)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 108)             var remainingQuantity = cartItem.Quantity ?? 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 109)             var availableStocks = await stockRepo.FindAsync(
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 110)                 s => s.Productid == cartItem.ProductId && s.Status == StockStatus.ACTIVE
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 111)             );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 112) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 113)             foreach (var stock in availableStocks.OrderBy(s => s.Productiondate))
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 114)             {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 115)                 if (remainingQuantity <= 0) break;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 116) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 117)                 var stockQuantity = stock.Stockquantity ?? 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 118)                 var quantityToDeduct = Math.Min(remainingQuantity, stockQuantity);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 119) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 120)                 stock.Stockquantity = stockQuantity - quantityToDeduct;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 121)                 if (stock.Stockquantity <= 0)
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 122)                     stock.Status = StockStatus.OUT_OF_STOCK;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 123) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 124)                 stockRepo.Update(stock);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 125) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 126)                 // Tß║ío StockMovement ─æß╗â ghi log
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 127)                 var movement = new StockMovement
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 128)                 {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 129)                     Stockid = stock.Stockid,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 130)                     Orderid = order.Orderid,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 131)                     Quantity = -quantityToDeduct, // Sß╗æ ├óm ─æß╗â thß╗â hiß╗çn xuß║Ñt kho
+12afc877 (<nthanhn2491@gmail.com>      2026-02-25 08:25:53 +0700 132)                     Movementdate = DateTime.Now,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 133)                     Note = $"Xuß║Ñt kho cho ─æãín h├áng #{order.Orderid}"
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 134)                 };
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 135)                 await stockMovementRepo.AddAsync(movement);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 136) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 137)                 remainingQuantity -= quantityToDeduct;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 138)             }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 139)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 140) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 141)         await _uow.SaveAsync();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 142) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 143)         // 6. Clear Cart sau khi tß║ío ─æãín th├ánh c├┤ng
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 144)         await _cartService.ClearCartAsync(accountId);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 145) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 146)         // 7. Load lß║íi Order vß╗øi ─æß║ºy ─æß╗º th├┤ng tin
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 147)         var fullOrder = await orderRepo.FindAsync(
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 148)             o => o.Orderid == order.Orderid,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 149)             include: q => q
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 150)                 .Include(o => o.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 151)                 .ThenInclude(od => od.Product)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 152)                 .Include(o => o.Promotion)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 153)         );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 154) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 155)         return MapToOrderResponseDto(fullOrder!);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 156)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 157) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 158)     public async Task<IEnumerable<OrderResponseDto>> GetOrdersByAccountIdAsync(int accountId)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 159)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 160)         var orderRepo = _uow.GetRepository<Order>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 161)         var orders = await orderRepo.GetAllAsync(
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 162)             o => o.Accountid == accountId,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 163)             include: q => q
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 164)                 .Include(o => o.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 165)                 .ThenInclude(od => od.Product)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 166)                 .Include(o => o.Promotion)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 167)         );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 168) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 169)         return orders.Select(o => MapToOrderResponseDto(o));
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 170)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 171) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 172)     public async Task<OrderResponseDto> UpdateOrderShippingInfoAsync(int orderId, int accountId, string userRole, UpdateOrderShippingRequest request)
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 173)     {
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 174)         var orderRepo = _uow.GetRepository<Order>();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 175)         var orders = await orderRepo.FindAsync(o => o.Orderid == orderId);
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 176) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 177)         if (!orders.Any())
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 178)             throw new Exception("Kh├┤ng t├¼m thß║Ñy ─æãín h├áng.");
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 179) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 180)         var order = orders.FirstOrDefault();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 181)         if (order == null)
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 182)             throw new Exception("Kh├┤ng t├¼m thß║Ñy ─æãín h├áng.");
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 183) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 184)         // Kiß╗âm tra quyß╗ün: Chß╗ë ADMIN hoß║Àc ch├¡nh chß╗º ─æãín h├áng mß╗øi ─æã░ß╗úc sß╗¡a
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 185)         var normalizedRole = userRole.ToUpper();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 186)         if (normalizedRole != "ADMIN" && order.Accountid != accountId)
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 187)         {
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 188)             throw new Exception("Bß║ín kh├┤ng c├│ quyß╗ün chß╗ënh sß╗¡a th├┤ng tin ─æãín h├áng n├áy.");
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 189)         }
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 190) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 191)         // Chß╗ë cho ph├®p sß╗¡a khi ─æãín h├áng chã░a giao hoß║Àc chã░a hß╗ºy (t├╣y nghiß╗çp vß╗Ñ cß╗ºa bß║ín)
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 192)         if (order.Status == OrderStatus.DELIVERED || order.Status == OrderStatus.CANCELLED)
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 193)         {
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 194)             throw new Exception("Kh├┤ng thß╗â cß║¡p nhß║¡t th├┤ng tin cho ─æãín h├áng ─æ├ú ho├án tß║Ñt hoß║Àc ─æ├ú hß╗ºy.");
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 195)         }
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 196) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 197)         // Cß║¡p nhß║¡t c├íc trã░ß╗Øng nß║┐u kh├┤ng null hoß║Àc empty
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 198)         if (!string.IsNullOrWhiteSpace(request.CustomerName))
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 199)             order.Customername = request.CustomerName;
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 200) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 201)         if (!string.IsNullOrWhiteSpace(request.CustomerPhone))
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 202)             order.Customerphone = request.CustomerPhone;
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 203) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 204)         if (!string.IsNullOrWhiteSpace(request.CustomerEmail))
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 205)             order.Customeremail = request.CustomerEmail;
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 206) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 207)         if (!string.IsNullOrWhiteSpace(request.CustomerAddress))
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 208)             order.Customeraddress = request.CustomerAddress;
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 209) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 210)         // Ri├¬ng Note c├│ thß╗â cho ph├®p x├│a trß║»ng nß║┐u cß║ºn, 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 211)         // nhã░ng theo y├¬u cß║ºu cß╗ºa bß║ín "null/empty th├¼ kh├┤ng sß╗¡a" n├¬n t├┤i ├íp dß╗Ñng logic tã░ãíng tß╗▒
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 212)         if (!string.IsNullOrWhiteSpace(request.Note))
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 213)             order.Note = request.Note;
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 214) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 215)         orderRepo.Update(order);
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 216)         await _uow.SaveAsync();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 217) 
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 218)         // Load lß║íi dß╗» liß╗çu ─æß║ºy ─æß╗º ─æß╗â trß║ú vß╗ü
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 219)         return await GetOrderByIdAsync(orderId, order.Accountid ?? accountId);
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 220)     }
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 221) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 222)     public async Task<OrderResponseDto> GetOrderByIdAsync(int orderId, int accountId)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 223)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 224)         var orderRepo = _uow.GetRepository<Order>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 225)         var order = await orderRepo.FindAsync(
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 226)             o => o.Orderid == orderId && o.Accountid == accountId,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 227)             include: q => q
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 228)                 .Include(o => o.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 229)                 .ThenInclude(od => od.Product)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 230)                 .Include(o => o.Promotion)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 231)         );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 232) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 233)         if (order == null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 234)             throw new Exception("Kh├┤ng t├¼m thß║Ñy ─æãín h├áng hoß║Àc bß║ín kh├┤ng c├│ quyß╗ün xem ─æãín h├áng n├áy.");
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 235) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 236)         return MapToOrderResponseDto(order);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 237)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 238) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 239)     public async Task<IEnumerable<OrderResponseDto>> GetAllOrdersAsync(string? status = null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 240)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 241)         var orderRepo = _uow.GetRepository<Order>();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 242) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 243)         IEnumerable<Order> orders;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 244)         if (!string.IsNullOrWhiteSpace(status))
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 245)         {
+b5fd629b (<khanhtrantuc2004@gmail.com> 2026-01-31 23:58:43 +0700 246)             orders = await orderRepo.GetAllAsync(
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 247)                 o => o.Status == status,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 248)                 include: q => q
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 249)                     .Include(o => o.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 250)                     .ThenInclude(od => od.Product)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 251)                     .Include(o => o.Promotion)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 252)                     .Include(o => o.Account)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 253)             );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 254)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 255)         else
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 256)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 257)             orders = await orderRepo.GetAllAsync(
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 258)                 null,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 259)                 include: q => q
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 260)                     .Include(o => o.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 261)                     .ThenInclude(od => od.Product)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 262)                     .Include(o => o.Promotion)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 263)                     .Include(o => o.Account)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 264)             );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 265)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 266) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 267)         return orders.Select(o => MapToOrderResponseDto(o));
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 268)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 269) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 270)     public async Task<OrderResponseDto> GetOrderByIdForAdminAsync(int orderId)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 271)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 272)         var orderRepo = _uow.GetRepository<Order>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 273)         var order = await orderRepo.FindAsync(
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 274)             o => o.Orderid == orderId,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 275)             include: q => q
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 276)                 .Include(o => o.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 277)                 .ThenInclude(od => od.Product)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 278)                 .Include(o => o.Promotion)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 279)                 .Include(o => o.Account)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 280)         );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 281) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 282)         if (order == null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 283)             throw new Exception("Kh├┤ng t├¼m thß║Ñy ─æãín h├áng.");
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 284) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 285)         return MapToOrderResponseDto(order);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 286)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 287) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 288)     public async Task<OrderResponseDto> UpdateOrderStatusAsync(int orderId, UpdateOrderStatusRequest request)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 289)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 290)         var orderRepo = _uow.GetRepository<Order>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 291)         var order = await orderRepo.FindAsync(
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 292)             o => o.Orderid == orderId,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 293)             include: q => q
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 294)                 .Include(o => o.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 295)                 .ThenInclude(od => od.Product)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 296)         );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 297) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 298)         if (order == null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 299)             throw new Exception("Kh├┤ng t├¼m thß║Ñy ─æãín h├áng.");
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 300) 
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 301)         var currentStatus = order.Status ?? OrderStatus.PENDING;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 302)         var newStatus = request.Status.ToUpper();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 303) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 304)         // Validate status transition
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 305)         if (!IsValidStatusTransition(currentStatus, newStatus))
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 306)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 307)             throw new Exception($"Kh├┤ng thß╗â chuyß╗ân trß║íng th├íi tß╗½ '{currentStatus}' sang '{newStatus}'.");
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 308)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 309) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 310)         // Nß║┐u hß╗ºy ─æãín, ho├án lß║íi stock v├á ho├án tiß╗ün v├áo v├¡ (nß║┐u thanh to├ín bß║▒ng v├¡)
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 311)         if (newStatus == OrderStatus.CANCELLED && currentStatus != OrderStatus.CANCELLED)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 312)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 313)             await RestoreStockAsync(order);
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 314) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 315)             // Ho├án tiß╗ün v├áo v├¡ nß║┐u thanh to├ín bß║▒ng v├¡
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 316)             await _walletService.RefundToWalletAsync(orderId);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 317)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 318) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 319)         order.Status = newStatus;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 320)         orderRepo.Update(order);
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 321)         await _uow.SaveAsync(); // Save tß║Ñt cß║ú thay ─æß╗òi (bao gß╗ôm cß║ú stock ─æ├ú ─æã░ß╗úc restore)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 322) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 323)         // Load lß║íi vß╗øi ─æß║ºy ─æß╗º th├┤ng tin
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 324)         var updatedOrder = await orderRepo.FindAsync(
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 325)             o => o.Orderid == orderId,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 326)             include: q => q
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 327)                 .Include(o => o.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 328)                 .ThenInclude(od => od.Product)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 329)                 .Include(o => o.Promotion)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 330)         );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 331) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 332)         return MapToOrderResponseDto(updatedOrder!);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 333)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 334) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 335)     public async Task<OrderResponseDto> CancelOrderAsync(int orderId, int accountId, string userRole)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 336)     {
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 337)         var orderRepo = _uow.GetRepository<Order>();
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 338)         var order = await orderRepo.FindAsync(
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 339)             o => o.Orderid == orderId,
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 340)             include: q => q
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 341)                 .Include(o => o.OrderDetails)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 342)                 .ThenInclude(od => od.Product)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 343)                 .Include(o => o.Account)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 344)         );
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 345) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 346)         if (order == null)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 347)             throw new Exception("Kh├┤ng t├¼m thß║Ñy ─æãín h├áng.");
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 348) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 349)         var currentStatus = order.Status ?? OrderStatus.PENDING;
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 350) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 351)         // Validate: Kh├┤ng thß╗â hß╗ºy nß║┐u ─æ├ú DELIVERED hoß║Àc CANCELLED
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 352)         if (currentStatus == OrderStatus.DELIVERED)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 353)             throw new Exception("Kh├┤ng thß╗â hß╗ºy ─æãín h├áng ─æ├ú ─æã░ß╗úc giao.");
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 354) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 355)         if (currentStatus == OrderStatus.CANCELLED)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 356)             throw new Exception("─Éãín h├áng ─æ├ú ─æã░ß╗úc hß╗ºy trã░ß╗øc ─æ├│.");
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 357) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 358)         // Validate ownership: Customer chß╗ë ─æã░ß╗úc hß╗ºy order cß╗ºa ch├¡nh m├¼nh
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 359)         var normalizedRole = userRole.ToUpper();
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 360)         if (normalizedRole != "ADMIN")
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 361)         {
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 362)             if (order.Accountid != accountId)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 363)                 throw new Exception("Bß║ín kh├┤ng c├│ quyß╗ün hß╗ºy ─æãín h├áng n├áy.");
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 364) 
+73fd6627 (<nthanhn2491@gmail.com>      2026-02-24 20:19:49 +0700 365)             // Validate order status
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 366)             if (order.Status != OrderStatus.PENDING &&
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 367)                 order.Status != OrderStatus.CONFIRMED &&
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 368)                 order.Status != OrderStatus.PAID_WAITING_STOCK)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 369)             {
+73fd6627 (<nthanhn2491@gmail.com>      2026-02-24 20:19:49 +0700 370)                 throw new Exception("Chß╗ë c├│ thß╗â hß╗ºy ─æãín h├áng trong giai ─æoß║ín chã░a xß╗¡ l├¡ ─æãín h├áng.");
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 371)             }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 372)         }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 373) 
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 374)         _uow.BeginTransaction();
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 375) 
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 376)         try
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 377)         {
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 378)             // Process cancellation
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 379)             await RestoreStockAsync(order);
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 380) 
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 381)             // Ho├án tiß╗ün v├áo v├¡ (nß║┐u ─æ├ú thanh to├ín)
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 382)             await _walletService.RefundToWalletAsync(orderId);
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 383) 
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 384)             // Update order status
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 385)             order.Status = OrderStatus.CANCELLED;
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 386)             orderRepo.Update(order);
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 387)             await _uow.SaveAsync();
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 388) 
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 389)             _uow.CommitTransaction();
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 390)         }
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 391)         catch (Exception e)
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 392)         {
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 393)             _uow.RollBack();
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 394)             throw;
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 395)         }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 396) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 397)         // Load lß║íi vß╗øi ─æß║ºy ─æß╗º th├┤ng tin
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 398)         var updatedOrder = await orderRepo.FindAsync(
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 399)             o => o.Orderid == orderId,
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 400)             include: q => q
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 401)                 .Include(o => o.OrderDetails)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 402)                 .ThenInclude(od => od.Product)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 403)                 .Include(o => o.Promotion)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 404)         );
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 405) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 406)         return MapToOrderResponseDto(updatedOrder!);
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 407)     }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 408) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 409)     private bool IsValidStatusTransition(string currentStatus, string newStatus)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 410)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 411)         var validTransitions = new Dictionary<string, List<string>>
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 412)         {
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 413)             { OrderStatus.PENDING, new List<string> { OrderStatus.CONFIRMED, OrderStatus.CANCELLED } },
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 414)             { OrderStatus.CONFIRMED, new List<string> { OrderStatus.PROCESSING, OrderStatus.CANCELLED } },
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 415)             { OrderStatus.PROCESSING, new List<string> { OrderStatus.SHIPPED, OrderStatus.CANCELLED } },
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 416)             { OrderStatus.SHIPPED, new List<string> { OrderStatus.DELIVERED, OrderStatus.CANCELLED } },
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 417)             { OrderStatus.DELIVERED, new List<string> { } }, // Kh├┤ng thß╗â chuyß╗ân tß╗½ DELIVERED
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 418)             { OrderStatus.CANCELLED, new List<string> { } } // Kh├┤ng thß╗â chuyß╗ân tß╗½ CANCELLED
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 419)         };
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 420) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 421)         if (!validTransitions.ContainsKey(currentStatus))
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 422)             return false;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 423) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 424)         return validTransitions[currentStatus].Contains(newStatus);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 425)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 426) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 427)     private async Task RestoreStockAsync(Order order)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 428)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 429)         var stockRepo = _uow.GetRepository<Stock>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 430)         var stockMovementRepo = _uow.GetRepository<StockMovement>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 431) 
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 432)         // Lß║Ñy c├íc StockMovement li├¬n quan ─æß║┐n ─æãín h├áng n├áy (chß╗ë lß║Ñy nhß╗»ng record xuß║Ñt kho - Quantity < 0)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 433)         var movements = await stockMovementRepo.GetAllAsync(
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 434)             sm => sm.Orderid == order.Orderid && sm.Quantity.HasValue && sm.Quantity < 0
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 435)         );
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 436) 
+fe91b63e (<nthanhn2491@gmail.com>      2026-02-24 20:48:38 +0700 437)         if (movements == null || !movements.Any()) return;
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 438) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 439)         foreach (var movement in movements)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 440)         {
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 441)             if (movement.Stockid == null)
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 442)                 continue;
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 443) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 444)             var stock = await stockRepo.GetByIdAsync(movement.Stockid);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 445)             if (stock != null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 446)             {
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 447)                 var quantityToRestore = Math.Abs(movement.Quantity ?? 0);
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 448)                 stock.Stockquantity = (stock.Stockquantity ?? 0) + quantityToRestore;
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 449) 
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 450)                 // Nß║┐u stock ─æang OUT_OF_STOCK v├á sau khi ho├án lß║íi c├│ sß╗æ lã░ß╗úng > 0, chuyß╗ân vß╗ü ACTIVE
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 451)                 if (stock.Status == StockStatus.OUT_OF_STOCK && stock.Stockquantity > 0)
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 452)                     stock.Status = StockStatus.ACTIVE;
+ac672778 (<nthanhn2491@gmail.com>      2026-02-24 15:10:10 +0700 453) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 454)                 stockRepo.Update(stock);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 455) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 456)                 // Tß║ío StockMovement mß╗øi ─æß╗â ghi log ho├án lß║íi
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 457)                 var restoreMovement = new StockMovement
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 458)                 {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 459)                     Stockid = stock.Stockid,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 460)                     Orderid = order.Orderid,
+a1a15660 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:01:23 +0700 461)                     Quantity = quantityToRestore, // Sß╗æ dã░ãíng ─æß╗â thß╗â hiß╗çn nhß║¡p lß║íi
+12afc877 (<nthanhn2491@gmail.com>      2026-02-25 08:25:53 +0700 462)                     Movementdate = DateTime.Now,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 463)                     Note = $"Ho├án lß║íi kho do hß╗ºy ─æãín h├áng #{order.Orderid}"
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 464)                 };
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 465)                 await stockMovementRepo.AddAsync(restoreMovement);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 466)             }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 467)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 468)     }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 469) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 470)     private OrderResponseDto MapToOrderResponseDto(Order order)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 471)     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 472)         var items = new List<OrderDetailResponseDto>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 473)         decimal totalPrice = 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 474) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 475)         if (order.OrderDetails != null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 476)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 477)             foreach (var detail in order.OrderDetails)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 478)             {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 479)                 if (detail.Product != null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 480)                 {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 481)                     var price = detail.Product.Price ?? 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 482)                     var quantity = detail.Quantity ?? 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 483)                     var amount = detail.Amount ?? (price * quantity);
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 484) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 485)                     items.Add(new OrderDetailResponseDto
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 486)                     {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 487)                         OrderDetailId = detail.Orderdetailid,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 488)                         ProductId = detail.Product.Productid,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 489)                         ProductName = detail.Product.Productname,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 490)                         Sku = detail.Product.Sku,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 491)                         Quantity = quantity,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 492)                         Price = price,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 493)                         Amount = amount,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 494)                         ImageUrl = detail.Product.ImageUrl
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 495)                     });
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 496) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 497)                     totalPrice += amount;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 498)                 }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 499)             }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 500)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 501) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 502)         var discountValue = 0m;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 503)         var promotionCode = "";
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 504)         if (order.Promotion != null)
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 505)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 506)             discountValue = order.Promotion.Discountvalue ?? 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 507)             promotionCode = order.Promotion.Code ?? "";
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 508)         }
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 509) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 510)         var finalPrice = totalPrice - discountValue;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 511)         if (finalPrice < 0) finalPrice = 0;
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 512) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 513)         return new OrderResponseDto
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 514)         {
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 515)             OrderId = order.Orderid,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 516)             AccountId = order.Accountid ?? 0,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 517)             OrderDateTime = order.Orderdatetime,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 518)             TotalPrice = order.Totalprice ?? totalPrice,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 519)             DiscountValue = discountValue > 0 ? discountValue : null,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 520)             FinalPrice = finalPrice,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 521)             Status = order.Status,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 522)             CustomerName = order.Customername,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 523)             CustomerPhone = order.Customerphone,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 524)             CustomerEmail = order.Customeremail,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 525)             CustomerAddress = order.Customeraddress,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 526)             Note = order.Note,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 527)             PromotionCode = !string.IsNullOrEmpty(promotionCode) ? promotionCode : null,
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 528)             Items = items
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 529)         };
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 530)     }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 531) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 532)     public async Task TryAllocateStockAfterPaymentAsync(int orderId)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 533)     {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 534)         if (orderId <= 0) throw new Exception("orderId is required.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 535) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 536)         var orderRepo = _uow.GetRepository<Order>();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 537)         var stockRepo = _uow.GetRepository<Stock>();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 538)         var movementRepo = _uow.GetRepository<StockMovement>();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 539) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 540)         // load order + details
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 541)         var order = await orderRepo.FindAsync(
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 542)             o => o.Orderid == orderId,
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 543)             include: q => q.Include(x => x.OrderDetails)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 544)         );
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 545) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 546)         if (order == null) throw new Exception("Order not found.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 547)         if (order.OrderDetails == null || order.OrderDetails.Count == 0)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 548)             throw new Exception("Order has no details.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 549) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 550) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 551)         var status = (order.Status ?? OrderStatus.PENDING).ToUpper();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 552) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 553)         // Idempotent: nß║┐u ─æ├ú c├│ movement OUT rß╗ôi th├¼ coi nhã░ ─æ├ú allocate
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 554)         var existingOutMovements = await movementRepo.GetAllAsync(sm =>
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 555)             sm.Orderid == orderId && sm.Quantity.HasValue && sm.Quantity < 0
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 556)         );
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 557)         if (existingOutMovements.Any()) return;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 558) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 559)         // Chß╗ë chß║íy auto allocate sau payment nß║┐u ─æang CONFIRMED
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 560)         if (status != OrderStatus.CONFIRMED)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 561)             return;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 562) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 563)         // 1) Check ─æß╗º kho cho tß║Ñt cß║ú items trã░ß╗øc khi trß╗½
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 564)         foreach (var d in order.OrderDetails)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 565)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 566)             var pid = d.Productid ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 567)             var qty = d.Quantity ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 568)             if (pid <= 0 || qty <= 0) continue;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 569) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 570)             var stocks = await stockRepo.FindAsync(s => s.Productid == pid && s.Status == StockStatus.ACTIVE);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 571)             var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 572) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 573)             if (totalStock < qty)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 574)             {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 575)                 order.Status = OrderStatus.PAID_WAITING_STOCK;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 576) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 577)                 order.Note = string.IsNullOrWhiteSpace(order.Note)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 578)                     ? $"[PAID_WAITING_STOCK] Thiß║┐u h├áng ProductId={pid}. C├▓n {totalStock}, cß║ºn {qty}."
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 579)                     : $"{order.Note}\n[PAID_WAITING_STOCK] Thiß║┐u h├áng ProductId={pid}. C├▓n {totalStock}, cß║ºn {qty}.";
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 580) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 581)                 orderRepo.Update(order);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 582)                 await _uow.SaveAsync();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 583)                 return;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 584)             }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 585)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 586) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 587)         // 2) Deduct theo FIFO trong transaction
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 588)         _uow.BeginTransaction();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 589)         try
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 590)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 591)             foreach (var d in order.OrderDetails)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 592)             {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 593)                 var pid = d.Productid ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 594)                 var need = d.Quantity ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 595)                 if (pid <= 0 || need <= 0) continue;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 596) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 597)                 var availableStocks = (await stockRepo.FindAsync(
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 598)                         s => s.Productid == pid && s.Status == StockStatus.ACTIVE
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 599)                     ))
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 600)                     .OrderBy(s => s.Productiondate) // FIFO
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 601)                     .ToList();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 602) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 603)                 var remaining = need;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 604) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 605)                 foreach (var stock in availableStocks)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 606)                 {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 607)                     if (remaining <= 0) break;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 608) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 609)                     var stockQty = stock.Stockquantity ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 610)                     if (stockQty <= 0) continue;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 611) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 612)                     var deduct = Math.Min(remaining, stockQty);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 613) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 614)                     stock.Stockquantity = stockQty - deduct;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 615)                     if ((stock.Stockquantity ?? 0) <= 0)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 616)                         stock.Status = StockStatus.OUT_OF_STOCK;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 617) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 618)                     stockRepo.Update(stock);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 619) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 620)                     await movementRepo.AddAsync(new StockMovement
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 621)                     {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 622)                         Stockid = stock.Stockid,
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 623)                         Orderid = order.Orderid,
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 624)                         Quantity = -deduct,
+12afc877 (<nthanhn2491@gmail.com>      2026-02-25 08:25:53 +0700 625)                         Movementdate = DateTime.Now,
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 626)                         Note = $"Xuß║Ñt kho cho ─æãín h├áng #{order.Orderid}"
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 627)                     });
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 628) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 629)                     remaining -= deduct;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 630)                 }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 631) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 632)                 if (remaining > 0)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 633)                     throw new Exception($"Unexpected thiß║┐u h├áng khi xuß║Ñt kho (ProductId={pid}).");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 634)             }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 635) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 636)             order.Status = OrderStatus.PROCESSING;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 637)             order.Note = string.IsNullOrWhiteSpace(order.Note)
+12afc877 (<nthanhn2491@gmail.com>      2026-02-25 08:25:53 +0700 638)                 ? $"[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+12afc877 (<nthanhn2491@gmail.com>      2026-02-25 08:25:53 +0700 639)                 : $"{order.Note}\n[ALLOCATED] Auto allocated at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 640) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 641)             orderRepo.Update(order);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 642) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 643)             await _uow.SaveAsync();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 644)             _uow.CommitTransaction();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 645)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 646)         catch (Exception ex)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 647)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 648)             _uow.RollBack();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 649) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 650)             // nß║┐u fail th├¼ PAID_WAITING_STOCK
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 651)             order.Status = OrderStatus.PAID_WAITING_STOCK;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 652)             order.Note = string.IsNullOrWhiteSpace(order.Note)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 653)                 ? $"[PAID_WAITING_STOCK] {ex.Message}"
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 654)                 : $"{order.Note}\n[PAID_WAITING_STOCK] {ex.Message}";
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 655) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 656)             orderRepo.Update(order);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 657)             await _uow.SaveAsync();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 658)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 659)     }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 660) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 661) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 662)     public async Task AllocateStockForWaitingOrderAsync(int orderId)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 663)     {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 664)         if (orderId <= 0) throw new Exception("orderId is required.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 665) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 666)         var orderRepo = _uow.GetRepository<Order>();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 667) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 668)         var order = (await orderRepo.FindAsync(
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 669)             o => o.Orderid == orderId,
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 670)             include: q => q.Include(o => o.OrderDetails)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 671)         ));
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 672) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 673)         if (order == null) throw new Exception("Order not found.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 674) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 675)         var status = (order.Status ?? "").ToUpper();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 676)         if (status != OrderStatus.PAID_WAITING_STOCK)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 677)             throw new Exception("Order is not in PAID_WAITING_STOCK.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 678) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 679)         throw new Exception("Use ForceAllocateStockAsync for STAFF/ADMIN allocation retry.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 680)     }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 681) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 682) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 683)     public async Task ForceAllocateStockAsync(int orderId, int actorAccountId, string actorRole)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 684)     {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 685)         if (orderId <= 0) throw new Exception("orderId is required.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 686)         if (actorAccountId <= 0) throw new Exception("actorAccountId is required.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 687)         if (string.IsNullOrWhiteSpace(actorRole)) throw new Exception("actorRole is required.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 688) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 689)         var role = actorRole.Trim().ToUpper();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 690)         if (role != "ADMIN" && role != "STAFF")
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 691)             throw new Exception("Forbidden.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 692) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 693)         var orderRepo = _uow.GetRepository<Order>();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 694)         var stockRepo = _uow.GetRepository<Stock>();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 695)         var movementRepo = _uow.GetRepository<StockMovement>();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 696) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 697)         var order = await orderRepo.FindAsync(
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 698)             o => o.Orderid == orderId,
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 699)             include: q => q.Include(o => o.OrderDetails)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 700)         );
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 701) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 702)         if (order == null) throw new Exception("Order not found.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 703)         if (order.OrderDetails == null || order.OrderDetails.Count == 0)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 704)             throw new Exception("Order has no details.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 705) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 706)         var status = (order.Status ?? OrderStatus.PENDING).ToUpper();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 707) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 708)         if (status != OrderStatus.PAID_WAITING_STOCK && status != OrderStatus.CONFIRMED)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 709)             throw new Exception("Order is not eligible for allocation.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 710) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 711)         var existingOutMovements = await movementRepo.GetAllAsync(sm =>
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 712)             sm.Orderid == orderId && sm.Quantity.HasValue && sm.Quantity < 0
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 713)         );
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 714)         if (existingOutMovements.Any())
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 715)             throw new Exception("Order already allocated stock.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 716) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 717)         foreach (var d in order.OrderDetails)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 718)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 719)             var pid = d.Productid ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 720)             var need = d.Quantity ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 721)             if (pid <= 0 || need <= 0) continue;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 722) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 723)             var stocks = await stockRepo.FindAsync(s => s.Productid == pid && s.Status == StockStatus.ACTIVE);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 724)             var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 725) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 726)             if (totalStock < need)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 727)             {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 728)                 // vß║½n c├│ thß╗â set PAID_WAITING_STOCK ─æß╗â lã░u trß║íng th├íi
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 729)                 order.Status = OrderStatus.PAID_WAITING_STOCK;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 730)                 order.Note = string.IsNullOrWhiteSpace(order.Note)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 731)                     ? $"[PAID_WAITING_STOCK] Thiß║┐u h├áng ProductId={pid}. C├▓n {totalStock}, cß║ºn {need}."
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 732)                     : $"{order.Note}\n[PAID_WAITING_STOCK] Thiß║┐u h├áng ProductId={pid}. C├▓n {totalStock}, cß║ºn {need}.";
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 733) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 734)                 orderRepo.Update(order);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 735)                 await _uow.SaveAsync();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 736) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 737)                 // throw ─æß╗â controller trß║ú lß╗ùi thiß║┐u h├áng
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 738)                 throw new Exception($"Thiß║┐u h├áng (ProductId={pid}). C├▓n {totalStock}, cß║ºn {need}.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 739)             }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 740)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 741) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 742)         var originalStatus = order.Status;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 743) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 744)         if ((order.Status ?? "").ToUpper() == OrderStatus.PAID_WAITING_STOCK)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 745)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 746)             order.Status = OrderStatus.CONFIRMED;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 747)             orderRepo.Update(order);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 748)             await _uow.SaveAsync();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 749)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 750) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 751)         await TryAllocateStockAfterPaymentAsync(orderId);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 752) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 753)         var outMovementsAfter = await movementRepo.GetAllAsync(sm =>
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 754)             sm.Orderid == orderId && sm.Quantity.HasValue && sm.Quantity < 0
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 755)         );
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 756) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 757)         var updated = (await orderRepo.FindAsync(o => o.Orderid == orderId)).FirstOrDefault();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 758)         if (updated == null) throw new Exception("Order not found after allocation.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 759) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 760)         if (outMovementsAfter.Any())
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 761)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 762)             updated.Status = OrderStatus.PROCESSING;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 763)             updated.Note = string.IsNullOrWhiteSpace(updated.Note)
+12afc877 (<nthanhn2491@gmail.com>      2026-02-25 08:25:53 +0700 764)                 ? $"[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+12afc877 (<nthanhn2491@gmail.com>      2026-02-25 08:25:53 +0700 765)                 : $"{updated.Note}\n[ALLOCATED] Allocated by {role}:{actorAccountId} at {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 766) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 767)             orderRepo.Update(updated);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 768)             await _uow.SaveAsync();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 769)             return;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 770)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 771) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 772)         foreach (var d in updated.OrderDetails ?? new List<OrderDetail>())
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 773)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 774)             var pid = d.Productid ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 775)             var need = d.Quantity ?? 0;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 776)             if (pid <= 0 || need <= 0) continue;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 777) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 778)             var stocks = await stockRepo.FindAsync(s => s.Productid == pid && s.Status == StockStatus.ACTIVE);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 779)             var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 780) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 781)             if (totalStock < need)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 782)             {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 783)                 throw new Exception($"Thiß║┐u h├áng (ProductId={pid}). C├▓n {totalStock}, cß║ºn {need}.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 784)             }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 785)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 786) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 787)         if ((originalStatus ?? "").ToUpper() == OrderStatus.PAID_WAITING_STOCK)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 788)         {
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 789)             updated.Status = OrderStatus.PAID_WAITING_STOCK;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 790)             orderRepo.Update(updated);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 791)             await _uow.SaveAsync();
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 792)         }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 793) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 794)         throw new Exception("Allocate failed unexpectedly. Please check stock data and allocation logic.");
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 795)     }
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 796) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 797) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 798) 
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 799) }

@@ -1,0 +1,322 @@
+﻿7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   1) using Microsoft.EntityFrameworkCore;
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700   2) using TetGift.BLL.Common.Constraint;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   3) using TetGift.BLL.Dtos;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   4) using TetGift.BLL.Interfaces;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   5) using TetGift.DAL.Entities;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   6) using TetGift.DAL.Interfaces;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   7) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   8) namespace TetGift.BLL.Services;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700   9) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  10) public class DashboardService : IDashboardService
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  11) {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  12)     private readonly IUnitOfWork _uow;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  13) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  14)     public DashboardService(IUnitOfWork uow)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  15)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  16)         _uow = uow;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  17)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  18) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  19)     public async Task<RevenueChartDto> GetRevenueByTimeRangeAsync(TimeRangeRequest request)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  20)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  21)         var orderRepo = _uow.GetRepository<Order>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  22)         var paymentRepo = _uow.GetRepository<Payment>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  23) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  24)         // Lß║Ñy tß║Ñt cß║ú orders trong khoß║úng thß╗Øi gian vß╗øi Payment v├á Promotion
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  25)         var ordersQuery = orderRepo.Entities
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  26)             .Include(o => o.Promotion)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  27)             .Include(o => o.Payments)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  28)             .AsQueryable();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  29) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  30)         // Filter theo thß╗Øi gian
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  31)         if (request.StartDate.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  32)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  33)             ordersQuery = ordersQuery.Where(o => o.Orderdatetime >= request.StartDate.Value);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  34)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  35)         if (request.EndDate.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  36)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  37)             var endDate = request.EndDate.Value.AddDays(1); // Include end date
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  38)             ordersQuery = ordersQuery.Where(o => o.Orderdatetime < endDate);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  39)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  40) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  41)         // Chß╗ë t├¡nh orders ─æ├ú thanh to├ín th├ánh c├┤ng
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  42)         // Orders c├│ Payment vß╗øi Status = "SUCCESS" hoß║Àc Order Status = "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  43)         var paidOrders = await ordersQuery
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  44)             .Where(o => o.Payments.Any(p => p.Status == PaymentStatus.SUCCESS) ||
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  45)                        (o.Status != null && new[] { OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED }.Contains(o.Status)))
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  46)             .ToListAsync();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  47) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  48)         // T├¡nh revenue theo period
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  49)         var revenueData = new List<RevenueChartDataDto>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  50)         var period = request.Period.ToLower();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  51) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  52)         if (period == "day")
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  53)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  54)             var grouped = paidOrders
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  55)                 .GroupBy(o => o.Orderdatetime?.Date)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  56)                 .Where(g => g.Key.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  57)                 .OrderBy(g => g.Key)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  58)                 .ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  59) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  60)             foreach (var group in grouped)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  61)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  62)                 var date = group.Key!.Value;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  63)                 var orders = group.ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  64)                 var revenue = orders.Sum(o => CalculateFinalPrice(o));
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  65)                 var orderCount = orders.Count;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  66) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  67)                 revenueData.Add(new RevenueChartDataDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  68)                 {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  69)                     Date = date.ToString("yyyy-MM-dd"),
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  70)                     Revenue = revenue,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  71)                     OrderCount = orderCount
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  72)                 });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  73)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  74)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  75)         else if (period == "month")
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  76)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  77)             var grouped = paidOrders
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  78)                 .GroupBy(o => o.Orderdatetime.HasValue 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  79)                     ? new DateTime(o.Orderdatetime.Value.Year, o.Orderdatetime.Value.Month, 1)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  80)                     : (DateTime?)null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  81)                 .Where(g => g.Key.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  82)                 .OrderBy(g => g.Key)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  83)                 .ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  84) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  85)             foreach (var group in grouped)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  86)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  87)                 var date = group.Key!.Value;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  88)                 var orders = group.ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  89)                 var revenue = orders.Sum(o => CalculateFinalPrice(o));
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  90)                 var orderCount = orders.Count;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  91) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  92)                 revenueData.Add(new RevenueChartDataDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  93)                 {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  94)                     Date = date.ToString("yyyy-MM"),
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  95)                     Revenue = revenue,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  96)                     OrderCount = orderCount
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  97)                 });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  98)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700  99)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 100)         else if (period == "year")
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 101)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 102)             var grouped = paidOrders
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 103)                 .GroupBy(o => o.Orderdatetime?.Year)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 104)                 .Where(g => g.Key.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 105)                 .OrderBy(g => g.Key)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 106)                 .ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 107) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 108)             foreach (var group in grouped)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 109)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 110)                 var year = group.Key!.Value;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 111)                 var orders = group.ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 112)                 var revenue = orders.Sum(o => CalculateFinalPrice(o));
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 113)                 var orderCount = orders.Count;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 114) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 115)                 revenueData.Add(new RevenueChartDataDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 116)                 {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 117)                     Date = year.ToString(),
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 118)                     Revenue = revenue,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 119)                     OrderCount = orderCount
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 120)                 });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 121)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 122)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 123) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 124)         return new RevenueChartDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 125)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 126)             Period = period,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 127)             Data = revenueData,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 128)             TotalRevenue = revenueData.Sum(d => d.Revenue),
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 129)             TotalOrders = revenueData.Sum(d => d.OrderCount)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 130)         };
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 131)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 132) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 133)     public async Task<PaymentChannelStatisticsDto> GetPaymentChannelStatisticsAsync(TimeRangeRequest? request = null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 134)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 135)         var paymentRepo = _uow.GetRepository<Payment>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 136)         var orderRepo = _uow.GetRepository<Order>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 137) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 138)         // Lß║Ñy payments th├ánh c├┤ng
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 139)         var paymentsQuery = paymentRepo.Entities
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 140)             .Include(p => p.Order)
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 141)             .Where(p => p.Status == PaymentStatus.SUCCESS && p.Type != null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 142)             .AsQueryable();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 143) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 144)         // Filter theo thß╗Øi gian tß╗½ Order
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 145)         if (request != null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 146)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 147)             if (request.StartDate.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 148)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 149)                 paymentsQuery = paymentsQuery.Where(p => p.Order != null && p.Order.Orderdatetime >= request.StartDate.Value);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 150)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 151)             if (request.EndDate.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 152)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 153)                 var endDate = request.EndDate.Value.AddDays(1);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 154)                 paymentsQuery = paymentsQuery.Where(p => p.Order != null && p.Order.Orderdatetime < endDate);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 155)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 156)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 157) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 158)         var payments = await paymentsQuery.ToListAsync();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 159) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 160)         // Group by Payment Type
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 161)         var grouped = payments
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 162)             .GroupBy(p => p.Type ?? "UNKNOWN")
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 163)             .ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 164) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 165)         var channelStats = new List<PaymentChannelStatsDto>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 166)         var totalCount = payments.Count;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 167)         var totalAmount = payments.Sum(p => p.Amount ?? 0);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 168) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 169)         foreach (var group in grouped)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 170)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 171)             var channel = group.Key;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 172)             var count = group.Count();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 173)             var amount = group.Sum(p => p.Amount ?? 0);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 174)             var percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 175) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 176)             channelStats.Add(new PaymentChannelStatsDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 177)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 178)                 Channel = channel,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 179)                 Count = count,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 180)                 TotalAmount = amount,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 181)                 Percentage = percentage
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 182)             });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 183)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 184) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 185)         return new PaymentChannelStatisticsDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 186)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 187)             Data = channelStats.OrderByDescending(s => s.TotalAmount).ToList(),
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 188)             Total = new PaymentChannelStatsDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 189)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 190)                 Channel = "TOTAL",
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 191)                 Count = totalCount,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 192)                 TotalAmount = totalAmount,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 193)                 Percentage = 100
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 194)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 195)         };
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 196)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 197) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 198)     public async Task<AbandonedCartDto> GetAbandonedCartsAsync(int? days = null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 199)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 200)         var cartRepo = _uow.GetRepository<Cart>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 201)         var orderRepo = _uow.GetRepository<Order>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 202)         var cartDetailRepo = _uow.GetRepository<CartDetail>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 203) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 204)         // Lß║Ñy tß║Ñt cß║ú carts c├│ items
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 205)         var cartsWithItems = await cartRepo.Entities
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 206)             .Include(c => c.CartDetails)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 207)             .Where(c => c.CartDetails != null && c.CartDetails.Any())
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 208)             .ToListAsync();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 209) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 210)         // Lß║Ñy tß║Ñt cß║ú orders ─æß╗â check cart n├áo ─æ├ú tß║ío order
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 211)         var allOrders = await orderRepo.GetAllAsync();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 212)         var orderAccountIds = allOrders
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 213)             .Where(o => o.Accountid.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 214)             .Select(o => o.Accountid!.Value)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 215)             .Distinct()
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 216)             .ToHashSet();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 217) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 218)         // Filter: Cart c├│ items nhã░ng kh├┤ng c├│ Order tã░ãíng ß╗®ng
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 219)         // Hoß║Àc nß║┐u c├│ days: Cart kh├┤ng tß║ío Order trong X ng├áy (cß║ºn logic kh├íc v├¼ Cart kh├┤ng c├│ CreatedDate)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 220)         var abandonedCarts = cartsWithItems
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 221)             .Where(c => !orderAccountIds.Contains(c.Accountid ?? 0))
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 222)             .ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 223) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 224)         // Nß║┐u c├│ filter theo days, cß║ºn check Order datetime
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 225)         if (days.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 226)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 227)             var cutoffDate = DateTime.UtcNow.AddHours(7).AddDays(-days.Value);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 228)             var recentOrderAccountIds = allOrders
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 229)                 .Where(o => o.Accountid.HasValue && o.Orderdatetime >= cutoffDate)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 230)                 .Select(o => o.Accountid!.Value)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 231)                 .Distinct()
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 232)                 .ToHashSet();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 233) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 234)             // Cart kh├┤ng c├│ Order trong X ng├áy
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 235)             abandonedCarts = cartsWithItems
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 236)                 .Where(c => !recentOrderAccountIds.Contains(c.Accountid ?? 0))
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 237)                 .ToList();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 238)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 239) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 240)         var cartItems = new List<AbandonedCartItemDto>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 241)         foreach (var cart in abandonedCarts)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 242)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 243)             var itemCount = cart.CartDetails?.Count ?? 0;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 244)             var cartTotalValue = cart.Totalprice ?? 0;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 245) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 246)             cartItems.Add(new AbandonedCartItemDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 247)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 248)                 CartId = cart.Cartid,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 249)                 AccountId = cart.Accountid ?? 0,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 250)                 TotalValue = cartTotalValue,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 251)                 ItemCount = itemCount
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 252)             });
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 253)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 254) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 255)         var totalCarts = abandonedCarts.Count;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 256)         var totalValue = abandonedCarts.Sum(c => c.Totalprice ?? 0);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 257)         var averageValue = totalCarts > 0 ? totalValue / totalCarts : 0;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 258) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 259)         return new AbandonedCartDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 260)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 261)             TotalCarts = totalCarts,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 262)             TotalValue = totalValue,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 263)             AverageCartValue = averageValue,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 264)             Carts = cartItems.OrderByDescending(c => c.TotalValue).Take(50).ToList() // Limit to top 50
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 265)         };
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 266)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 267) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 268)     public async Task<DashboardSummaryDto> GetDashboardSummaryAsync(TimeRangeRequest? request = null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 269)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 270)         var revenueRequest = request ?? new TimeRangeRequest { Period = "month" };
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 271)         var revenue = await GetRevenueByTimeRangeAsync(revenueRequest);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 272)         var paymentChannels = await GetPaymentChannelStatisticsAsync(request);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 273)         var abandonedCarts = await GetAbandonedCartsAsync();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 274) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 275)         // Get order status statistics
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 276)         var orderRepo = _uow.GetRepository<Order>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 277)         var ordersQuery = orderRepo.Entities.AsQueryable();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 278) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 279)         if (request != null)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 280)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 281)             if (request.StartDate.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 282)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 283)                 ordersQuery = ordersQuery.Where(o => o.Orderdatetime >= request.StartDate.Value);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 284)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 285)             if (request.EndDate.HasValue)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 286)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 287)                 var endDate = request.EndDate.Value.AddDays(1);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 288)                 ordersQuery = ordersQuery.Where(o => o.Orderdatetime < endDate);
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 289)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 290)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 291) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 292)         var allOrders = await ordersQuery.ToListAsync();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 293)         var orderStatusStats = new Dictionary<string, int>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 294)         foreach (var order in allOrders)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 295)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 296)             var status = order.Status ?? "UNKNOWN";
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 297)             if (!orderStatusStats.ContainsKey(status))
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 298)                 orderStatusStats[status] = 0;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 299)             orderStatusStats[status]++;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 300)         }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 301) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 302)         return new DashboardSummaryDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 303)         {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 304)             Revenue = revenue,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 305)             PaymentChannels = paymentChannels,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 306)             AbandonedCarts = abandonedCarts,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 307)             Orders = new OrderStatusStatsDto
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 308)             {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 309)                 Total = allOrders.Count,
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 310)                 ByStatus = orderStatusStats
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 311)             }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 312)         };
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 313)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 314) 
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 315)     private decimal CalculateFinalPrice(Order order)
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 316)     {
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 317)         var totalPrice = order.Totalprice ?? 0;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 318)         var discountValue = order.Promotion?.Discountvalue ?? 0;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 319)         var finalPrice = totalPrice - discountValue;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 320)         return finalPrice > 0 ? finalPrice : 0;
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 321)     }
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 322) }

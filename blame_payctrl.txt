@@ -1,0 +1,249 @@
+﻿3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700   1) using System.Security.Claims;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700   2) using Microsoft.AspNetCore.Authorization;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700   3) using Microsoft.AspNetCore.Mvc;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700   4) using TetGift.BLL.Dtos;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700   5) using TetGift.BLL.Interfaces;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700   6) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700   7) namespace TetGift.Controllers;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700   8) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700   9) [ApiController]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  10) [Route("api/payments")]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  11) public class PaymentController : ControllerBase
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  12) {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  13)     private readonly IPaymentService _paymentService;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  14)     private readonly IWalletService _walletService;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700  15)     private readonly IOrderService _orderService;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  16) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700  17)     public PaymentController(IPaymentService paymentService, IWalletService walletService, IOrderService orderService)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  18)     {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  19)         _paymentService = paymentService;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  20)         _walletService = walletService;
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700  21)         _orderService = orderService;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  22)     }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  23) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  24)     private int GetCurrentAccountId()
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  25)     {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  26)         var accountIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  27)         if (string.IsNullOrEmpty(accountIdClaim) || !int.TryParse(accountIdClaim, out var accountId))
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  28)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  29)             throw new UnauthorizedAccessException("Kh├┤ng thß╗â x├íc ─æß╗ïnh ngã░ß╗Øi d├╣ng.");
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  30)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  31)         return accountId;
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  32)     }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  33) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  34)     private string GetClientIpAddress()
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  35)     {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  36)         // Lß║Ñy IP tß╗½ header X-Forwarded-For (nß║┐u c├│ proxy/load balancer)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  37)         var forwardedFor = Request.Headers["X-Forwarded-For"].FirstOrDefault();
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  38)         if (!string.IsNullOrEmpty(forwardedFor))
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  39)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  40)             var ips = forwardedFor.Split(',');
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  41)             if (ips.Length > 0)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  42)                 return ips[0].Trim();
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  43)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  44) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  45)         // Lß║Ñy IP tß╗½ RemoteIpAddress
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  46)         return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  47)     }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  48) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  49)     // ========== CUSTOMER ENDPOINTS ==========
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  50) 
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700  51)     [HttpPost()]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  52)     [Authorize]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  53)     public async Task<IActionResult> CreatePayment([FromBody] CreatePaymentRequest request)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  54)     {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  55)         try
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  56)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  57)             var accountId = GetCurrentAccountId();
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  58)             var clientIp = GetClientIpAddress();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  59)             var paymentMethod = request.PaymentMethod ?? "VNPAY";
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  60)             var result = await _paymentService.CreatePaymentAsync(request.OrderId, accountId, clientIp, paymentMethod);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  61)             return Ok(result);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  62)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  63)         catch (Exception ex)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  64)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  65)             return BadRequest(new { message = ex.Message });
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  66)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  67)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  68) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  69)     /// <summary>
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  70)     /// Thanh to├ín ─æãín h├áng bß║▒ng v├¡
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  71)     /// </summary>
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  72)     /// <summary>
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  73)     /// Thanh to├ín ─æãín h├áng bß║▒ng v├¡
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  74)     /// </summary>
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  75)     [HttpPost("wallet/pay")]
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  76)     [Authorize]
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  77)     public async Task<IActionResult> PayWithWallet([FromBody] WalletPaymentRequest request)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  78)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  79)         try
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  80)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  81)             var accountId = GetCurrentAccountId();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  82)             var result = await _walletService.PayWithWalletAsync(accountId, request.OrderId);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  83)             return Ok(result);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  84)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  85)         catch (Exception ex)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  86)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  87)             return BadRequest(new { message = ex.Message });
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  88)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  89)     }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  90) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  91)     [HttpGet("order/{orderId}")]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  92)     [Authorize]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  93)     public async Task<IActionResult> GetPaymentsByOrder(int orderId)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  94)     {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  95)         try
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  96)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  97)             var result = await _paymentService.GetPaymentsByOrderIdAsync(orderId);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  98)             return Ok(result);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700  99)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 100)         catch (Exception ex)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 101)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 102)             return BadRequest(new { message = ex.Message });
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 103)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 104)     }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 105) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 106)     [HttpGet("my-payments")]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 107)     [Authorize]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 108)     public async Task<IActionResult> GetMyPayments()
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 109)     {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 110)         try
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 111)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 112)             var accountId = GetCurrentAccountId();
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 113)             var result = await _paymentService.GetPaymentsByAccountIdAsync(accountId);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 114)             return Ok(result);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 115)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 116)         catch (Exception ex)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 117)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 118)             return BadRequest(new { message = ex.Message });
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 119)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 120)     }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 121) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 122)     // ========== VNPAY CALLBACK ENDPOINTS (Kh├┤ng cß║ºn [Authorize]) ==========
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 123) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 124)     [HttpGet("vnpay-ipn")]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 125)     [HttpPost("vnpay-ipn")]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 126)     public async Task<IActionResult> VnPayIpn()
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 127)     {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 128)         try
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 129)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 130)             // VNPay c├│ thß╗â gß╗¡i GET hoß║Àc POST, lß║Ñy tß╗½ Query hoß║Àc Form
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 131)             var queryParams = new Dictionary<string, string>();
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700 132) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 133)             if (Request.Method == "POST" && Request.HasFormContentType)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 134)             {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 135)                 foreach (var key in Request.Form.Keys)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 136)                 {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 137)                     queryParams[key] = Request.Form[key].ToString();
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 138)                 }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 139)             }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 140)             else
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 141)             {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 142)                 queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 143)             }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 144) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 145)             var result = await _paymentService.ProcessIpnCallbackAsync(queryParams);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 146) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 147)             ////Bß║úo: check stock nß║┐u ─æß╗º th├¼ lß║Ñy
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 148)             //if (result.Success && result.OrderId > 0)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 149)             //{
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 150)             //    await _orderService.TryAllocateStockAfterPaymentAsync(result.OrderId);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 151)             //}
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 152) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 153)             // Trß║ú vß╗ü JSON response cho VNPay
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 154)             var response = new
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 155)             {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 156)                 RspCode = result.ResponseCode ?? "99",
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 157)                 Message = result.Message
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 158)             };
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 159) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 160)             return Ok(response);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 161)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 162)         catch (Exception ex)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 163)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 164)             return Ok(new { RspCode = "99", Message = ex.Message });
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 165)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 166)     }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 167) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 168)     [HttpGet("vnpay-return")]
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 169)     public async Task<IActionResult> VnPayReturn()
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 170)     {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 171)         try
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 172)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 173)             var queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 174)             var result = await _paymentService.ProcessReturnUrlAsync(queryParams);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 175) 
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 176)             ////Bß║úo: check stock nß║┐u ─æß╗º th├¼ lß║Ñy
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 177)             //if (result.Success && result.OrderId > 0)
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 178)             //{
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 179)             //    await _orderService.TryAllocateStockAfterPaymentAsync(result.OrderId);
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 180)             //}
+0303e5ae (<ttinhbao@gmail.com>         2026-02-06 00:23:40 +0700 181) 
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 182)             return Ok(result);
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 183)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 184)         catch (Exception ex)
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 185)         {
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 186)             return BadRequest(new { message = ex.Message });
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 187)         }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 188)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 189) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 190)     // ========== WALLET DEPOSIT CALLBACK ENDPOINTS (Kh├┤ng cß║ºn [Authorize]) ==========
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 191) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 192)     /// <summary>
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 193)     /// IPN callback tß╗½ VNPay khi nß║íp tiß╗ün v├áo v├¡
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 194)     /// </summary>
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 195)     [HttpGet("wallet/deposit-ipn")]
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 196)     [HttpPost("wallet/deposit-ipn")]
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 197)     public async Task<IActionResult> WalletDepositIpn()
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 198)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 199)         try
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 200)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 201)             var queryParams = new Dictionary<string, string>();
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700 202) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 203)             if (Request.Method == "POST" && Request.HasFormContentType)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 204)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 205)                 foreach (var key in Request.Form.Keys)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 206)                 {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 207)                     queryParams[key] = Request.Form[key].ToString();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 208)                 }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 209)             }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 210)             else
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 211)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 212)                 queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 213)             }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 214) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 215)             var result = await _paymentService.ProcessWalletDepositIpnAsync(queryParams);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 216) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 217)             var response = new
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 218)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 219)                 RspCode = result.ResponseCode ?? "99",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 220)                 Message = result.Message
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 221)             };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 222) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 223)             return Ok(response);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 224)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 225)         catch (Exception ex)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 226)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 227)             return Ok(new { RspCode = "99", Message = ex.Message });
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 228)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 229)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 230) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 231)     /// <summary>
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 232)     /// Return URL tß╗½ VNPay khi nß║íp tiß╗ün v├áo v├¡
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 233)     /// </summary>
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 234)     [HttpGet("wallet/deposit-return")]
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 235)     public async Task<IActionResult> WalletDepositReturn()
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 236)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 237)         try
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 238)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 239)             var queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 240)             var result = await _paymentService.ProcessWalletDepositReturnAsync(queryParams);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 241) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 242)             return Ok(result);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 243)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 244)         catch (Exception ex)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 245)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 246)             return BadRequest(new { message = ex.Message });
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 247)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 248)     }
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 249) }

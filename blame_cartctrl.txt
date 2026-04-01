@@ -1,0 +1,140 @@
+﻿3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700   1) using System.Security.Claims;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   2) using Microsoft.AspNetCore.Authorization;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   3) using Microsoft.AspNetCore.Mvc;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   4) using TetGift.BLL.Dtos;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   5) using TetGift.BLL.Interfaces;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   6) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   7) namespace TetGift.Controllers;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   8) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700   9) [ApiController]
+3ca3a2e3 (<nthanhn2491@gmail.com>      2026-02-02 11:16:18 +0700  10) [Route("api/carts")]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  11) [Authorize]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  12) public class CartController : ControllerBase
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  13) {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  14)     private readonly ICartService _cartService;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  15) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  16)     public CartController(ICartService cartService)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  17)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  18)         _cartService = cartService;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  19)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  20) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  21)     private int GetCurrentAccountId()
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  22)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  23)         var accountIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  24)         if (string.IsNullOrEmpty(accountIdClaim) || !int.TryParse(accountIdClaim, out var accountId))
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  25)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  26)             throw new UnauthorizedAccessException("Kh├┤ng thß╗â x├íc ─æß╗ïnh ngã░ß╗Øi d├╣ng.");
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  27)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  28)         return accountId;
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  29)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  30) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  31) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  32)     [HttpGet]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  33)     public async Task<IActionResult> GetCart()
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  34)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  35)         try
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  36)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  37)             var accountId = GetCurrentAccountId();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  38)             var result = await _cartService.GetCartByAccountIdAsync(accountId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  39)             return Ok(result);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  40)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  41)         catch (Exception ex)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  42)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  43)             return BadRequest(new { message = ex.Message });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  44)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  45)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  46) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  47)     [HttpGet("count")]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  48)     public async Task<IActionResult> GetCartItemCount()
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  49)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  50)         try
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  51)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  52)             var accountId = GetCurrentAccountId();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  53)             var count = await _cartService.GetCartItemCountAsync(accountId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  54)             return Ok(new { count });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  55)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  56)         catch (Exception ex)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  57)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  58)             return BadRequest(new { message = ex.Message });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  59)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  60)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  61) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  62)     [HttpPost("items")]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  63)     public async Task<IActionResult> AddItem([FromBody] AddToCartRequest request)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  64)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  65)         try
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  66)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  67)             var accountId = GetCurrentAccountId();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  68)             var result = await _cartService.AddItemAsync(accountId, request);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  69)             return Ok(result);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  70)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  71)         catch (Exception ex)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  72)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  73)             return BadRequest(new { message = ex.Message });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  74)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  75)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  76) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  77)     [HttpPut("items/{cartDetailId}")]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  78)     public async Task<IActionResult> UpdateItem(int cartDetailId, [FromBody] UpdateCartItemRequest request)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  79)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  80)         try
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  81)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  82)             var accountId = GetCurrentAccountId();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  83)             // Validate cartDetailId thuß╗Öc vß╗ü accountId n├áy
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  84)             await _cartService.ValidateCartDetailOwnershipAsync(cartDetailId, accountId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  85)             var result = await _cartService.UpdateItemAsync(cartDetailId, request);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  86)             return Ok(result);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  87)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  88)         catch (Exception ex)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  89)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  90)             return BadRequest(new { message = ex.Message });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  91)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  92)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  93) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  94)     [HttpDelete("items/{cartDetailId}")]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  95)     public async Task<IActionResult> RemoveItem(int cartDetailId)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  96)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  97)         try
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  98)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700  99)             var accountId = GetCurrentAccountId();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 100)             // Validate cartDetailId thuß╗Öc vß╗ü accountId n├áy
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 101)             await _cartService.ValidateCartDetailOwnershipAsync(cartDetailId, accountId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 102)             var result = await _cartService.RemoveItemAsync(cartDetailId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 103)             return Ok(result);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 104)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 105)         catch (Exception ex)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 106)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 107)             return BadRequest(new { message = ex.Message });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 108)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 109)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 110) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 111)     [HttpPost("apply-promotion")]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 112)     public async Task<IActionResult> ApplyPromotion([FromBody] ApplyPromotionRequest request)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 113)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 114)         try
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 115)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 116)             var accountId = GetCurrentAccountId();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 117)             var result = await _cartService.ApplyPromotionAsync(accountId, request);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 118)             return Ok(result);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 119)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 120)         catch (Exception ex)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 121)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 122)             return BadRequest(new { message = ex.Message });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 123)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 124)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 125) 
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 126)     [HttpDelete("clear")]
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 127)     public async Task<IActionResult> ClearCart()
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 128)     {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 129)         try
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 130)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 131)             var accountId = GetCurrentAccountId();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 132)             await _cartService.ClearCartAsync(accountId);
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 133)             return Ok(new { message = "─É├ú x├│a to├án bß╗Ö giß╗Å h├áng" });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 134)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 135)         catch (Exception ex)
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 136)         {
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 137)             return BadRequest(new { message = ex.Message });
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 138)         }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 139)     }
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 140) }

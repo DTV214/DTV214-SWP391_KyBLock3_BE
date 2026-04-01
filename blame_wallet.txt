@@ -1,0 +1,554 @@
+﻿0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700   1) using Microsoft.EntityFrameworkCore;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700   2) using Microsoft.Extensions.Configuration;
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700   3) using TetGift.BLL.Common.Constraint;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700   4) using TetGift.BLL.Common.VnPay;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700   5) using TetGift.BLL.Dtos;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700   6) using TetGift.BLL.Interfaces;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700   7) using TetGift.DAL.Entities;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700   8) using TetGift.DAL.Interfaces;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700   9) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  10) namespace TetGift.BLL.Services;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  11) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  12) public class WalletService : IWalletService
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  13) {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  14)     private readonly IUnitOfWork _uow;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  15)     private readonly IConfiguration _configuration;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  16) 
+b011e005 (<khanhtrantuc2004@gmail.com> 2026-02-01 17:02:19 +0700  17)     public WalletService(IUnitOfWork uow, IConfiguration configuration)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  18)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  19)         _uow = uow;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  20)         _configuration = configuration;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  21)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  22) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  23)     public async Task<WalletResponseDto> GetWalletByAccountIdAsync(int accountId)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  24)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  25)         var walletRepo = _uow.GetRepository<Wallet>();
+2aad664b (<khanhtrantuc2004@gmail.com> 2026-02-01 15:01:16 +0700  26)         var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  27) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  28)         if (wallet == null)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  29)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  30)             // Tß╗▒ ─æß╗Öng tß║ío v├¡ nß║┐u chã░a c├│ (lazy creation)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  31)             return await CreateWalletForAccountAsync(accountId);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  32)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  33) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  34)         return new WalletResponseDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  35)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  36)             WalletId = wallet.Walletid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  37)             AccountId = wallet.Accountid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  38)             Balance = wallet.Balance,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  39)             Status = wallet.Status ?? WalletStatus.ACTIVE,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  40)             CreatedAt = wallet.Createdat,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  41)             UpdatedAt = wallet.Updatedat
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  42)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  43)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  44) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  45)     public async Task<WalletTransactionHistoryDto> GetWalletTransactionsAsync(int accountId, int? page = 1, int? limit = 20)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  46)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  47)         var walletRepo = _uow.GetRepository<Wallet>();
+2aad664b (<khanhtrantuc2004@gmail.com> 2026-02-01 15:01:16 +0700  48)         var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  49) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  50)         if (wallet == null)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  51)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  52)             return new WalletTransactionHistoryDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  53)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  54)                 Transactions = new List<WalletTransactionDto>(),
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  55)                 TotalCount = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  56)                 Page = page ?? 1,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  57)                 Limit = limit ?? 20
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  58)             };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  59)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  60) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  61)         var transactionRepo = _uow.GetRepository<WalletTransaction>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  62)         var pageNumber = page ?? 1;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  63)         var pageSize = limit ?? 20;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  64)         var pageIndex = pageNumber - 1;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  65) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  66)         // Lß║Ñy tß║Ñt cß║ú transactions v├á paginate manually
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  67)         var allTransactions = await transactionRepo.GetAllAsync(
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  68)             t => t.Walletid == wallet.Walletid
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  69)         );
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  70) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  71)         var totalCount = allTransactions.Count();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  72)         var transactions = allTransactions
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  73)             .OrderByDescending(t => t.Createdat)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  74)             .Skip(pageIndex * pageSize)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  75)             .Take(pageSize)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  76)             .ToList();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  77) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  78)         return new WalletTransactionHistoryDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  79)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  80)             Transactions = transactions.Select(t => new WalletTransactionDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  81)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  82)                 TransactionId = t.Transactionid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  83)                 WalletId = t.Walletid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  84)                 OrderId = t.Orderid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  85)                 TransactionType = t.Transactiontype ?? "",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  86)                 Amount = t.Amount,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  87)                 BalanceBefore = t.Balancebefore,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  88)                 BalanceAfter = t.Balanceafter,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700  89)                 Status = t.Status ?? WalletTransactionStatus.SUCCESS,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  90)                 Description = t.Description,
+2aad664b (<khanhtrantuc2004@gmail.com> 2026-02-01 15:01:16 +0700  91)                 CreatedAt = t.Createdat
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  92)             }).ToList(),
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  93)             TotalCount = totalCount,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  94)             Page = pageNumber,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  95)             Limit = pageSize
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  96)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  97)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  98) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700  99)     public async Task<WalletResponseDto> CreateWalletForAccountAsync(int accountId)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 100)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 101)         var walletRepo = _uow.GetRepository<Wallet>();
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 102) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 103)         // Kiß╗âm tra ─æ├ú c├│ v├¡ chã░a
+2aad664b (<khanhtrantuc2004@gmail.com> 2026-02-01 15:01:16 +0700 104)         var existingWallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 105)         if (existingWallet != null)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 106)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 107)             return new WalletResponseDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 108)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 109)                 WalletId = existingWallet.Walletid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 110)                 AccountId = existingWallet.Accountid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 111)                 Balance = existingWallet.Balance,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 112)                 Status = existingWallet.Status ?? WalletStatus.ACTIVE,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 113)                 CreatedAt = existingWallet.Createdat,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 114)                 UpdatedAt = existingWallet.Updatedat
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 115)             };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 116)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 117) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 118)         // Tß║ío v├¡ mß╗øi
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 119)         var wallet = new Wallet
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 120)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 121)             Accountid = accountId,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 122)             Balance = 0,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 123)             Status = WalletStatus.ACTIVE,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 124)             Createdat = DateTime.Now
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 125)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 126) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 127)         await walletRepo.AddAsync(wallet);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 128)         await _uow.SaveAsync();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 129) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 130)         return new WalletResponseDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 131)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 132)             WalletId = wallet.Walletid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 133)             AccountId = wallet.Accountid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 134)             Balance = wallet.Balance,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 135)             Status = wallet.Status,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 136)             CreatedAt = wallet.Createdat,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 137)             UpdatedAt = wallet.Updatedat
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 138)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 139)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 140) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 141)     public async Task<DepositResponseDto> DepositToWalletAsync(int accountId, decimal amount, string? clientIp = null)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 142)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 143)         // Validation
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 144)         if (amount < 10000)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 145)             throw new Exception("Sß╗æ tiß╗ün nß║íp tß╗æi thiß╗âu l├á 10,000 VN─É.");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 146)         if (amount > 50000000)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 147)             throw new Exception("Sß╗æ tiß╗ün nß║íp tß╗æi ─æa l├á 50,000,000 VN─É.");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 148) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 149)         // ─Éß║úm bß║úo c├│ v├¡
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 150)         var wallet = await GetWalletByAccountIdAsync(accountId);
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 151)         if (wallet.Status != WalletStatus.ACTIVE)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 152)             throw new Exception("V├¡ cß╗ºa bß║ín ─æang bß╗ï kh├│a, kh├┤ng thß╗â nß║íp tiß╗ün.");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 153) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 154)         // Tß║ío Payment record vß╗øi Type = WALLET_DEPOSIT
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 155)         var paymentRepo = _uow.GetRepository<Payment>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 156)         var payment = new Payment
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 157)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 158)             Walletid = wallet.WalletId,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 159)             Amount = amount,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 160)             Status = PaymentStatus.PENDING,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 161)             Type = "WALLET_DEPOSIT",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 162)             Paymentmethod = "VNPAY",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 163)             Ispayonline = true
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 164)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 165)         await paymentRepo.AddAsync(payment);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 166)         await _uow.SaveAsync();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 167) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 168)         // Build VNPay URL
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 169)         var vnpUrl = _configuration["VnPay:Url"] ?? throw new Exception("Missing config: VnPay:Url");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 170)         var vnpTmnCode = _configuration["VnPay:TmnCode"] ?? throw new Exception("Missing config: VnPay:TmnCode");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 171)         var vnpHashSecret = _configuration["VnPay:HashSecret"] ?? throw new Exception("Missing config: VnPay:HashSecret");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 172)         var vnpReturnUrl = _configuration["VnPay:DepositReturnUrl"] ?? _configuration["VnPay:ReturnUrl"] ?? throw new Exception("Missing config: VnPay:ReturnUrl");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 173)         var vnpIpnUrl = _configuration["VnPay:DepositIpnUrl"] ?? _configuration["VnPay:IpnUrl"] ?? throw new Exception("Missing config: VnPay:IpnUrl");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 174) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 175)         var vnpay = new VnPayLibrary();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 176)         vnpay.AddRequestData("vnp_Version", VnPayLibrary.VERSION);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 177)         vnpay.AddRequestData("vnp_Command", "pay");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 178)         vnpay.AddRequestData("vnp_TmnCode", vnpTmnCode);
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 179) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 180)         var vietnamTime = DateTime.UtcNow.AddHours(7);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 181)         vnpay.AddRequestData("vnp_Amount", ((long)(amount * 100)).ToString());
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 182)         vnpay.AddRequestData("vnp_CreateDate", vietnamTime.ToString("yyyyMMddHHmmss"));
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 183)         vnpay.AddRequestData("vnp_CurrCode", "VND");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 184)         vnpay.AddRequestData("vnp_IpAddr", clientIp ?? "127.0.0.1");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 185)         vnpay.AddRequestData("vnp_Locale", "vn");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 186)         vnpay.AddRequestData("vnp_OrderInfo", $"Nap tien vao vi - So tien: {amount:N0} VND");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 187)         vnpay.AddRequestData("vnp_OrderType", "other");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 188)         vnpay.AddRequestData("vnp_ReturnUrl", vnpReturnUrl);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 189)         vnpay.AddRequestData("vnp_TxnRef", $"WALLET_{wallet.WalletId}_{payment.Paymentid}_{DateTime.Now:yyyyMMddHHmmss}");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 190)         vnpay.AddRequestData("vnp_ExpireDate", vietnamTime.AddMinutes(60).ToString("yyyyMMddHHmmss"));
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 191) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 192)         var paymentUrl = vnpay.CreateRequestUrl(vnpUrl, vnpHashSecret);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 193) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 194)         return new DepositResponseDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 195)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 196)             PaymentId = payment.Paymentid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 197)             Amount = amount,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 198)             PaymentUrl = paymentUrl,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 199)             Status = "PENDING"
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 200)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 201)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 202) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 203)     public async Task<PaymentResultDto> ProcessDepositCallbackAsync(Dictionary<string, string> queryParams)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 204)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 205)         var vnpHashSecret = _configuration["VnPay:HashSecret"] ?? throw new Exception("Missing config: VnPay:HashSecret");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 206) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 207)         var vnpay = new VnPayLibrary();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 208)         foreach (var kv in queryParams)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 209)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 210)             if (!string.IsNullOrEmpty(kv.Key) && kv.Key.StartsWith("vnp_"))
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 211)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 212)                 vnpay.AddResponseData(kv.Key, kv.Value);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 213)             }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 214)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 215) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 216)         var vnpTxnRef = vnpay.GetResponseData("vnp_TxnRef");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 217)         var vnpSecureHash = queryParams.ContainsKey("vnp_SecureHash") ? queryParams["vnp_SecureHash"] : "";
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 218) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 219)         // Validate signature
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 220)         if (!vnpay.ValidateSignature(vnpSecureHash, vnpHashSecret))
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 221)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 222)             return new PaymentResultDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 223)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 224)                 Success = false,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 225)                 PaymentId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 226)                 OrderId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 227)                 Message = "Invalid signature",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 228)                 Amount = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 229)                 ResponseCode = "97"
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 230)             };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 231)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 232) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 233)         // Parse vnp_TxnRef ─æß╗â lß║Ñy PaymentId
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 234)         // Format: WALLET_{WalletId}_{PaymentId}_{Timestamp}
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 235)         if (string.IsNullOrEmpty(vnpTxnRef) || !vnpTxnRef.StartsWith("WALLET_"))
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 236)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 237)             return new PaymentResultDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 238)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 239)                 Success = false,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 240)                 PaymentId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 241)                 OrderId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 242)                 Message = "Invalid transaction reference",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 243)                 Amount = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 244)                 ResponseCode = "99"
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 245)             };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 246)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 247) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 248)         var parts = vnpTxnRef.Split('_');
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 249)         if (parts.Length < 3 || !int.TryParse(parts[2], out var paymentId))
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 250)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 251)             return new PaymentResultDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 252)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 253)                 Success = false,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 254)                 PaymentId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 255)                 OrderId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 256)                 Message = "Invalid transaction reference format",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 257)                 Amount = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 258)                 ResponseCode = "99"
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 259)             };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 260)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 261) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 262)         var paymentRepo = _uow.GetRepository<Payment>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 263)         var payment = await paymentRepo.FindAsync(
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 264)             p => p.Paymentid == paymentId && p.Type == "WALLET_DEPOSIT",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 265)             include: q => q.Include(p => p.Wallet)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 266)         );
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 267) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 268)         if (payment == null)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 269)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 270)             return new PaymentResultDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 271)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 272)                 Success = false,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 273)                 PaymentId = paymentId,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 274)                 OrderId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 275)                 Message = "Payment not found",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 276)                 Amount = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 277)                 ResponseCode = "01"
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 278)             };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 279)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 280) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 281)         var vnpResponseCode = vnpay.GetResponseData("vnp_ResponseCode");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 282)         var vnpTransactionStatus = vnpay.GetResponseData("vnp_TransactionStatus");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 283)         var vnpAmount = long.Parse(vnpay.GetResponseData("vnp_Amount") ?? "0") / 100;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 284)         var vnpTransactionNo = vnpay.GetResponseData("vnp_TransactionNo");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 285) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 286)         var success = vnpResponseCode == "00" && vnpTransactionStatus == "00";
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 287) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 288)         // Kiß╗âm tra sß╗æ tiß╗ün
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 289)         if (vnpAmount != (long)payment.Amount)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 290)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 291)             return new PaymentResultDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 292)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 293)                 Success = false,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 294)                 PaymentId = paymentId,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 295)                 OrderId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 296)                 Message = "Invalid amount",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 297)                 Amount = payment.Amount ?? 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 298)                 ResponseCode = "04"
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 299)             };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 300)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 301) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 302)         // Cß║¡p nhß║¡t Payment status nß║┐u chã░a ─æã░ß╗úc cß║¡p nhß║¡t (idempotent)
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 303)         if (payment.Status != PaymentStatus.SUCCESS && success)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 304)         {
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 305)             payment.Status = PaymentStatus.SUCCESS;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 306)             payment.Transactionno = vnpTransactionNo;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 307)             paymentRepo.Update(payment);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 308) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 309)             // Cß╗Öng tiß╗ün v├áo v├¡
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 310)             if (payment.Wallet != null)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 311)             {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 312)                 var walletRepo = _uow.GetRepository<Wallet>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 313)                 var wallet = payment.Wallet;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 314)                 var balanceBefore = wallet.Balance;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 315) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 316)                 wallet.Balance += payment.Amount ?? 0;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 317)                 wallet.Updatedat = DateTime.Now;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 318)                 walletRepo.Update(wallet);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 319) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 320)                 // Tß║ío WalletTransaction ─æß╗â ghi log
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 321)                 var transactionRepo = _uow.GetRepository<WalletTransaction>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 322)                 var transaction = new WalletTransaction
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 323)                 {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 324)                     Walletid = wallet.Walletid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 325)                     Transactiontype = "DEPOSIT",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 326)                     Amount = payment.Amount ?? 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 327)                     Balancebefore = balanceBefore,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 328)                     Balanceafter = wallet.Balance,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 329)                     Status = WalletTransactionStatus.SUCCESS,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 330)                     Description = $"Nß║íp tiß╗ün v├áo v├¡ qua VNPay - Payment #{payment.Paymentid}",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 331)                     Createdat = DateTime.Now
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 332)                 };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 333)                 await transactionRepo.AddAsync(transaction);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 334)             }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 335) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 336)             await _uow.SaveAsync();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 337)         }
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 338)         else if (!success && payment.Status != PaymentStatus.FAILED)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 339)         {
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 340)             payment.Status = PaymentStatus.FAILED;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 341)             paymentRepo.Update(payment);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 342)             await _uow.SaveAsync();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 343)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 344) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 345)         return new PaymentResultDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 346)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 347)             Success = success,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 348)             PaymentId = paymentId,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 349)             OrderId = 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 350)             TransactionNo = vnpTransactionNo,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 351)             Message = success ? "Nß║íp tiß╗ün th├ánh c├┤ng" : $"Nß║íp tiß╗ün thß║Ñt bß║íi. M├ú lß╗ùi: {vnpResponseCode}",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 352)             Amount = payment.Amount ?? 0,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 353)             ResponseCode = vnpResponseCode
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 354)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 355)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 356) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 357)     public async Task<PaymentResultDto> ProcessDepositReturnAsync(Dictionary<string, string> queryParams)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 358)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 359)         // Tã░ãíng tß╗▒ ProcessDepositCallbackAsync nhã░ng chß╗ë ─æß╗â hiß╗ân thß╗ï kß║┐t quß║ú cho user
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 360)         return await ProcessDepositCallbackAsync(queryParams);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 361)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 362) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 363)     public async Task<WalletPaymentResponseDto> PayWithWalletAsync(int accountId, int orderId)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 364)     {
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 365)         // 1. Validate Order (query trß╗▒c tiß║┐p ─æß╗â tr├ính circular dependency)
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 366)         var orderRepo = _uow.GetRepository<Order>();
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 367)         var order = await orderRepo.FindAsync(
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 368)             o => o.Orderid == orderId && o.Accountid == accountId,
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 369)             include: q => q
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 370)                 .Include(o => o.OrderDetails)
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 371)                 .ThenInclude(od => od.Product)
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 372)                 .Include(o => o.Promotion)
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 373)         );
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 374) 
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 375)         if (order == null)
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 376)             throw new Exception("Kh├┤ng t├¼m thß║Ñy ─æãín h├áng hoß║Àc bß║ín kh├┤ng c├│ quyß╗ün thanh to├ín ─æãín h├áng n├áy.");
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 377) 
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 378)         if (order.Status != OrderStatus.PENDING)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 379)             throw new Exception("Chß╗ë c├│ thß╗â thanh to├ín cho ─æãín h├áng ─æang chß╗Ø x├íc nhß║¡n.");
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 380) 
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 381)         // Calculate FinalPrice tß╗½ Order (Totalprice ─æ├ú ─æã░ß╗úc t├¡nh vß╗øi discount khi tß║ío order)
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 382)         decimal finalPrice = order.Totalprice ?? 0;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 383) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 384)         // 2. Kiß╗âm tra ─æ├ú c├│ payment th├ánh c├┤ng chã░a
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 385)         var paymentRepo = _uow.GetRepository<Payment>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 386)         var existingPayments = await paymentRepo.GetAllAsync(
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 387)             p => p.Orderid == orderId && p.Status == PaymentStatus.SUCCESS
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 388)         );
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 389)         if (existingPayments.Any())
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 390)             throw new Exception("─Éãín h├áng n├áy ─æ├ú ─æã░ß╗úc thanh to├ín th├ánh c├┤ng.");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 391) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 392)         // 3. Lß║Ñy v├¡ v├á kiß╗âm tra sß╗æ dã░
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 393)         var walletRepo = _uow.GetRepository<Wallet>();
+2aad664b (<khanhtrantuc2004@gmail.com> 2026-02-01 15:01:16 +0700 394)         var wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 395) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 396)         if (wallet == null)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 397)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 398)             // Tß╗▒ ─æß╗Öng tß║ío v├¡ nß║┐u chã░a c├│
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 399)             await CreateWalletForAccountAsync(accountId);
+2aad664b (<khanhtrantuc2004@gmail.com> 2026-02-01 15:01:16 +0700 400)             wallet = await walletRepo.FindAsync(w => w.Accountid == accountId, include: null);
+2aad664b (<khanhtrantuc2004@gmail.com> 2026-02-01 15:01:16 +0700 401)             if (wallet == null)
+2aad664b (<khanhtrantuc2004@gmail.com> 2026-02-01 15:01:16 +0700 402)                 throw new Exception("Kh├┤ng thß╗â tß║ío v├¡ cho t├ái khoß║ún n├áy.");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 403)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 404) 
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 405)         if (wallet.Status != WalletStatus.ACTIVE)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 406)             throw new Exception("V├¡ cß╗ºa bß║ín ─æang bß╗ï kh├│a, kh├┤ng thß╗â thanh to├ín.");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 407) 
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 408)         if (wallet.Balance < finalPrice)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 409)         {
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 410)             throw new Exception($"Sß╗æ dã░ v├¡ kh├┤ng ─æß╗º ─æß╗â thanh to├ín ─æãín h├áng n├áy. Sß╗æ dã░ hiß╗çn tß║íi: {wallet.Balance:N0} VN─É, Cß║ºn thanh to├ín: {finalPrice:N0} VN─É, Thiß║┐u: {finalPrice - wallet.Balance:N0} VN─É");
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 411)         }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 412) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 413)         // 4. Trß╗½ tiß╗ün tß╗½ v├¡ v├á tß║ío Payment (trong transaction)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 414)         var balanceBefore = wallet.Balance;
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 415)         wallet.Balance -= finalPrice;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 416)         wallet.Updatedat = DateTime.Now;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 417)         walletRepo.Update(wallet);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 418) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 419)         // Tß║ío Payment record
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 420)         var payment = new Payment
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 421)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 422)             Orderid = orderId,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 423)             Walletid = wallet.Walletid,
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 424)             Amount = finalPrice,
+aecd64a9 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:31:03 +0700 425)             Status = PaymentStatus.SUCCESS,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 426)             Type = "ORDER_PAYMENT",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 427)             Paymentmethod = "WALLET",
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 428)             CreatedDate = DateTime.UtcNow,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 429)             Ispayonline = false
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 430)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 431)         await paymentRepo.AddAsync(payment);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 432)         await _uow.SaveAsync();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 433) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 434)         // Tß║ío WalletTransaction ─æß╗â ghi log
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 435)         var transactionRepo = _uow.GetRepository<WalletTransaction>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 436)         var transaction = new WalletTransaction
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 437)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 438)             Walletid = wallet.Walletid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 439)             Orderid = orderId,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 440)             Transactiontype = "PAYMENT",
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 441)             Amount = -finalPrice, // Sß╗æ ├óm ─æß╗â thß╗â hiß╗çn trß╗½ tiß╗ün
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 442)             Balancebefore = balanceBefore,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 443)             Balanceafter = wallet.Balance,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 444)             Status = "SUCCESS",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 445)             Description = $"Thanh to├ín ─æãín h├áng #{orderId}",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 446)             Createdat = DateTime.Now
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 447)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 448)         await transactionRepo.AddAsync(transaction);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 449) 
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 450)         // 5. Cß║¡p nhß║¡t Order status (order ─æ├ú ─æã░ß╗úc load ß╗ƒ tr├¬n)
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 451)         order.Status = OrderStatus.CONFIRMED;
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 452)         orderRepo.Update(order);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 453)         await _uow.SaveAsync();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 454) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 455)         return new WalletPaymentResponseDto
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 456)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 457)             PaymentId = payment.Paymentid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 458)             OrderId = orderId,
+fb3512a1 (<khanhtrantuc2004@gmail.com> 2026-02-01 16:14:09 +0700 459)             Amount = finalPrice,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 460)             Status = "SUCCESS",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 461)             Message = "Thanh to├ín bß║▒ng v├¡ th├ánh c├┤ng"
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 462)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 463)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 464) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 465)     public async Task RefundToWalletAsync(int orderId)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 466)     {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 467)         var paymentRepo = _uow.GetRepository<Payment>();
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 468)         var orderRepo = _uow.GetRepository<Order>();
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 469) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 470)         // T├¼m payment th├ánh c├┤ng (WALLET hoß║Àc VNPAY)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 471)         var payment = await paymentRepo.FindAsync(
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 472)             p => p.Orderid == orderId &&
+0f903d2f (<nthanhn2491@gmail.com>      2026-02-24 21:28:09 +0700 473)                  (p.Paymentmethod == "WALLET" || p.Paymentmethod == "VNPAY") &&
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 474)                  p.Status == PaymentStatus.SUCCESS,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 475)             include: q => q.Include(p => p.Wallet)
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 476)         );
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 477) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 478)         if (payment == null)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 479)             return; // Chã░a thanh to├ín hoß║Àc thanh to├ín thß║Ñt bß║íi
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 480) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 481)         // Kiß╗âm tra ─æ├ú ─æã░ß╗úc ho├án lß║íi chã░a
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 482)         var transactionRepo = _uow.GetRepository<WalletTransaction>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 483)         var existingRefunds = await transactionRepo.GetAllAsync(
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 484)             t => t.Orderid == orderId && t.Transactiontype == "REFUND"
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 485)         );
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 486)         if (existingRefunds.Any())
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 487)             return; // ─É├ú ─æã░ß╗úc ho├án lß║íi rß╗ôi
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 488) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 489)         Wallet? wallet = null;
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 490) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 491)         // Nß║┐u thanh to├ín bß║▒ng WALLET, d├╣ng wallet tß╗½ payment
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 492)         if (payment.Paymentmethod == "WALLET" && payment.Wallet != null)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 493)         {
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 494)             wallet = payment.Wallet;
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 495)         }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 496)         // Nß║┐u thanh to├ín bß║▒ng VNPAY, lß║Ñy wallet tß╗½ account cß╗ºa order
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 497)         else if (payment.Paymentmethod == "VNPAY")
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 498)         {
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 499)             var order = await orderRepo.FindAsync(
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 500)                 o => o.Orderid == orderId,
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 501)                 include: q => q.Include(o => o.Account).ThenInclude(a => a.Wallet)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 502)             );
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 503) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 504)             if (order?.Account?.Wallet == null)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 505)                 return; // Kh├┤ng t├¼m thß║Ñy v├¡ cß╗ºa customer
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 506) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 507)             wallet = order.Account.Wallet;
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 508)         }
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 509) 
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 510)         if (wallet == null)
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 511)             return; // Kh├┤ng t├¼m thß║Ñy v├¡
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 512) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 513)         var balanceBefore = wallet.Balance;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 514)         var refundAmount = payment.Amount ?? 0;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 515) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 516)         // Cß╗Öng tiß╗ün v├áo v├¡
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 517)         wallet.Balance += refundAmount;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 518)         wallet.Updatedat = DateTime.Now;
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 519)         var walletRepo = _uow.GetRepository<Wallet>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 520)         walletRepo.Update(wallet);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 521) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 522)         // Tß║ío WalletTransaction ─æß╗â ghi log
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 523)         var transaction = new WalletTransaction
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 524)         {
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 525)             Walletid = wallet.Walletid,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 526)             Orderid = orderId,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 527)             Transactiontype = "REFUND",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 528)             Amount = refundAmount, // Sß╗æ dã░ãíng ─æß╗â thß╗â hiß╗çn cß╗Öng tiß╗ün
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 529)             Balancebefore = balanceBefore,
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 530)             Balanceafter = wallet.Balance,
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 531)             Status = WalletTransactionStatus.SUCCESS,
+b973cb06 (<khanhtrantuc2004@gmail.com> 2026-02-01 15:47:44 +0700 532)             Description = $"Ho├án tiß╗ün do hß╗ºy ─æãín h├áng #{orderId} (Thanh to├ín bß║▒ng {payment.Paymentmethod ?? "UNKNOWN"})",
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 533)             Createdat = DateTime.Now
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 534)         };
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 535)         await transactionRepo.AddAsync(transaction);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 536) 
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 537)         //payment.Status = PaymentStatus.REFUNDED;
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 538)         //paymentRepo.Update(payment);
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 539) 
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 540)         var refundPayment = new Payment
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 541)         {
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 542)             Orderid = orderId,
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 543)             Amount = refundAmount,
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 544)             Status = PaymentStatus.REFUNDED,
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 545)             Type = "ORDER_REFUND",
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 546)             Paymentmethod = "WALLET",
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 547)             CreatedDate = DateTime.UtcNow,
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 548)             Ispayonline = false
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 549)         };
+7261fdd0 (<nthanhn2491@gmail.com>      2026-02-26 12:54:02 +0700 550)         await paymentRepo.AddAsync(refundPayment);
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 551) 
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 552)         await _uow.SaveAsync();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 553)     }
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 554) }

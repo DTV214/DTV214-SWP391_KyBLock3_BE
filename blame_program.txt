@@ -1,0 +1,246 @@
+﻿d5dbe34a (<nthanhn2491@gmail.com>      2026-02-23 21:01:01 +0700   1) ´╗┐using System.Net.Http.Headers;
+d5dbe34a (<nthanhn2491@gmail.com>      2026-02-23 21:01:01 +0700   2) using System.Text;
+d5dbe34a (<nthanhn2491@gmail.com>      2026-02-23 21:01:01 +0700   3) using System.Text.Json;
+d5dbe34a (<nthanhn2491@gmail.com>      2026-02-23 21:01:01 +0700   4) using Microsoft.AspNetCore.Authentication.JwtBearer;
+5b5eaee4 (<nthanhn2491@gmail.com>      2026-01-27 18:40:18 +0700   5) using Microsoft.EntityFrameworkCore;
+5b5eaee4 (<nthanhn2491@gmail.com>      2026-01-27 18:40:18 +0700   6) using Microsoft.IdentityModel.Tokens;
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700   7) using Microsoft.OpenApi.Models;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700   8) using TetGift.BackgroundJobs;
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700   9) using TetGift.BLL.Common;
+021bcfdc (<ttinhbao@gmail.com>         2026-02-26 17:59:34 +0700  10) using TetGift.BLL.Hubs;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  11) using TetGift.BLL.Interfaces;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  12) using TetGift.BLL.Services;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  13) using TetGift.DAL.Context;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  14) using TetGift.DAL.Interfaces;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  15) using TetGift.DAL.Repositories;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  16) using TetGift.DAL.UnitOfWork;
+4b797bd4 (<ttinhbao@gmail.com>         2026-01-29 11:11:20 +0700  17) using TetGift.Filters;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  18) using TetGift.Middlewares;
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  19) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  20) namespace TetGift
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  21) {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  22)     public class Program
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  23)     {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  24)         public static void Main(string[] args)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  25)         {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  26)             var builder = WebApplication.CreateBuilder(args);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  27) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  28)             // ConnectionString
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  29)             builder.Services.AddDbContext<DatabaseContext>(options =>
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  30)                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  31) 
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  32)             // --- PHß║ªN TH├èM Cß╗ªA M├îNH: ─É─éNG K├Ø CORS SERVICE ---
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  33)             builder.Services.AddCors(options =>
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  34)             {
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  35)                 options.AddPolicy("AllowReactApp",
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  36)                     policy =>
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  37)                     {
+76b944a9 (<ttinhbao@gmail.com>         2026-02-26 20:05:17 +0700  38)                         policy.WithOrigins("http://localhost:5173", "http://14.225.207.221", "https://localhost:7056/") // Khß╗øp vß╗øi origin cß╗ºa React (Vite)
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  39)                               .AllowAnyHeader()
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  40)                               .AllowAnyMethod()
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  41)                               .AllowCredentials();
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  42)                     });
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  43)             });
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700  44) 
+4b797bd4 (<ttinhbao@gmail.com>         2026-01-29 11:11:20 +0700  45)             builder.Services.AddControllers(options =>
+4b797bd4 (<ttinhbao@gmail.com>         2026-01-29 11:11:20 +0700  46)             {
+4b797bd4 (<ttinhbao@gmail.com>         2026-01-29 11:11:20 +0700  47)                 options.Filters.Add<ApiResponseWrapperFilter>();
+4b797bd4 (<ttinhbao@gmail.com>         2026-01-29 11:11:20 +0700  48)             });
+4b797bd4 (<ttinhbao@gmail.com>         2026-01-29 11:11:20 +0700  49) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  50)             // Cß║Ñu h├¼nh Jwt
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  51)             var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new Exception("Missing config: Jwt:Key");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  52)             var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  53)             var jwtAudience = builder.Configuration["Jwt:Audience"];
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  54) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  55)             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  56)                 .AddJwtBearer(options =>
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  57)                 {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  58)                     options.TokenValidationParameters = new TokenValidationParameters
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  59)                     {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  60)                         ValidateIssuerSigningKey = true,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  61)                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  62) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  63)                         ValidateIssuer = !string.IsNullOrWhiteSpace(jwtIssuer),
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  64)                         ValidIssuer = jwtIssuer,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  65) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  66)                         ValidateAudience = !string.IsNullOrWhiteSpace(jwtAudience),
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  67)                         ValidAudience = jwtAudience,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  68) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  69)                         ValidateLifetime = true,
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  70)                         ClockSkew = TimeSpan.FromSeconds(30)
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700  71)                     };
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  72) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  73)                     options.Events = new JwtBearerEvents
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  74)                     {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  75)                         // 401
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  76)                         OnChallenge = async context =>
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  77)                         {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  78)                             context.HandleResponse();
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  79) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  80)                             if (!context.Response.HasStarted)
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  81)                             {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  82)                                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  83)                                 context.Response.ContentType = "application/json";
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  84) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  85)                                 var payload = new ApiResponse<object?>
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  86)                                 {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  87)                                     Status = 401,
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  88)                                     Msg = "Unauthorized.",
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  89)                                     Data = null
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  90)                                 };
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  91) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  92)                                 var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  93)                                 {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  94)                                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  95)                                 });
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  96) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  97)                                 await context.Response.WriteAsync(json);
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  98)                             }
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700  99)                         },
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 100) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 101)                         // 403
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 102)                         OnForbidden = async context =>
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 103)                         {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 104)                             if (!context.Response.HasStarted)
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 105)                             {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 106)                                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 107)                                 context.Response.ContentType = "application/json";
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 108) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 109)                                 var payload = new ApiResponse<object?>
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 110)                                 {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 111)                                     Status = 403,
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 112)                                     Msg = "Forbidden.",
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 113)                                     Data = null
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 114)                                 };
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 115) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 116)                                 var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 117)                                 {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 118)                                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 119)                                 });
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 120) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 121)                                 await context.Response.WriteAsync(json);
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 122)                             }
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 123)                         },
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 124) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 125)                         OnAuthenticationFailed = context =>
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 126)                         {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 127)                             return Task.CompletedTask;
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 128)                         }
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 129)                     };
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 130)                 });
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 131) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 132) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 133)             builder.Services.AddAuthorization();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 134) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 135)             // Add services to the container.
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 136)             builder.Services.AddEndpointsApiExplorer();
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 137)             builder.Services.AddSwaggerGen(c =>
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 138)             {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 139)                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "TetGift API", Version = "v1" });
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 140) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 141)                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 142)                 {
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 143)                     Name = "Authorization",
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 144)                     Type = SecuritySchemeType.Http,
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 145)                     Scheme = "bearer",
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 146)                     BearerFormat = "JWT",
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 147)                     In = ParameterLocation.Header,
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 148)                     Description = "Nhß║¡p: Bearer {your_jwt_token}"
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 149)                 });
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 150) 
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 151)                 c.AddSecurityRequirement(new OpenApiSecurityRequirement
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 152)                 {
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 153)                     {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 154)                         new OpenApiSecurityScheme
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 155)                         {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 156)                             Reference = new OpenApiReference
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 157)                             {
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 158)                                 Type = ReferenceType.SecurityScheme,
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 159)                                 Id = "Bearer"
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 160)                             }
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 161)                         },
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 162)                         Array.Empty<string>()
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 163)                     }
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 164)                 });
+ddc903ba (<khanhtrantuc2004@gmail.com> 2026-02-01 00:21:15 +0700 165)             });
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 166) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 167)             // ─É─âng k├¢ Background Services
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 168)             builder.Services.AddHostedService<PendingAccountCleanupService>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 169) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 170)             // ─É─âng k├¢ c├íc Repository
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 171)             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 172)             builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 173) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 174)             // ─É─âng k├¢ c├íc external Service
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 175)             builder.Services.AddScoped<IEmailTemplateRenderer, FileEmailTemplateRenderer>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 176)             builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 177)             builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>((sp, http) =>
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 178)             {
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 179)                 var cfg = sp.GetRequiredService<IConfiguration>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 180)                 var apiKey = cfg["Resend:ApiKey"];
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 181) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 182)                 http.BaseAddress = new Uri("https://api.resend.com/");
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 183)                 if (!string.IsNullOrWhiteSpace(apiKey))
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 184)                     http.DefaultRequestHeaders.Authorization =
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 185)                         new AuthenticationHeaderValue("Bearer", apiKey);
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 186)             });
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 187) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 188)             // ─É─âng k├¢ c├íc Service
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 189)             builder.Services.AddScoped<IAuthService, AuthService>();
+5b5eaee4 (<nthanhn2491@gmail.com>      2026-01-27 18:40:18 +0700 190)             builder.Services.AddScoped<IProductConfigService, ProductConfigService>();
+1aff0d1c (<nthanhn2491@gmail.com>      2026-01-27 19:05:18 +0700 191)             builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
+7b2ecf8a (<nthanhn2491@gmail.com>      2026-01-27 20:47:35 +0700 192)             builder.Services.AddScoped<IConfigDetailService, ConfigDetailService>();
+c2b21fa4 (<nthanhn2491@gmail.com>      2026-01-28 08:34:24 +0700 193)             builder.Services.AddScoped<IProductService, ProductService>();
+99fc3d94 (<nthanhn2491@gmail.com>      2026-01-28 16:13:46 +0700 194)             builder.Services.AddScoped<IProductDetailService, ProductDetailService>();
+9fb4c132 (<dtvgaming214@gmail.com>     2026-01-31 18:36:34 +0700 195)             builder.Services.AddScoped<IPromotionService, PromotionService>();
+9fb4c132 (<dtvgaming214@gmail.com>     2026-01-31 18:36:34 +0700 196)             builder.Services.AddScoped<IInventoryService, InventoryService>();
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 197)             builder.Services.AddScoped<IQuotationService, QuotationService>();
+90e5482b (<ttinhbao@gmail.com>         2026-02-01 05:46:58 +0700 198)             builder.Services.AddScoped<IOrderFromQuotationService, OrderFromQuotationService>();
+72b5c258 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:07:18 +0700 199)             builder.Services.AddScoped<ICartService, CartService>();
+0b0eb2d9 (<khanhtrantuc2004@gmail.com> 2026-01-31 23:18:54 +0700 200)             builder.Services.AddScoped<IOrderService, OrderService>();
+b84d79ba (<khanhtrantuc2004@gmail.com> 2026-01-31 23:54:07 +0700 201)             builder.Services.AddScoped<IPaymentService, PaymentService>();
+0ebdf730 (<khanhtrantuc2004@gmail.com> 2026-02-01 14:57:45 +0700 202)             builder.Services.AddScoped<IWalletService, WalletService>();
+7a3a4090 (<khanhtrantuc2004@gmail.com> 2026-02-01 02:35:46 +0700 203)             builder.Services.AddScoped<IDashboardService, DashboardService>();
+8393ae9f (<dtvgaming214@gmail.com>     2026-02-01 11:14:05 +0700 204)             builder.Services.AddScoped<IBlogService, BlogService>();
+076daf15 (<dtvgaming214@gmail.com>     2026-02-02 11:00:38 +0700 205)             builder.Services.AddScoped<IAccountService, AccountService>();
+021bcfdc (<ttinhbao@gmail.com>         2026-02-26 17:59:34 +0700 206)             builder.Services.AddScoped<IChatService, ChatService>();
+8eb71ce1 (<dtvgaming214@gmail.com>     2026-03-04 22:36:53 +0700 207)             builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
+021bcfdc (<ttinhbao@gmail.com>         2026-02-26 17:59:34 +0700 208) 
+021bcfdc (<ttinhbao@gmail.com>         2026-02-26 17:59:34 +0700 209)             builder.Services.AddSignalR();
+021bcfdc (<ttinhbao@gmail.com>         2026-02-26 17:59:34 +0700 210) 
+021bcfdc (<ttinhbao@gmail.com>         2026-02-26 17:59:34 +0700 211)             
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700 212) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 213)             var app = builder.Build();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 214) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 215)             // Configure the HTTP request pipeline.
+1904f66e (<khanhtrantuc2004@gmail.com> 2026-01-29 10:46:27 +0700 216)             app.UseSwagger();
+1904f66e (<khanhtrantuc2004@gmail.com> 2026-01-29 10:46:27 +0700 217)             app.UseSwaggerUI();
+1904f66e (<khanhtrantuc2004@gmail.com> 2026-01-29 10:46:27 +0700 218) 
+1904f66e (<khanhtrantuc2004@gmail.com> 2026-01-29 10:46:27 +0700 219)             // Only redirect to HTTPS in production with SSL configured
+1904f66e (<khanhtrantuc2004@gmail.com> 2026-01-29 10:46:27 +0700 220)             if (!app.Environment.IsProduction())
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 221)             {
+1904f66e (<khanhtrantuc2004@gmail.com> 2026-01-29 10:46:27 +0700 222)                 app.UseHttpsRedirection();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 223)             }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 224) 
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700 225)             // --- PHß║ªN TH├èM Cß╗ªA M├îNH: Sß╗¼ Dß╗ñNG CORS MIDDLEWARE ---
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700 226)             // Phß║úi ─æß║Àt sau UseRouting v├á trã░ß╗øc UseAuthentication/Authorization
+76b944a9 (<ttinhbao@gmail.com>         2026-02-26 20:05:17 +0700 227)             app.UseStaticFiles();
+76b944a9 (<ttinhbao@gmail.com>         2026-02-26 20:05:17 +0700 228) 
+24ccdee8 (<khanhtrantuc2004@gmail.com> 2026-02-01 00:53:24 +0700 229)             app.UseRouting();
+4b797bd4 (<ttinhbao@gmail.com>         2026-01-29 11:11:20 +0700 230) 
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700 231)             app.UseCors("AllowReactApp");
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700 232) 
+76b944a9 (<ttinhbao@gmail.com>         2026-02-26 20:05:17 +0700 233)             app.MapHub<ChatHub>("/hubs/chat");
+021bcfdc (<ttinhbao@gmail.com>         2026-02-26 17:59:34 +0700 234) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 235)             //Middleware
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 236)             app.UseMiddleware<ExceptionMiddleware>();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 237) 
+c160e817 (<khanhtrantuc2004@gmail.com> 2026-02-01 00:48:29 +0700 238)             app.UseAuthentication();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 239)             app.UseAuthorization();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 240) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 241)             app.MapControllers();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 242) 
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 243)             app.Run();
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 244)         }
+^cc74536 (<ttinhbao@gmail.com>         2026-01-26 23:13:11 +0700 245)     }
+7ec1c7fa (<dtvgaming214@gmail.com>     2026-02-03 10:30:27 +0700 246) }

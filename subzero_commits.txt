@@ -1,0 +1,178 @@
+﻿===COMMIT=== 274c75e 2026-03-16 [CONFIG] Add Gemini AI API key config for VPS deployment
+
+.github/workflows/deploy.yml
+TetGift/appsettings.json
+docker-compose.prod.yml
+===COMMIT=== c9ff492 2026-02-12 Merge main into dev: Sync merge commits
+===COMMIT=== d907199 2026-02-12 Merge dev into main: Include EmailTemplates fix and latest changes
+===COMMIT=== 0fee640 2026-02-12 Merge branch 'dev' of github.com:Subzerozdev/PRN232_ProjectGroup into dev
+===COMMIT=== fa8a2c6 2026-02-12 Fix: Include EmailTemplates in build output and improve template path resolution
+
+TetGift.BLL/Services/FileEmailTemplateRenderer.cs
+TetGift/TetGift.csproj
+===COMMIT=== 253b918 2026-02-01 Fix wallet deposit callback: Handle WALLET_ prefix in vnpTxnRef
+
+TetGift.BLL/Services/PaymentService.cs
+===COMMIT=== 3f84d3d 2026-02-01 Force normalize all role values to UPPERCASE in account table
+
+TetGift.DAL/Migrations/20260201100432_ForceNormalizeRoleValuesToUppercase.Designer.cs
+TetGift.DAL/Migrations/20260201100432_ForceNormalizeRoleValuesToUppercase.cs
+===COMMIT=== b011e00 2026-02-01 Fix circular dependency: Remove unused IPaymentService from WalletService
+
+TetGift.BLL/Services/WalletService.cs
+TetGift.DAL/Migrations/20260201093328_NormalizeRoleValuesToUppercase.Designer.cs
+TetGift.DAL/Migrations/20260201093328_NormalizeRoleValuesToUppercase.cs
+TetGift/TetGift.csproj
+===COMMIT=== a58188e 2026-02-01 Normalize role values to UPPERCASE and add UserRole constants
+
+TetGift.BLL/Common/Constraint/UserRole.cs
+TetGift.BLL/Services/AuthService.cs
+TetGift.BLL/Services/JwtTokenGenerator.cs
+TetGift.BLL/Services/ProductService.cs
+TetGift.DAL/Context/DatabaseContext.cs
+TetGift.DAL/Migrations/20260201090000_NormalizeRoleValuesToUppercase.cs
+TetGift/Controllers/BaseApiController.cs
+TetGift/Controllers/OrderController.cs
+===COMMIT=== fb3512a 2026-02-01 Fix circular dependency between OrderService, WalletService and PaymentService
+
+TetGift.BLL/Services/PaymentService.cs
+TetGift.BLL/Services/WalletService.cs
+===COMMIT=== b973cb0 2026-02-01 Add order cancellation with 15min limit for customer and refund to wallet
+
+TetGift.BLL/Interfaces/IOrderService.cs
+TetGift.BLL/Services/OrderService.cs
+TetGift.BLL/Services/WalletService.cs
+TetGift/Controllers/OrderController.cs
+===COMMIT=== aecd64a 2026-02-01 Standardize status values to UPPERCASE constants
+
+TetGift.BLL/Common/Constraint/AccountStatus.cs
+TetGift.BLL/Common/Constraint/OrderStatus.cs
+TetGift.BLL/Common/Constraint/PaymentStatus.cs
+TetGift.BLL/Common/Constraint/ProductStatus.cs
+TetGift.BLL/Common/Constraint/StockStatus.cs
+TetGift.BLL/Common/Constraint/WalletStatus.cs
+TetGift.BLL/Common/Constraint/WalletTransactionStatus.cs
+TetGift.BLL/Services/AuthService.cs
+TetGift.BLL/Services/CartService.cs
+TetGift.BLL/Services/DashboardService.cs
+TetGift.BLL/Services/InventoryService.cs
+TetGift.BLL/Services/OrderFromQuotationService.cs
+TetGift.BLL/Services/OrderService.cs
+TetGift.BLL/Services/PaymentService.cs
+TetGift.BLL/Services/ProductService.cs
+TetGift.BLL/Services/QuotationService.cs
+TetGift.BLL/Services/WalletService.cs
+TetGift.DAL/Migrations/20260201082648_NormalizeStatusValuesToUppercase.Designer.cs
+TetGift.DAL/Migrations/20260201082648_NormalizeStatusValuesToUppercase.cs
+===COMMIT=== 2aad664 2026-02-01 Fix WalletService: use FindAsync with include parameter
+
+TetGift.BLL/Services/WalletService.cs
+===COMMIT=== 0ebdf73 2026-02-01 Add Wallet feature: deposit, payment, refund
+
+TetGift.BLL/Dtos/PaymentDto.cs
+TetGift.BLL/Dtos/WalletDto.cs
+TetGift.BLL/Interfaces/IPaymentService.cs
+TetGift.BLL/Interfaces/IWalletService.cs
+TetGift.BLL/Services/OrderService.cs
+TetGift.BLL/Services/PaymentService.cs
+TetGift.BLL/Services/WalletService.cs
+TetGift.DAL/Context/DatabaseContext.cs
+TetGift.DAL/Entities/Account.cs
+TetGift.DAL/Entities/Order.cs
+TetGift.DAL/Entities/Payment.cs
+TetGift.DAL/Entities/Wallet.cs
+TetGift.DAL/Entities/WalletTransaction.cs
+TetGift.DAL/Migrations/20260201075137_AddWalletTables.Designer.cs
+TetGift.DAL/Migrations/20260201075137_AddWalletTables.cs
+TetGift.DAL/Migrations/DatabaseContextModelSnapshot.cs
+TetGift/Controllers/PaymentController.cs
+TetGift/Controllers/WalletController.cs
+TetGift/Program.cs
+===COMMIT=== a1a1566 2026-02-01 fix: Improve RestoreStockAsync to handle null checks and ensure stock restoration works correctly
+
+TetGift.BLL/Services/OrderService.cs
+===COMMIT=== c4cfbf1 2026-02-01 fix: Update role names to match database (ADMIN, STAFF uppercase)
+
+TetGift/Controllers/AdminQuotationsController.cs
+TetGift/Controllers/DashboardController.cs
+TetGift/Controllers/OrderController.cs
+TetGift/Controllers/StaffQuotationsController.cs
+===COMMIT=== c5a7da6 2026-02-01 fix: Correct namespace import in InventoryController
+
+TetGift/Controllers/InventoryController.cs
+===COMMIT=== 3902f3f 2026-02-01 Merge branch 'dev' of github.com:Subzerozdev/PRN232_ProjectGroup into dev
+===COMMIT=== 0aa7f77 2026-02-01 fix: Add Admin role authorization for Order Admin endpoints
+
+TetGift/Controllers/OrderController.cs
+===COMMIT=== 7a3a409 2026-02-01 Add Admin Dashboard API
+
+TetGift.BLL/Dtos/DashboardDto.cs
+TetGift.BLL/Interfaces/IDashboardService.cs
+TetGift.BLL/Services/DashboardService.cs
+TetGift/Controllers/DashboardController.cs
+TetGift/Program.cs
+===COMMIT=== 2e01114 2026-02-01 fix: Include Order when loading Payment in ReturnUrl to update Order status
+
+TetGift.BLL/Services/PaymentService.cs
+===COMMIT=== daade33 2026-02-01 fix: Update Order status in ReturnUrl callback when payment succeeds
+
+TetGift.BLL/Services/PaymentService.cs
+===COMMIT=== 90078cc 2026-02-01 fix: Use GMT+7 timezone and increase VNPay expire time to 60 minutes
+
+TetGift.BLL/Services/PaymentService.cs
+===COMMIT=== bcda417 2026-02-01 fix: Increase VNPay payment URL expire time from 15 to 30 minutes
+
+TetGift.BLL/Services/PaymentService.cs
+===COMMIT=== 24ccdee 2026-02-01 fix: Update Swagger JWT config to Http scheme and add UseRouting middleware
+
+TetGift/Program.cs
+===COMMIT=== c160e81 2026-02-01 fix: Add UseAuthentication middleware for JWT Bearer authentication
+
+TetGift/Program.cs
+===COMMIT=== 44c6727 2026-02-01 config: Update VNPay ReturnUrl and IpnUrl with actual domain
+
+TetGift/appsettings.json
+===COMMIT=== ddc903b 2026-02-01 feat: Add JWT Bearer authentication to Swagger UI
+
+TetGift/Program.cs
+===COMMIT=== b5fd629 2026-01-31 fix: Fix compile errors in CartService and OrderService
+
+TetGift.BLL/Services/CartService.cs
+TetGift.BLL/Services/OrderService.cs
+===COMMIT=== b84d79b 2026-01-31 feat: Add VNPay payment integration
+
+TetGift.BLL/Common/VnPay/VnPayLibrary.cs
+TetGift.BLL/Dtos/PaymentDto.cs
+TetGift.BLL/Interfaces/IPaymentService.cs
+TetGift.BLL/Services/PaymentService.cs
+TetGift/Controllers/PaymentController.cs
+TetGift/Program.cs
+TetGift/appsettings.json
+===COMMIT=== 0b0eb2d 2026-01-31 feat: Add order management
+
+TetGift.BLL/Dtos/OrderDto.cs
+TetGift.BLL/Interfaces/IOrderService.cs
+TetGift.BLL/Services/OrderService.cs
+TetGift/Controllers/OrderController.cs
+TetGift/Program.cs
+===COMMIT=== 72b5c25 2026-01-31 feat: Add shopping cart and promotion processing
+
+TetGift.BLL/Dtos/CartDto.cs
+TetGift.BLL/Interfaces/ICartService.cs
+TetGift.BLL/Services/CartService.cs
+TetGift/Controllers/CartController.cs
+TetGift/Program.cs
+===COMMIT=== 92cb36b 2026-01-31 Merge dev into main: Update CRUD for inventory and promotion
+===COMMIT=== 6cd6ee6 2026-01-31 Merge branch 'main' into dev
+===COMMIT=== a61915a 2026-01-29 fix: Use pre-built Docker image for production deployment
+
+.github/workflows/deploy.yml
+docker-compose.prod.yml
+===COMMIT=== 1904f66 2026-01-29 feat: Add Docker and GitHub Actions CI/CD for VPS deployment
+
+.dockerignore
+.github/workflows/deploy.yml
+Dockerfile
+TetGift/Program.cs
+TetGift/appsettings.Production.json
+docker-compose.yml

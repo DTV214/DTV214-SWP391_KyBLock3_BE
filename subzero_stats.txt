@@ -1,0 +1,202 @@
+﻿===COMMIT=== 274c75e 2026-03-16 [CONFIG] Add Gemini AI API key config for VPS deployment
+
+ .github/workflows/deploy.yml | 1 +
+ TetGift/appsettings.json     | 4 ++++
+ docker-compose.prod.yml      | 2 ++
+ 3 files changed, 7 insertions(+)
+===COMMIT=== fa8a2c6 2026-02-12 Fix: Include EmailTemplates in build output and improve template path resolution
+
+ TetGift.BLL/Services/FileEmailTemplateRenderer.cs | 29 ++++++++++++++++++++---
+ TetGift/TetGift.csproj                            |  6 +++++
+ 2 files changed, 32 insertions(+), 3 deletions(-)
+===COMMIT=== 253b918 2026-02-01 Fix wallet deposit callback: Handle WALLET_ prefix in vnpTxnRef
+
+ TetGift.BLL/Services/PaymentService.cs | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
+===COMMIT=== 3f84d3d 2026-02-01 Force normalize all role values to UPPERCASE in account table
+
+ ...ForceNormalizeRoleValuesToUppercase.Designer.cs | 1591 ++++++++++++++++++++
+ ...01100432_ForceNormalizeRoleValuesToUppercase.cs |   28 +
+ 2 files changed, 1619 insertions(+)
+===COMMIT=== b011e00 2026-02-01 Fix circular dependency: Remove unused IPaymentService from WalletService
+
+ TetGift.BLL/Services/WalletService.cs              |    4 +-
+ ...3328_NormalizeRoleValuesToUppercase.Designer.cs | 1591 ++++++++++++++++++++
+ ...260201093328_NormalizeRoleValuesToUppercase.cs} |    5 +-
+ TetGift/TetGift.csproj                             |    4 +
+ 4 files changed, 1598 insertions(+), 6 deletions(-)
+===COMMIT=== a58188e 2026-02-01 Normalize role values to UPPERCASE and add UserRole constants
+
+ TetGift.BLL/Common/Constraint/UserRole.cs          |  8 ++++
+ TetGift.BLL/Services/AuthService.cs                |  6 +--
+ TetGift.BLL/Services/JwtTokenGenerator.cs          |  3 +-
+ TetGift.BLL/Services/ProductService.cs             |  2 +-
+ TetGift.DAL/Context/DatabaseContext.cs             | 26 ++++++++++++
+ ...0260201090000_NormalizeRoleValuesToUppercase.cs | 47 ++++++++++++++++++++++
+ TetGift/Controllers/BaseApiController.cs           |  4 +-
+ TetGift/Controllers/OrderController.cs             |  2 +-
+ 8 files changed, 91 insertions(+), 7 deletions(-)
+===COMMIT=== fb3512a 2026-02-01 Fix circular dependency between OrderService, WalletService and PaymentService
+
+ TetGift.BLL/Services/PaymentService.cs | 28 +++++++++++++++------
+ TetGift.BLL/Services/WalletService.cs  | 46 +++++++++++++++++++---------------
+ 2 files changed, 46 insertions(+), 28 deletions(-)
+===COMMIT=== b973cb0 2026-02-01 Add order cancellation with 15min limit for customer and refund to wallet
+
+ TetGift.BLL/Interfaces/IOrderService.cs |  1 +
+ TetGift.BLL/Services/OrderService.cs    | 62 +++++++++++++++++++++++++++++++++
+ TetGift.BLL/Services/WalletService.cs   | 40 +++++++++++++++++----
+ TetGift/Controllers/OrderController.cs  | 22 ++++++++++++
+ 4 files changed, 119 insertions(+), 6 deletions(-)
+===COMMIT=== aecd64a 2026-02-01 Standardize status values to UPPERCASE constants
+
+ TetGift.BLL/Common/Constraint/AccountStatus.cs     |    9 +
+ TetGift.BLL/Common/Constraint/OrderStatus.cs       |   11 +
+ TetGift.BLL/Common/Constraint/PaymentStatus.cs     |    9 +
+ TetGift.BLL/Common/Constraint/ProductStatus.cs     |    8 +
+ TetGift.BLL/Common/Constraint/StockStatus.cs       |    9 +
+ TetGift.BLL/Common/Constraint/WalletStatus.cs      |    7 +
+ .../Common/Constraint/WalletTransactionStatus.cs   |    8 +
+ TetGift.BLL/Services/AuthService.cs                |   13 +-
+ TetGift.BLL/Services/CartService.cs                |    3 +-
+ TetGift.BLL/Services/DashboardService.cs           |    7 +-
+ TetGift.BLL/Services/InventoryService.cs           |   15 +-
+ TetGift.BLL/Services/OrderFromQuotationService.cs  |    5 +-
+ TetGift.BLL/Services/OrderService.cs               |   29 +-
+ TetGift.BLL/Services/PaymentService.cs             |   37 +-
+ TetGift.BLL/Services/ProductService.cs             |   23 +-
+ TetGift.BLL/Services/QuotationService.cs           |    3 +-
+ TetGift.BLL/Services/WalletService.cs              |   37 +-
+ ...48_NormalizeStatusValuesToUppercase.Designer.cs | 1591 ++++++++++++++++++++
+ ...60201082648_NormalizeStatusValuesToUppercase.cs |  172 +++
+ 19 files changed, 1915 insertions(+), 81 deletions(-)
+===COMMIT=== 2aad664 2026-02-01 Fix WalletService: use FindAsync with include parameter
+
+ TetGift.BLL/Services/WalletService.cs | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
+===COMMIT=== 0ebdf73 2026-02-01 Add Wallet feature: deposit, payment, refund
+
+ TetGift.BLL/Dtos/PaymentDto.cs                     |   15 +-
+ TetGift.BLL/Dtos/WalletDto.cs                      |   73 +
+ TetGift.BLL/Interfaces/IPaymentService.cs          |    7 +-
+ TetGift.BLL/Interfaces/IWalletService.cs           |   46 +
+ TetGift.BLL/Services/OrderService.cs               |    9 +-
+ TetGift.BLL/Services/PaymentService.cs             |   80 +-
+ TetGift.BLL/Services/WalletService.cs              |  508 +++++++
+ TetGift.DAL/Context/DatabaseContext.cs             |   89 ++
+ TetGift.DAL/Entities/Account.cs                    |    2 +
+ TetGift.DAL/Entities/Order.cs                      |    2 +
+ TetGift.DAL/Entities/Payment.cs                    |    8 +
+ TetGift.DAL/Entities/Wallet.cs                     |   25 +
+ TetGift.DAL/Entities/WalletTransaction.cs          |   30 +
+ .../20260201075137_AddWalletTables.Designer.cs     | 1591 ++++++++++++++++++++
+ .../Migrations/20260201075137_AddWalletTables.cs   |  150 ++
+ .../Migrations/DatabaseContextModelSnapshot.cs     |  179 +++
+ TetGift/Controllers/PaymentController.cs           |   89 +-
+ TetGift/Controllers/WalletController.cs            |   97 ++
+ TetGift/Program.cs                                 |    2 +
+ 19 files changed, 2984 insertions(+), 18 deletions(-)
+===COMMIT=== a1a1566 2026-02-01 fix: Improve RestoreStockAsync to handle null checks and ensure stock restoration works correctly
+
+ TetGift.BLL/Services/OrderService.cs | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
+===COMMIT=== c4cfbf1 2026-02-01 fix: Update role names to match database (ADMIN, STAFF uppercase)
+
+ TetGift/Controllers/AdminQuotationsController.cs | 2 +-
+ TetGift/Controllers/DashboardController.cs       | 2 +-
+ TetGift/Controllers/OrderController.cs           | 6 +++---
+ TetGift/Controllers/StaffQuotationsController.cs | 2 +-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+===COMMIT=== c5a7da6 2026-02-01 fix: Correct namespace import in InventoryController
+
+ TetGift/Controllers/InventoryController.cs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+===COMMIT=== 0aa7f77 2026-02-01 fix: Add Admin role authorization for Order Admin endpoints
+
+ TetGift/Controllers/OrderController.cs | 3 +++
+ 1 file changed, 3 insertions(+)
+===COMMIT=== 7a3a409 2026-02-01 Add Admin Dashboard API
+
+ TetGift.BLL/Dtos/DashboardDto.cs            |  67 ++++++
+ TetGift.BLL/Interfaces/IDashboardService.cs |  11 +
+ TetGift.BLL/Services/DashboardService.cs    | 321 ++++++++++++++++++++++++++++
+ TetGift/Controllers/DashboardController.cs  | 112 ++++++++++
+ TetGift/Program.cs                          |   2 +
+ 5 files changed, 513 insertions(+)
+===COMMIT=== 2e01114 2026-02-01 fix: Include Order when loading Payment in ReturnUrl to update Order status
+
+ TetGift.BLL/Services/PaymentService.cs | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+===COMMIT=== daade33 2026-02-01 fix: Update Order status in ReturnUrl callback when payment succeeds
+
+ TetGift.BLL/Services/PaymentService.cs | 53 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 51 insertions(+), 2 deletions(-)
+===COMMIT=== 90078cc 2026-02-01 fix: Use GMT+7 timezone and increase VNPay expire time to 60 minutes
+
+ TetGift.BLL/Services/PaymentService.cs | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+===COMMIT=== bcda417 2026-02-01 fix: Increase VNPay payment URL expire time from 15 to 30 minutes
+
+ TetGift.BLL/Services/PaymentService.cs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+===COMMIT=== 24ccdee 2026-02-01 fix: Update Swagger JWT config to Http scheme and add UseRouting middleware
+
+ TetGift/Program.cs | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+===COMMIT=== c160e81 2026-02-01 fix: Add UseAuthentication middleware for JWT Bearer authentication
+
+ TetGift/Program.cs | 1 +
+ 1 file changed, 1 insertion(+)
+===COMMIT=== 44c6727 2026-02-01 config: Update VNPay ReturnUrl and IpnUrl with actual domain
+
+ TetGift/appsettings.json | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+===COMMIT=== ddc903b 2026-02-01 feat: Add JWT Bearer authentication to Swagger UI
+
+ TetGift/Program.cs | 34 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 33 insertions(+), 1 deletion(-)
+===COMMIT=== b5fd629 2026-01-31 fix: Fix compile errors in CartService and OrderService
+
+ TetGift.BLL/Services/CartService.cs  | 3 ++-
+ TetGift.BLL/Services/OrderService.cs | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+===COMMIT=== b84d79b 2026-01-31 feat: Add VNPay payment integration
+
+ TetGift.BLL/Common/VnPay/VnPayLibrary.cs  | 109 +++++++++++
+ TetGift.BLL/Dtos/PaymentDto.cs            |  42 ++++
+ TetGift.BLL/Interfaces/IPaymentService.cs |  12 ++
+ TetGift.BLL/Services/PaymentService.cs    | 311 ++++++++++++++++++++++++++++++
+ TetGift/Controllers/PaymentController.cs  | 150 ++++++++++++++
+ TetGift/Program.cs                        |   2 +
+ TetGift/appsettings.json                  |   7 +
+ 7 files changed, 633 insertions(+)
+===COMMIT=== 0b0eb2d 2026-01-31 feat: Add order management
+
+ TetGift.BLL/Dtos/OrderDto.cs            |  62 +++++
+ TetGift.BLL/Interfaces/IOrderService.cs |  16 ++
+ TetGift.BLL/Services/OrderService.cs    | 392 ++++++++++++++++++++++++++++++++
+ TetGift/Controllers/OrderController.cs  | 121 ++++++++++
+ TetGift/Program.cs                      |   2 +
+ 5 files changed, 593 insertions(+)
+===COMMIT=== 72b5c25 2026-01-31 feat: Add shopping cart and promotion processing
+
+ TetGift.BLL/Dtos/CartDto.cs            |  50 +++++
+ TetGift.BLL/Interfaces/ICartService.cs |  15 ++
+ TetGift.BLL/Services/CartService.cs    | 340 +++++++++++++++++++++++++++++++++
+ TetGift/Controllers/CartController.cs  | 140 ++++++++++++++
+ TetGift/Program.cs                     |   2 +
+ 5 files changed, 547 insertions(+)
+===COMMIT=== a61915a 2026-01-29 fix: Use pre-built Docker image for production deployment
+
+ .github/workflows/deploy.yml |  4 ++--
+ docker-compose.prod.yml      | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 2 deletions(-)
+===COMMIT=== 1904f66 2026-01-29 feat: Add Docker and GitHub Actions CI/CD for VPS deployment
+
+ .dockerignore                       | 42 +++++++++++++++++
+ .github/workflows/deploy.yml        | 89 +++++++++++++++++++++++++++++++++++++
+ Dockerfile                          | 41 +++++++++++++++++
+ TetGift/Program.cs                  | 13 +++---
+ TetGift/appsettings.Production.json | 10 +++++
+ docker-compose.yml                  | 38 ++++++++++++++++
+ 6 files changed, 227 insertions(+), 6 deletions(-)

@@ -80,6 +80,13 @@ public class PaymentController : ControllerBase
         {
             var accountId = GetCurrentAccountId();
             var result = await _walletService.PayWithWalletAsync(accountId, request.OrderId);
+
+            // Auto trừ stock sau khi thanh toán ví thành công
+            if (result.Status == "SUCCESS")
+            {
+                await _orderService.TryAllocateStockAfterPaymentAsync(request.OrderId);
+            }
+
             return Ok(result);
         }
         catch (Exception ex)
@@ -144,11 +151,11 @@ public class PaymentController : ControllerBase
 
             var result = await _paymentService.ProcessIpnCallbackAsync(queryParams);
 
-            ////Bảo: check stock nếu đủ thì lấy
-            //if (result.Success && result.OrderId > 0)
-            //{
-            //    await _orderService.TryAllocateStockAfterPaymentAsync(result.OrderId);
-            //}
+            // Auto trừ stock sau khi thanh toán thành công
+            if (result.Success && result.OrderId > 0)
+            {
+                await _orderService.TryAllocateStockAfterPaymentAsync(result.OrderId);
+            }
 
             // Trả về JSON response cho VNPay
             var response = new
@@ -173,11 +180,11 @@ public class PaymentController : ControllerBase
             var queryParams = Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString());
             var result = await _paymentService.ProcessReturnUrlAsync(queryParams);
 
-            ////Bảo: check stock nếu đủ thì lấy
-            //if (result.Success && result.OrderId > 0)
-            //{
-            //    await _orderService.TryAllocateStockAfterPaymentAsync(result.OrderId);
-            //}
+            // Auto trừ stock sau khi thanh toán thành công
+            if (result.Success && result.OrderId > 0)
+            {
+                await _orderService.TryAllocateStockAfterPaymentAsync(result.OrderId);
+            }
 
             return Ok(result);
         }

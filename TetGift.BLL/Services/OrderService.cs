@@ -131,13 +131,11 @@ public class OrderService : IOrderService
         await orderRepo.AddAsync(order);
         await _uow.SaveAsync();
 
-        // 5. Tạo OrderDetails và cập nhật Stock
+        // 5. Tạo OrderDetails (Stock sẽ được trừ sau khi thanh toán thành công qua TryAllocateStockAfterPaymentAsync)
         var orderDetailRepo = _uow.GetRepository<OrderDetail>();
-        var stockMovementRepo = _uow.GetRepository<StockMovement>();
 
         foreach (var cartItem in cart.Items)
         {
-            // Tạo OrderDetail
             var orderDetail = new OrderDetail
             {
                 Orderid = order.Orderid,
@@ -146,39 +144,6 @@ public class OrderService : IOrderService
                 Amount = cartItem.SubTotal
             };
             await orderDetailRepo.AddAsync(orderDetail);
-
-            // Cập nhật Stock (FIFO - First In First Out)
-            var remainingQuantity = cartItem.Quantity ?? 0;
-            var availableStocks = await stockRepo.FindAsync(
-                s => s.Productid == cartItem.ProductId && s.Status == StockStatus.ACTIVE
-            );
-
-            foreach (var stock in availableStocks.OrderBy(s => s.Productiondate))
-            {
-                if (remainingQuantity <= 0) break;
-
-                var stockQuantity = stock.Stockquantity ?? 0;
-                var quantityToDeduct = Math.Min(remainingQuantity, stockQuantity);
-
-                stock.Stockquantity = stockQuantity - quantityToDeduct;
-                if (stock.Stockquantity <= 0)
-                    stock.Status = StockStatus.OUT_OF_STOCK;
-
-                stockRepo.Update(stock);
-
-                // Tạo StockMovement để ghi log
-                var movement = new StockMovement
-                {
-                    Stockid = stock.Stockid,
-                    Orderid = order.Orderid,
-                    Quantity = -quantityToDeduct, // Số âm để thể hiện xuất kho
-                    Movementdate = DateTime.Now,
-                    Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
-                };
-                await stockMovementRepo.AddAsync(movement);
-
-                remainingQuantity -= quantityToDeduct;
-            }
         }
 
         await _uow.SaveAsync();

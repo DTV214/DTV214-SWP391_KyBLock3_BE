@@ -1,0 +1,150 @@
+﻿df34f7c inkB12 2026-03-17 [FEAT] Quotation + Payment send email
+75133a0 Osi30 2026-03-17 [UPDATE] Update authorization member
+2a23a5d Osi30 2026-03-17 [UPDATE] Update uri
+6d8898d inkB12 2026-03-16 merge
+9ecf6c0 inkB12 2026-03-16 [UPDATE] Update SignalR
+616ee62 Subzerozdev 2026-03-16 [CONFIG] Add Gemini AI API key config for VPS deployment
+274c75e Subzerozdev 2026-03-16 [CONFIG] Add Gemini AI API key config for VPS deployment
+6761991 E99PLANT 2026-03-11 Refactor the product Create-Update and add handle file
+db59490 dtvgaming214 2026-03-11 [FIX] FIx url image of blog
+9ea3599 dtvgaming214 2026-03-11 Merge branch 'main' of github.com:Subzerozdev/PRN232_ProjectGroup
+4c271f0 dtvgaming214 2026-03-11 FIX
+ba7b1e2 inkB12 2026-03-09 [UPDATE] update authorize AccountController
+50ce7de Osi30 2026-03-09 [UPDATE] Update authorize for order
+3896ed8 dtvgaming214 2026-03-09 [UPDATE] Update verify forget username
+99bb32e dtvgaming214 2026-03-09 Merge branch 'main' of github.com:Subzerozdev/PRN232_ProjectGroup
+e10f716 dtvgaming214 2026-03-09 [UPDATE] Update forget Login
+01e3086 E99PLANT 2026-03-09 Merge branch 'main' of https://github.com/Subzerozdev/PRN232_ProjectGroup
+5323fc7 E99PLANT 2026-03-09 Fix add custom basket bug
+4a65964 dtvgaming214 2026-03-08 [Fix]Fix Authen of blog controller
+0e7fd1c dtvgaming214 2026-03-08 [Update] Update role ADMIN and Staff for Blog
+07831bb dtvgaming214 2026-03-08 [Update] Update image and video for Blog
+f7adaaf dtvgaming214 2026-03-08 [FEAT] Add feature update file img and video from Cloudinary
+3a8703d cntduongg 2026-03-08 Merge branch 'main' of https://github.com/Subzerozdev/PRN232_ProjectGroup
+d1212a9 cntduongg 2026-03-08 fix AI chatbot
+6a2a57b Osi30 2026-03-06 [UPDATE] At show all option for fetching products
+7ef62a5 Osi30 2026-03-06 [UPDATE] Remove bug when not adding promo
+d040a18 Osi30 2026-03-06 [UPDATE] Update filter for single product
+04eb022 E99PLANT 2026-03-05 Update ProductDto
+dccef19 Osi30 2026-03-05 [UPDATE] Use 401 get id
+c114c9d Osi30 2026-03-05 [FEAT] Add promo public limited
+dd992cf Osi30 2026-03-05 [UPDATE] Update appsettings
+1d6aad5 Osi30 2026-03-05 Merge branch 'main' into feat/promotion
+20a87eb Osi30 2026-03-05 [UPDATE] Add promo fields and account promo logic
+25c4f25 inkB12 2026-03-04 [FIX] Fix DTV BackStab
+a639e69 dtvgaming214 2026-03-04 [FIX] Fix merge
+8eb71ce dtvgaming214 2026-03-04 [FEAT] Add account management for admin
+ae290ea inkB12 2026-03-04 [FIX] Fix Add and Update Address
+b8a6ad2 Osi30 2026-03-04 Merge branch 'main' into feat/promotion
+0402757 Osi30 2026-03-04 [UPDATE] Add validationa and apply promo
+e0083de inkB12 2026-03-04 [FIX] Fix Field AccountAddress
+67005b5 Osi30 2026-03-04 Merge branch 'main' into feat/promotion
+4c5b80d Osi30 2026-03-04 [UPDATE] Add promo attributes and account promo
+9dbe257 cntduongg 2026-03-03 fix duplicate chat
+588114f cntduongg 2026-03-03 resolve conflict
+b5e1188 cntduongg 2026-03-03 AI Chat Box
+831717c inkB12 2026-03-03 [FEAT] Map Service + Address
+fe9d0c1 E99PLANT 2026-03-02 Update UpdateProduct method to process admin and client update product
+1191913 Osi30 2026-02-28 Merge branch 'main' into redis
+1f1cbc8 Osi30 2026-02-28 [FEAT] Add redis for products
+b33c7d9 E99PLANT 2026-02-28 Merge pull request #10 from Subzerozdev/dev
+75f8df6 E99PLANT 2026-02-28 Merge branch 'main' into dev
+1bf2648 E99PLANT 2026-02-26 fix logic for Product
+76b944a inkB12 2026-02-26 [UPDATE] Update Chat + Test Chat Finished
+cb5f97d inkB12 2026-02-26 Merge branch 'feature/Chat'
+021bcfd inkB12 2026-02-26 [FEAT] Chat
+7261fdd Osi30 2026-02-26 [UPDATE] Change from update payment to create new one
+1132cae inkB12 2026-02-25 [FEAT] update field Order(isQuotation)
+12afc87 Osi30 2026-02-25 [UPDATE] Remove ngsql settings
+1dc7b67 Osi30 2026-02-25 [UPDATE] Update return url
+0f903d2 Osi30 2026-02-24 [UPDATE] Update utc for payment in wallet
+fe91b63 Osi30 2026-02-24 [FIX] Remove rule for datetime
+73fd662 Osi30 2026-02-24 [UPDATE] Remove 15 minutes to not cancel order
+ac67277 Osi30 2026-02-24 [UPDATE] Add update shipping info for order and add created date for payment
+a0ccb8a Osi30 2026-02-24 [FEAT] Add promo api for code
+d5dbe34 Osi30 2026-02-23 [UPDATE] Update vnpay return url and cors
+c9ff492 Subzerozdev 2026-02-12 Merge main into dev: Sync merge commits
+d907199 Subzerozdev 2026-02-12 Merge dev into main: Include EmailTemplates fix and latest changes
+0fee640 Subzerozdev 2026-02-12 Merge branch 'dev' of github.com:Subzerozdev/PRN232_ProjectGroup into dev
+fa8a2c6 Subzerozdev 2026-02-12 Fix: Include EmailTemplates in build output and improve template path resolution
+0303e5a inkB12 2026-02-06 [Update] Update Quotation Flow 2 + Update create Order and payment
+4bf8163 Osi 2026-02-05 Merge pull request #9 from Subzerozdev/dev
+1f3414c Osi30 2026-02-05 [UPDATE] Update page response for products
+e0390d1 Osi 2026-02-05 Merge pull request #8 from Subzerozdev/dev
+45d29e3 Osi30 2026-02-05 [FIX] Resolve merge conflicts
+740ca4c Osi30 2026-02-05 Merge branch 'main' into dev
+806547a Osi30 2026-02-05 [UPDATE] Update filter, sort and paging for products
+5e9d703 E99PLANT 2026-02-05 Fix logic for Products
+3cc5de5 E99PLANT 2026-02-04 Fix bug for Product core flows
+4420aeb E99PLANT 2026-02-04 Redo the CustomBasket Logic #1
+dfd4183 inkB12 2026-02-03 [FIX] Fix Quotation Flow 1: t├ích fee crud ri├¬ng
+9869553 inkB12 2026-02-03 Merge branch 'feature/FixQuotation' into dev
+1a60398 inkB12 2026-02-03 [FIX] Fix flow 1 Quotation
+e4d2f1e E99PLANT 2026-02-03 Merge pull request #7 from Subzerozdev/dev
+c0bc5e7 E99PLANT 2026-02-03 Merge branch 'dev' of https://github.com/Subzerozdev/PRN232_ProjectGroup into dev
+ae1bc84 E99PLANT 2026-02-03 Add config logic
+5b8eef8 Osi 2026-02-03 Merge pull request #6 from Subzerozdev/dev
+fce757a dtvgaming214 2026-02-03 Merge branch 'main' into dev
+7ec1c7f dtvgaming214 2026-02-03 [UPDATE] Update program
+67d5266 Osi 2026-02-03 Merge pull request #5 from Subzerozdev/dev
+fa083c7 Osi30 2026-02-03 [FIX] Resolve merge conflict
+d7f96c2 Osi30 2026-02-03 [UPDATE] Add authorize for products
+57c0285 Osi30 2026-02-03 Merge branch 'main' into dev
+bb1b33a Osi30 2026-02-02 [UPDATE] Update uri
+3ca3a2e Osi30 2026-02-02 [UPDATE] Update uri
+9ff3dc8 Osi 2026-02-02 Merge pull request #4 from Subzerozdev/dev
+47dff31 dtvgaming214 2026-02-02 Merge branch 'main' into dev
+076daf1 dtvgaming214 2026-02-02 Update account profile for personal account
+0fb8e14 Osi 2026-02-01 Merge pull request #3 from Subzerozdev/dev
+66cb907 Osi30 2026-02-01 [UPDATE] Update field image for product
+d7df458 Osi30 2026-02-01 [UPDATE] Update field image for product
+253b918 Subzerozdev 2026-02-01 Fix wallet deposit callback: Handle WALLET_ prefix in vnpTxnRef
+3f84d3d Subzerozdev 2026-02-01 Force normalize all role values to UPPERCASE in account table
+b011e00 Subzerozdev 2026-02-01 Fix circular dependency: Remove unused IPaymentService from WalletService
+a58188e Subzerozdev 2026-02-01 Normalize role values to UPPERCASE and add UserRole constants
+fb3512a Subzerozdev 2026-02-01 Fix circular dependency between OrderService, WalletService and PaymentService
+b973cb0 Subzerozdev 2026-02-01 Add order cancellation with 15min limit for customer and refund to wallet
+aecd64a Subzerozdev 2026-02-01 Standardize status values to UPPERCASE constants
+2aad664 Subzerozdev 2026-02-01 Fix WalletService: use FindAsync with include parameter
+0ebdf73 Subzerozdev 2026-02-01 Add Wallet feature: deposit, payment, refund
+a1a1566 Subzerozdev 2026-02-01 fix: Improve RestoreStockAsync to handle null checks and ensure stock restoration works correctly
+c4cfbf1 Subzerozdev 2026-02-01 fix: Update role names to match database (ADMIN, STAFF uppercase)
+c5a7da6 Subzerozdev 2026-02-01 fix: Correct namespace import in InventoryController
+3902f3f Subzerozdev 2026-02-01 Merge branch 'dev' of github.com:Subzerozdev/PRN232_ProjectGroup into dev
+0aa7f77 Subzerozdev 2026-02-01 fix: Add Admin role authorization for Order Admin endpoints
+b6d10fa E99PLANT 2026-02-01 CRUD for product
+17011a4 dtvgaming214 2026-02-01 Merge branch 'dev' into feature/blog
+8393ae9 dtvgaming214 2026-02-01 Update blog CRUD
+9af4282 Osi30 2026-02-01 [UPDATE] Modified calculation for product and uri
+3851978 inkB12 2026-02-01 [FEAT] QuotationFlow1: user->staff->admin->user
+90e5482 inkB12 2026-02-01 [FEAT] Quotation Flow1
+7a3a409 Subzerozdev 2026-02-01 Add Admin Dashboard API
+2e01114 Subzerozdev 2026-02-01 fix: Include Order when loading Payment in ReturnUrl to update Order status
+daade33 Subzerozdev 2026-02-01 fix: Update Order status in ReturnUrl callback when payment succeeds
+90078cc Subzerozdev 2026-02-01 fix: Use GMT+7 timezone and increase VNPay expire time to 60 minutes
+bcda417 Subzerozdev 2026-02-01 fix: Increase VNPay payment URL expire time from 15 to 30 minutes
+24ccdee Subzerozdev 2026-02-01 fix: Update Swagger JWT config to Http scheme and add UseRouting middleware
+c160e81 Subzerozdev 2026-02-01 fix: Add UseAuthentication middleware for JWT Bearer authentication
+44c6727 Subzerozdev 2026-02-01 config: Update VNPay ReturnUrl and IpnUrl with actual domain
+ddc903b Subzerozdev 2026-02-01 feat: Add JWT Bearer authentication to Swagger UI
+b5fd629 Subzerozdev 2026-01-31 fix: Fix compile errors in CartService and OrderService
+b84d79b Subzerozdev 2026-01-31 feat: Add VNPay payment integration
+0b0eb2d Subzerozdev 2026-01-31 feat: Add order management
+72b5c25 Subzerozdev 2026-01-31 feat: Add shopping cart and promotion processing
+92cb36b Subzerozdev 2026-01-31 Merge dev into main: Update CRUD for inventory and promotion
+6cd6ee6 Subzerozdev 2026-01-31 Merge branch 'main' into dev
+9fb4c13 dtvgaming214 2026-01-31 Update CRUD for inventory and promotion
+e4a5d75 Osi 2026-01-29 Merge pull request #2 from Subzerozdev/dev
+28e8d12 Osi30 2026-01-29 Add restful api rules
+a61915a Subzerozdev 2026-01-29 fix: Use pre-built Docker image for production deployment
+f913bbc Osi30 2026-01-29 Merge branch 'main' into feat/product
+52d7678 Bß║úo Tß║Ñt 2026-01-29 Merge pull request #1 from Subzerozdev/dev
+7ab040e Osi30 2026-01-29 [UPDATE] Add image field for Product
+4b797bd inkB12 2026-01-29 [UPDATE] Update responsefilter + middleware
+1904f66 Subzerozdev 2026-01-29 feat: Add Docker and GitHub Actions CI/CD for VPS deployment
+99fc3d9 Osi30 2026-01-28 [FEAT] Add crud for product custom detail
+c2b21fa Osi30 2026-01-28 [FEAT] Add crud for normal product and custom product
+7b2ecf8 Osi30 2026-01-27 [FEAT] Add crud for config detail
+1aff0d1 Osi30 2026-01-27 [FEAT] Add crud product cate
+5b5eaee Osi30 2026-01-27 [FEAT] Add crud for product config
+cc74536 inkB12 2026-01-26 Initial commit (new source)
