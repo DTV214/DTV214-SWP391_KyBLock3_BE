@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,6 +8,7 @@ using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 using TetGift.DAL.Entities;
 using TetGift.DAL.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace TetGift.BLL.Services
 {
@@ -20,10 +21,22 @@ namespace TetGift.BLL.Services
             _unitOfWork = unitOfWork;
         }
 
-        public async Task<IEnumerable<AccountAdminDto>> GetAllAccountsAsync()
+        public async Task<IEnumerable<AccountAdminDto>> GetAllAccountsAsync(DateTime? startDate = null, DateTime? endDate = null)
         {
             var repo = _unitOfWork.GetRepository<Account>();
-            var accounts = await repo.GetAllAsync();
+            var query = repo.Entities.AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(a => a.DayCreate >= startDate.Value);
+            }
+            if (endDate.HasValue)
+            {
+                var end = endDate.Value.AddDays(1);
+                query = query.Where(a => a.DayCreate < end);
+            }
+
+            var accounts = await query.ToListAsync();
 
             return accounts.Select(a => new AccountAdminDto
             {
@@ -34,8 +47,9 @@ namespace TetGift.BLL.Services
                 Phone = a.Phone,
                 Address = a.Address,
                 Role = a.Role,
-                Status = a.Status
-            }).OrderByDescending(a => a.AccountId);
+                Status = a.Status,
+                DayCreate = a.DayCreate
+            }).OrderByDescending(a => a.DayCreate ?? DateTime.MinValue);
         }
 
         public async Task<AccountAdminDto> GetAccountByIdAsync(int id)
@@ -54,7 +68,8 @@ namespace TetGift.BLL.Services
                 Phone = account.Phone,
                 Address = account.Address,
                 Role = account.Role,
-                Status = account.Status
+                Status = account.Status,
+                DayCreate = account.DayCreate
             };
         }
 

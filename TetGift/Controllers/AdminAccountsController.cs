@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using TetGift.BLL.Dtos;
@@ -20,9 +20,9 @@ namespace TetGift.Controllers
 
         [Authorize(Roles = "ADMIN,STAFF")]
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
         {
-            var result = await _adminAccountService.GetAllAccountsAsync();
+            var result = await _adminAccountService.GetAllAccountsAsync(startDate, endDate);
             return Ok(result);
         }
 

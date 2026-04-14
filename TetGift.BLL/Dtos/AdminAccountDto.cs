@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace TetGift.BLL.Dtos
 {
@@ -13,6 +13,7 @@ namespace TetGift.BLL.Dtos
         public string? Address { get; set; }
         public string? Role { get; set; }
         public string? Status { get; set; }
+        public DateTime? DayCreate { get; set; }
     }
 
     // 2. DTO Tạo tài khoản mới (Admin cấp tài khoản cho Staff/Admin khác)

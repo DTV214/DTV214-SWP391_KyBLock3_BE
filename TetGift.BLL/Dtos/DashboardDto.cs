@@ -58,10 +58,24 @@ public class OrderStatusStatsDto
     public Dictionary<string, int> ByStatus { get; set; } = new();
 }
 
+public class AccountChartDataDto
+{
+    public string Date { get; set; } = string.Empty;
+    public int Count { get; set; }
+}
+
+public class AccountChartDto
+{
+    public string Period { get; set; } = string.Empty;
+    public List<AccountChartDataDto> Data { get; set; } = new();
+    public int TotalCount { get; set; }
+}
+
 public class DashboardSummaryDto
 {
     public RevenueChartDto Revenue { get; set; } = new();
     public PaymentChannelStatisticsDto PaymentChannels { get; set; } = new();
     public AbandonedCartDto AbandonedCarts { get; set; } = new();
     public OrderStatusStatsDto Orders { get; set; } = new();
+    public AccountChartDto NewAccounts { get; set; } = new();
 }

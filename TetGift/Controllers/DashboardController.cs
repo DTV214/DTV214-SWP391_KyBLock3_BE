@@ -79,6 +79,23 @@ public class DashboardController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy thống kê khách hàng mới
+    /// </summary>
+    [HttpGet("accounts")]
+    public async Task<IActionResult> GetAccountStatistics([FromQuery] TimeRangeRequest request)
+    {
+        try
+        {
+            var result = await _dashboardService.GetAccountStatisticsAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Lấy tổng hợp dashboard (tất cả metrics)
     /// </summary>
     [HttpGet("summary")]

@@ -265,12 +265,90 @@ public class DashboardService : IDashboardService
         };
     }
 
+    public async Task<AccountChartDto> GetAccountStatisticsAsync(TimeRangeRequest request)
+    {
+        var accountRepo = _uow.GetRepository<Account>();
+        var query = accountRepo.Entities.AsQueryable();
+
+        if (request.StartDate.HasValue)
+        {
+            query = query.Where(a => a.DayCreate >= request.StartDate.Value);
+        }
+        if (request.EndDate.HasValue)
+        {
+            var endDate = request.EndDate.Value.AddDays(1);
+            query = query.Where(a => a.DayCreate < endDate);
+        }
+
+        var accounts = await query.ToListAsync();
+        var period = request.Period?.ToLower() ?? "day";
+        var chartData = new List<AccountChartDataDto>();
+
+        if (period == "day")
+        {
+            chartData = accounts
+                .GroupBy(a => a.DayCreate?.Date)
+                .Where(g => g.Key.HasValue)
+                .OrderBy(g => g.Key)
+                .Select(g => new AccountChartDataDto
+                {
+                    Date = g.Key!.Value.ToString("yyyy-MM-dd"),
+                    Count = g.Count()
+                }).ToList();
+        }
+        else if (period == "week")
+        {
+            // Group by start of week (Sunday)
+            chartData = accounts
+                .GroupBy(a => a.DayCreate.HasValue ? a.DayCreate.Value.Date.AddDays(-(int)a.DayCreate.Value.DayOfWeek) : (DateTime?)null)
+                .Where(g => g.Key.HasValue)
+                .OrderBy(g => g.Key)
+                .Select(g => new AccountChartDataDto
+                {
+                    Date = g.Key!.Value.ToString("yyyy-MM-dd"),
+                    Count = g.Count()
+                }).ToList();
+        }
+        else if (period == "month")
+        {
+            chartData = accounts
+                .GroupBy(a => a.DayCreate.HasValue ? new DateTime(a.DayCreate.Value.Year, a.DayCreate.Value.Month, 1) : (DateTime?)null)
+                .Where(g => g.Key.HasValue)
+                .OrderBy(g => g.Key)
+                .Select(g => new AccountChartDataDto
+                {
+                    Date = g.Key!.Value.ToString("yyyy-MM"),
+                    Count = g.Count()
+                }).ToList();
+        }
+        else if (period == "year")
+        {
+            chartData = accounts
+                .GroupBy(a => a.DayCreate?.Year)
+                .Where(g => g.Key.HasValue)
+                .OrderBy(g => g.Key)
+                .Select(g => new AccountChartDataDto
+                {
+                    Date = g.Key!.Value.ToString(),
+                    Count = g.Count()
+                }).ToList();
+        }
+
+        return new AccountChartDto
+        {
+            Period = period,
+            Data = chartData,
+            TotalCount = chartData.Sum(d => d.Count)
+        };
+    }
+
     public async Task<DashboardSummaryDto> GetDashboardSummaryAsync(TimeRangeRequest? request = null)
     {
-        var revenueRequest = request ?? new TimeRangeRequest { Period = "month" };
-        var revenue = await GetRevenueByTimeRangeAsync(revenueRequest);
+        var statsRequest = request ?? new TimeRangeRequest { Period = "month" };
+        var revenue = await GetRevenueByTimeRangeAsync(statsRequest);
         var paymentChannels = await GetPaymentChannelStatisticsAsync(request);
         var abandonedCarts = await GetAbandonedCartsAsync();
+        var newAccounts = await GetAccountStatisticsAsync(statsRequest);
 
         // Get order status statistics
         var orderRepo = _uow.GetRepository<Order>();
@@ -308,7 +386,8 @@ public class DashboardService : IDashboardService
             {
                 Total = allOrders.Count,
                 ByStatus = orderStatusStats
-            }
+            },
+            NewAccounts = newAccounts
         };
     }
 
