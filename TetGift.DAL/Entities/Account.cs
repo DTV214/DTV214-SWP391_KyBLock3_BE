@@ -1,4 +1,4 @@
-﻿namespace TetGift.DAL.Entities;
+namespace TetGift.DAL.Entities;
 
 public partial class Account
 {
@@ -27,6 +27,8 @@ public partial class Account
     public string? RegisterOtpHash { get; set; }
 
     public DateTime? RegisterOtpVerifiedAt { get; set; }
+
+    public DateTime? DayCreate { get; set; } = DateTime.UtcNow.AddHours(7);
 
     public virtual ICollection<Blog> Blogs { get; set; } = new List<Blog>();
 
