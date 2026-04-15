@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  tetgift-api:
-    image: tetgift-api:latest
-    container_name: tetgift-api
+  swp391-api:
+    image: swp391-api:latest
+    container_name: swp391-api
     ports:
       - "5002:5000"
     environment:
@@ -29,4 +29,4 @@ services:
 
 networks:
   default:
-    name: tetgift-network
+    name: swp391-network

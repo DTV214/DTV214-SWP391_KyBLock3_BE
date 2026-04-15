@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKER_IMAGE: tetgift-api
-  CONTAINER_NAME: tetgift-api
+  DOCKER_IMAGE: swp391-api
+  CONTAINER_NAME: swp391-api
 
 jobs:
   build-and-deploy:
@@ -34,7 +34,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
           source: "image.tar.gz,docker-compose.prod.yml"
-          target: "~/tetgift-api"
+          target: "~/swp391-api"
 
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -45,8 +45,8 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             set -e
-            mkdir -p ~/tetgift-api
-            cd ~/tetgift-api
+            mkdir -p ~/swp391-api
+            cd ~/swp391-api
             
             gunzip -c image.tar.gz | docker load
             

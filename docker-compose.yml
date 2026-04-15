@@ -1,25 +1,25 @@
 version: '3.8'
 
 services:
-  tetgift-api:
+  swp391-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tetgift-api
+    container_name: swp391-api
     ports:
       - "5000:5000"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}
-      - Jwt__Key=${JWT_KEY}
-      - Jwt__Issuer=TetGift
-      - Jwt__Audience=TetGiftUsers
-      - Jwt__ExpireMinutes=60
-      - Resend__ApiKey=${RESEND_API_KEY}
-      - Resend__From=TetGift <noreply@fitupco.fit>
-      - Otp__Secret=${OTP_SECRET:-SuperPowerOfGodSecretADIDACHUA}
-      - Otp__ExpireMinutes=5
-      - Otp__DeletePendingAfterMinutes=30
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING}
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: TetGift
+      Jwt__Audience: TetGiftUsers
+      Jwt__ExpireMinutes: 60
+      Resend__ApiKey: ${RESEND_API_KEY}
+      Resend__From: "TetGift <noreply@fitupco.fit>"
+      Otp__Secret: ${OTP_SECRET:-SuperPowerOfGodSecretADIDACHUA}
+      Otp__ExpireMinutes: 5
+      Otp__DeletePendingAfterMinutes: 30
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/swagger/index.html"]
@@ -35,4 +35,4 @@ services:
 
 networks:
   default:
-    name: tetgift-network
+    name: swp391-network
