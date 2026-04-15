@@ -110,6 +110,8 @@ public class OrderController : ControllerBase
         }
     }
 
+    // ========== ADMIN/STAFF ENDPOINTS ==========
+
     [HttpGet()]
     [Authorize(Roles = "ADMIN,STAFF")]
     public async Task<IActionResult> GetAllOrders([FromQuery] OrderQueryParameters queryParams)
@@ -156,22 +158,42 @@ public class OrderController : ControllerBase
     {
         //try
         //{
-            var accountIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(accountIdClaim) || !int.TryParse(accountIdClaim, out var actorId))
-                return Unauthorized(new { message = "Không thể xác định người dùng." });
+        var accountIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(accountIdClaim) || !int.TryParse(accountIdClaim, out var actorId))
+            return Unauthorized(new { message = "Không thể xác định người dùng." });
 
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value ?? "";
+        var role = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value ?? "";
 
-            await _orderService.ForceAllocateStockAsync(orderId, actorId, role);
+        await _orderService.ForceAllocateStockAsync(orderId, actorId, role);
 
-            return Ok(new { message = "Allocate stock executed." });
+        return Ok(new { message = "Allocate stock executed." });
         //}
         //catch (Exception ex)
         //{
         //    return BadRequest(new { message = ex.Message });
         //}
     }
-    
+
+    // ======================================================================
+    // API MỚI BƯỚC 2: ADMIN DUYỆT YÊU CẦU HỦY ĐƠN (HOÀN TIỀN & TRẢ KHO)
+    // ======================================================================
+    [HttpPost("{orderId}/approve-refund")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> ApproveRefund(int orderId)
+    {
+        try
+        {
+            var adminAccountId = GetCurrentAccountId();
+            // Gọi service xử lý logic hoàn kho và đổi trạng thái (Order & Payment)
+            var result = await _orderService.AdminApproveRefundAsync(orderId, adminAccountId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     // ========== INVOICE ENDPOINT ==========
 
     /// <summary>

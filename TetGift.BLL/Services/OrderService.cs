@@ -320,7 +320,7 @@ public class OrderService : IOrderService
             throw new Exception($"Không thể chuyển trạng thái từ '{currentStatus}' sang '{newStatus}'.");
         }
 
-        // Nếu hủy đơn, hoàn lại stock và hoàn tiền vào ví (nếu thanh toán bằng ví)
+        // Nếu HỦY ĐƠN trực tiếp từ hàm này (Trường hợp Admin ép hủy), hoàn lại stock
         if (newStatus == OrderStatus.CANCELLED && currentStatus != OrderStatus.CANCELLED)
         {
             await RestoreStockAsync(order);
@@ -345,7 +345,6 @@ public class OrderService : IOrderService
         catch
         {
             // Không throw để tránh update status thành công nhưng bị fail chỉ vì email
-            // Sau này có thể log lại bằng ILogger nếu muốn
         }
 
         // Load lại với đầy đủ thông tin
@@ -360,6 +359,10 @@ public class OrderService : IOrderService
 
         return MapToOrderResponseDto(updatedOrder!);
     }
+
+    // ========================================================
+    // LUỒNG HỦY ĐƠN (UNHAPPY CASE) BƯỚC 2
+    // ========================================================
 
     public async Task<OrderResponseDto> CancelOrderAsync(int orderId, int accountId, string userRole)
     {
@@ -376,45 +379,103 @@ public class OrderService : IOrderService
             throw new Exception("Không tìm thấy đơn hàng.");
 
         var currentStatus = order.Status ?? OrderStatus.PENDING;
-
-        // Validate: Không thể hủy nếu đã DELIVERED hoặc CANCELLED
-        if (currentStatus == OrderStatus.DELIVERED)
-            throw new Exception("Không thể hủy đơn hàng đã được giao.");
-
-        if (currentStatus == OrderStatus.CANCELLED)
-            throw new Exception("Đơn hàng đã được hủy trước đó.");
-
-        // Validate ownership: Customer chỉ được hủy order của chính mình
         var normalizedRole = userRole.ToUpper();
-        if (normalizedRole != "ADMIN")
-        {
-            if (order.Accountid != accountId)
-                throw new Exception("Bạn không có quyền hủy đơn hàng này.");
 
-            // Validate order status
-            if (order.Status != OrderStatus.PENDING &&
-                order.Status != OrderStatus.CONFIRMED &&
-                order.Status != OrderStatus.PAID_WAITING_STOCK)
+        // 1. Kiểm tra giới hạn 3 giờ
+        var orderTime = order.Orderdatetime ?? DateTime.Now;
+        if ((DateTime.Now - orderTime).TotalHours > 3 && normalizedRole != "ADMIN")
+        {
+            throw new Exception("Đã quá thời gian cho phép hủy đơn (3 giờ). Vui lòng liên hệ hotline.");
+        }
+
+        // 2. Validate: Không thể hủy nếu đã SHIPPED, DELIVERED hoặc CANCELLED
+        if (currentStatus == OrderStatus.SHIPPED || currentStatus == OrderStatus.DELIVERED)
+            throw new Exception("Đơn hàng đang giao hoặc đã giao, không thể yêu cầu hủy.");
+
+        if (currentStatus == OrderStatus.CANCELLED || currentStatus == "CANCEL_REQUESTED")
+            throw new Exception("Đơn hàng đã hủy hoặc đang chờ duyệt hủy.");
+
+        // 3. Phân luồng xử lý
+        if (normalizedRole == "ADMIN")
+        {
+            // Admin thì cho phép hủy thẳng và hoàn kho luôn (Quyền tối cao)
+            _uow.BeginTransaction();
+            try
             {
-                throw new Exception("Chỉ có thể hủy đơn hàng trong giai đoạn chưa xử lí đơn hàng.");
+                await RestoreStockAsync(order);
+                order.Status = OrderStatus.CANCELLED;
+                orderRepo.Update(order);
+                await _uow.SaveAsync();
+                _uow.CommitTransaction();
+            }
+            catch
+            {
+                _uow.RollBack();
+                throw;
             }
         }
-
-        _uow.BeginTransaction();
-
-        try
+        else
         {
-            // Process cancellation
-            await RestoreStockAsync(order);
+            // Customer hoặc Staff: Validate sở hữu và chuyển sang trạng thái chờ duyệt (CANCEL_REQUESTED)
+            if (normalizedRole != "STAFF" && order.Accountid != accountId)
+                throw new Exception("Bạn không có quyền hủy đơn hàng này.");
 
-            // Update order status
-            order.Status = OrderStatus.CANCELLED;
+            order.Status = "CANCEL_REQUESTED";
             orderRepo.Update(order);
             await _uow.SaveAsync();
+        }
 
+        // Load lại với đầy đủ thông tin
+        var updatedOrder = await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q
+                .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .Include(o => o.Promotion)
+                .Include(o => o.Feedbacks)
+        );
+
+        return MapToOrderResponseDto(updatedOrder!);
+    }
+
+    public async Task<OrderResponseDto> AdminApproveRefundAsync(int orderId, int adminAccountId)
+    {
+        var orderRepo = _uow.GetRepository<Order>();
+        var paymentRepo = _uow.GetRepository<Payment>();
+
+        var order = await orderRepo.FindAsync(
+            o => o.Orderid == orderId,
+            include: q => q.Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+        );
+        if (order == null) throw new Exception("Không tìm thấy đơn hàng.");
+
+        if (order.Status != "CANCEL_REQUESTED")
+            throw new Exception("Đơn hàng không ở trạng thái yêu cầu hủy.");
+
+        _uow.BeginTransaction();
+        try
+        {
+            // 1. Chính thức hoàn kho
+            await RestoreStockAsync(order);
+
+            // 2. Chuyển trạng thái Payment sang REFUNDED (Để bảo vệ số liệu Dashboard)
+            var payments = await paymentRepo.FindAsync(p => p.Orderid == orderId && p.Status == PaymentStatus.SUCCESS);
+            var payment = payments.FirstOrDefault();
+            if (payment != null)
+            {
+                payment.Status = "REFUNDED";
+                paymentRepo.Update(payment);
+            }
+
+            // 3. Cập nhật Order sang CANCELLED
+            order.Status = OrderStatus.CANCELLED;
+            order.Note = (order.Note ?? "") + $"\n[ADMIN APPROVED] Đã hoàn tiền & hủy đơn bởi Admin Id: {adminAccountId} lúc {DateTime.Now}";
+            orderRepo.Update(order);
+
+            await _uow.SaveAsync();
             _uow.CommitTransaction();
         }
-        catch (Exception e)
+        catch (Exception)
         {
             _uow.RollBack();
             throw;
@@ -437,10 +498,12 @@ public class OrderService : IOrderService
     {
         var validTransitions = new Dictionary<string, List<string>>
         {
-            { OrderStatus.PENDING, new List<string> { OrderStatus.CONFIRMED, OrderStatus.CANCELLED } },
-            { OrderStatus.CONFIRMED, new List<string> { OrderStatus.PROCESSING, OrderStatus.CANCELLED } },
-            { OrderStatus.PROCESSING, new List<string> { OrderStatus.SHIPPED, OrderStatus.CANCELLED } },
+            { OrderStatus.PENDING, new List<string> { OrderStatus.CONFIRMED, OrderStatus.CANCELLED, "CANCEL_REQUESTED" } },
+            { OrderStatus.CONFIRMED, new List<string> { OrderStatus.PROCESSING, OrderStatus.CANCELLED, "CANCEL_REQUESTED" } },
+            { OrderStatus.PAID_WAITING_STOCK, new List<string> { OrderStatus.CONFIRMED, "CANCEL_REQUESTED" } },
+            { OrderStatus.PROCESSING, new List<string> { OrderStatus.SHIPPED, OrderStatus.CANCELLED, "CANCEL_REQUESTED" } },
             { OrderStatus.SHIPPED, new List<string> { OrderStatus.DELIVERED, OrderStatus.CANCELLED } },
+            { "CANCEL_REQUESTED", new List<string> { OrderStatus.CANCELLED } }, // Trạng thái mới
             { OrderStatus.DELIVERED, new List<string> { } }, // Không thể chuyển từ DELIVERED
             { OrderStatus.CANCELLED, new List<string> { } } // Không thể chuyển từ CANCELLED
         };
@@ -494,102 +557,25 @@ public class OrderService : IOrderService
         }
     }
 
-    private OrderResponseDto MapToOrderResponseDto(Order order)
+    private string GetFriendlyOrderStatus(string status)
     {
-        var items = new List<OrderDetailResponseDto>();
-        decimal totalPrice = 0;
-
-        if (order.OrderDetails != null)
+        return (status ?? "").ToUpper() switch
         {
-            foreach (var detail in order.OrderDetails)
-            {
-                if (detail.Product != null)
-                {
-                    var price = detail.Product.Price ?? 0;
-                    var quantity = detail.Quantity ?? 0;
-                    var amount = detail.Amount ?? (price * quantity);
-
-                    items.Add(new OrderDetailResponseDto
-                    {
-                        OrderDetailId = detail.Orderdetailid,
-                        ProductId = detail.Product.Productid,
-                        ProductName = detail.Product.Productname,
-                        Sku = detail.Product.Sku,
-                        Quantity = quantity,
-                        Price = price,
-                        Amount = amount,
-                        ImageUrl = detail.Product.ImageUrl,
-                        ProductDetails = detail.Product.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
-                        {
-                            Productdetailid = pd.Productdetailid,
-                            Productparentid = pd.Productparentid,
-                            Productid = pd.Productid,
-                            Categoryid = pd.Product?.Categoryid,
-                            Productname = pd.Product?.Productname,
-                            Unit = pd.Product?.Unit,
-                            Price = pd.Product?.Price,
-                            Imageurl = pd.Product?.ImageUrl,
-                            Quantity = pd.Quantity,
-                            ChildProduct = null
-                        }).ToList()
-                    });
-
-                    totalPrice += amount;
-                }
-            }
-        }
-
-        var discountValue = 0m;
-        var promotionCode = "";
-        if (order.Promotion != null)
-        {
-            if (order.Promotion.IsPercentage ?? false)
-            {
-                discountValue = order.Totalprice ?? 0 * (order.Promotion.Discountvalue ?? 0 / 100);
-
-                if (discountValue > order.Promotion.MaxDiscountPrice)
-                {
-                    discountValue = order.Promotion.MaxDiscountPrice ?? 0;
-                }
-            }
-            else
-            {
-                discountValue = order.Promotion.Discountvalue ?? 0;
-            }
-
-
-
-            promotionCode = order.Promotion.Code ?? "";
-        }
-
-        return new OrderResponseDto
-        {
-            OrderId = order.Orderid,
-            AccountId = order.Accountid ?? 0,
-            OrderDateTime = order.Orderdatetime,
-            TotalPrice = totalPrice,
-            DiscountValue = discountValue > 0 ? discountValue : null,
-            FinalPrice = order.Totalprice.Value,
-            Status = order.Status,
-            CustomerName = order.Customername,
-            CustomerPhone = order.Customerphone,
-            CustomerEmail = order.Customeremail,
-            CustomerAddress = order.Customeraddress,
-            Note = order.Note,
-            PromotionCode = !string.IsNullOrEmpty(promotionCode) ? promotionCode : null,
-            ShippedDate = order.Shippeddate,
-            isQuotation = order.isQuotation,
-            Feedback = order.Feedbacks != null && order.Feedbacks.Any() && order.Feedbacks.First().Isdeleted != true ? new FeedbackResponseDto
-            {
-                FeedbackId = order.Feedbacks.First().Feedbackid,
-                OrderId = order.Orderid,
-                Rating = order.Feedbacks.First().Rating ?? 0,
-                Comment = order.Feedbacks.First().Comment,
-                CustomerName = null // Mặc định trong OrderResponseDto không cần lấy tên, nếu cần thì phải Join với Account
-            } : null,
-            Items = items
+            OrderStatus.PENDING => "Chờ xác nhận",
+            OrderStatus.CONFIRMED => "Đã thanh toán",
+            "CANCEL_REQUESTED" => "Đang chờ duyệt hủy đơn",
+            OrderStatus.PROCESSING => "Đang xử lý",
+            OrderStatus.SHIPPED => "Đã giao",
+            OrderStatus.DELIVERED => "Đã nhận",
+            OrderStatus.CANCELLED => "Đã hủy",
+            OrderStatus.PAID_WAITING_STOCK => "Đã thanh toán - chờ nhập kho",
+            _ => status
         };
     }
+
+    // ========================================================
+    // CÁC HÀM CŨ GIỮ NGUYÊN (KHÔNG ĐỤNG ĐẾN)
+    // ========================================================
 
     public async Task TryAllocateStockAfterPaymentAsync(int orderId)
     {
@@ -800,7 +786,6 @@ public class OrderService : IOrderService
         }
     }
 
-
     public async Task AllocateStockForWaitingOrderAsync(int orderId)
     {
         if (orderId <= 0) throw new Exception("orderId is required.");
@@ -820,7 +805,6 @@ public class OrderService : IOrderService
 
         throw new Exception("Use ForceAllocateStockAsync for STAFF/ADMIN allocation retry.");
     }
-
 
     public async Task ForceAllocateStockAsync(int orderId, int actorAccountId, string actorRole)
     {
@@ -867,16 +851,10 @@ public class OrderService : IOrderService
 
             if (totalStock < need)
             {
-                // vẫn có thể set PAID_WAITING_STOCK để lưu trạng thái
                 order.Status = OrderStatus.PAID_WAITING_STOCK;
-                //order.Note = string.IsNullOrWhiteSpace(order.Note)
-                //    ? $"[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {need}."
-                //    : $"{order.Note}\n[PAID_WAITING_STOCK] Thiếu hàng ProductId={pid}. Còn {totalStock}, cần {need}.";
-
                 orderRepo.Update(order);
                 await _uow.SaveAsync();
 
-                // throw để controller trả lỗi thiếu hàng
                 throw new Exception($"Thiếu hàng (ProductId={pid}). Còn {totalStock}, cần {need}.");
             }
         }
@@ -934,21 +912,6 @@ public class OrderService : IOrderService
         }
 
         throw new Exception("Allocate failed unexpectedly. Please check stock data and allocation logic.");
-    }
-
-    private string GetFriendlyOrderStatus(string status)
-    {
-        return (status ?? "").ToUpper() switch
-        {
-            OrderStatus.PENDING => "Chờ xác nhận",
-            OrderStatus.CONFIRMED => "Đã thanh toán",
-            OrderStatus.PROCESSING => "Đang xử lý",
-            OrderStatus.SHIPPED => "Đã giao",
-            OrderStatus.DELIVERED => "Đã nhận",
-            OrderStatus.CANCELLED => "Đã hủy",
-            OrderStatus.PAID_WAITING_STOCK => "Đã thanh toán - chờ nhập kho",
-            _ => status
-        };
     }
 
     private async Task SendOrderStatusChangedEmailAsync(Order order)
@@ -1013,4 +976,98 @@ public class OrderService : IOrderService
         return string.Join("", rows);
     }
 
+    private OrderResponseDto MapToOrderResponseDto(Order order)
+    {
+        var items = new List<OrderDetailResponseDto>();
+        decimal totalPrice = 0;
+
+        if (order.OrderDetails != null)
+        {
+            foreach (var detail in order.OrderDetails)
+            {
+                if (detail.Product != null)
+                {
+                    var price = detail.Product.Price ?? 0;
+                    var quantity = detail.Quantity ?? 0;
+                    var amount = detail.Amount ?? (price * quantity);
+
+                    items.Add(new OrderDetailResponseDto
+                    {
+                        OrderDetailId = detail.Orderdetailid,
+                        ProductId = detail.Product.Productid,
+                        ProductName = detail.Product.Productname,
+                        Sku = detail.Product.Sku,
+                        Quantity = quantity,
+                        Price = price,
+                        Amount = amount,
+                        ImageUrl = detail.Product.ImageUrl,
+                        ProductDetails = detail.Product.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
+                        {
+                            Productdetailid = pd.Productdetailid,
+                            Productparentid = pd.Productparentid,
+                            Productid = pd.Productid,
+                            Categoryid = pd.Product?.Categoryid,
+                            Productname = pd.Product?.Productname,
+                            Unit = pd.Product?.Unit,
+                            Price = pd.Product?.Price,
+                            Imageurl = pd.Product?.ImageUrl,
+                            Quantity = pd.Quantity,
+                            ChildProduct = null
+                        }).ToList()
+                    });
+
+                    totalPrice += amount;
+                }
+            }
+        }
+
+        var discountValue = 0m;
+        var promotionCode = "";
+        if (order.Promotion != null)
+        {
+            if (order.Promotion.IsPercentage ?? false)
+            {
+                discountValue = (order.Totalprice ?? 0) * ((order.Promotion.Discountvalue ?? 0) / 100);
+
+                if (discountValue > order.Promotion.MaxDiscountPrice)
+                {
+                    discountValue = order.Promotion.MaxDiscountPrice ?? 0;
+                }
+            }
+            else
+            {
+                discountValue = order.Promotion.Discountvalue ?? 0;
+            }
+
+            promotionCode = order.Promotion.Code ?? "";
+        }
+
+        return new OrderResponseDto
+        {
+            OrderId = order.Orderid,
+            AccountId = order.Accountid ?? 0,
+            OrderDateTime = order.Orderdatetime,
+            TotalPrice = totalPrice,
+            DiscountValue = discountValue > 0 ? discountValue : null,
+            FinalPrice = order.Totalprice ?? totalPrice,
+            Status = order.Status,
+            CustomerName = order.Customername,
+            CustomerPhone = order.Customerphone,
+            CustomerEmail = order.Customeremail,
+            CustomerAddress = order.Customeraddress,
+            Note = order.Note,
+            PromotionCode = !string.IsNullOrEmpty(promotionCode) ? promotionCode : null,
+            ShippedDate = order.Shippeddate,
+            isQuotation = order.isQuotation,
+            Feedback = order.Feedbacks != null && order.Feedbacks.Any() && order.Feedbacks.First().Isdeleted != true ? new FeedbackResponseDto
+            {
+                FeedbackId = order.Feedbacks.First().Feedbackid,
+                OrderId = order.Orderid,
+                Rating = order.Feedbacks.First().Rating ?? 0,
+                Comment = order.Feedbacks.First().Comment,
+                CustomerName = null
+            } : null,
+            Items = items
+        };
+    }
 }
