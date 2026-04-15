@@ -27,6 +27,9 @@ namespace TetGift.BLL.Services
                 Configname = x.Configname,
                 Suitablesuggestion = x.Suitablesuggestion,
                 Totalunit = x.Totalunit,
+                MaxLength = x.MaxLength,
+                MaxWidth = x.MaxWidth,
+                MaxHeight = x.MaxHeight,
                 Imageurl = x.Imageurl,
                 ConfigDetails = x.ConfigDetails?.Select(cd => new ConfigDetailDto
                 {
@@ -96,6 +99,9 @@ namespace TetGift.BLL.Services
                 Configname = result.Configname,
                 Suitablesuggestion = result.Suitablesuggestion,
                 Totalunit = result.Totalunit,
+                MaxLength = result.MaxLength,
+                MaxWidth = result.MaxWidth,
+                MaxHeight = result.MaxHeight,
                 Imageurl = result.Imageurl,
                 ConfigDetails = result.ConfigDetails?.Select(cd => new ConfigDetailDto
                 {
@@ -157,6 +163,9 @@ namespace TetGift.BLL.Services
                 Configname = request.Configname,
                 Suitablesuggestion = request.Description,
                 Totalunit = request.Totalunit,
+                MaxLength = request.MaxLength,
+                MaxWidth = request.MaxWidth,
+                MaxHeight = request.MaxHeight,
                 Imageurl = null,
                 Isdeleted = false
             };
@@ -194,6 +203,9 @@ namespace TetGift.BLL.Services
             entity.Configname = request.Configname;
             entity.Suitablesuggestion = request.Description;
             entity.Totalunit = request.Totalunit;
+            entity.MaxLength = request.MaxLength;
+            entity.MaxWidth = request.MaxWidth;
+            entity.MaxHeight = request.MaxHeight;
             repo.Update(entity);
 
             // Delete existing ConfigDetails
@@ -285,3 +297,4 @@ namespace TetGift.BLL.Services
         }
     }
 }
+

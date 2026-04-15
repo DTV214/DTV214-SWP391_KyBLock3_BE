@@ -421,6 +421,15 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.Unit)
                 .HasPrecision(18, 2)
                 .HasColumnName("unit");
+            entity.Property(e => e.Length)
+                .HasPrecision(18, 2)
+                .HasColumnName("length");
+            entity.Property(e => e.Width)
+                .HasPrecision(18, 2)
+                .HasColumnName("width");
+            entity.Property(e => e.Height)
+                .HasPrecision(18, 2)
+                .HasColumnName("height");
 
             entity.HasOne(d => d.Account).WithMany(p => p.Products)
                 .HasForeignKey(d => d.Accountid)
@@ -468,6 +477,15 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.Totalunit)
                 .HasPrecision(18, 2)
                 .HasColumnName("totalunit");
+            entity.Property(e => e.MaxLength)
+                .HasPrecision(18, 2)
+                .HasColumnName("maxlength");
+            entity.Property(e => e.MaxWidth)
+                .HasPrecision(18, 2)
+                .HasColumnName("maxwidth");
+            entity.Property(e => e.MaxHeight)
+                .HasPrecision(18, 2)
+                .HasColumnName("maxheight");
         });
 
         modelBuilder.Entity<ProductDetail>(entity =>

@@ -20,6 +20,9 @@ namespace TetGift.BLL.Dtos
         public List<StockDto>? Stocks { get; set; }
         public int? TotalQuantity { get; set; }
         public decimal? Unit { get; set; }
+        public decimal? Length { get; set; }
+        public decimal? Width { get; set; }
+        public decimal? Height { get; set; }
         public bool IsCustom { get; set; } = false;
         public List<ProductDetailResponse>? ProductDetails { get; set; }
     }
@@ -43,6 +46,9 @@ namespace TetGift.BLL.Dtos
         [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Đơn vị (trọng lượng) phải lớn hơn 0")]
         public decimal Unit { get; set; }
+        public decimal? Length { get; set; }
+        public decimal? Width { get; set; }
+        public decimal? Height { get; set; }
         
         public string? Sku { get; set; }
 
@@ -88,6 +94,9 @@ namespace TetGift.BLL.Dtos
         [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Đơn vị (trọng lượng) phải lớn hơn 0")]
         public decimal Unit { get; set; }
+        public decimal? Length { get; set; }
+        public decimal? Width { get; set; }
+        public decimal? Height { get; set; }
 
         public string? Sku { get; set; }
 
@@ -178,6 +187,9 @@ namespace TetGift.BLL.Dtos
         public string? Sku { get; set; }
         public decimal Price { get; set; }
         public decimal Unit { get; set; }
+        public decimal? Length { get; set; }
+        public decimal? Width { get; set; }
+        public decimal? Height { get; set; }
         public int Quantity { get; set; }
         public string? ImageUrl { get; set; }
         public int TotalQuantityInStock { get; set; }

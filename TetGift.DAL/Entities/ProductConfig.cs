@@ -28,6 +28,15 @@ public partial class ProductConfig
     /// </summary>
     public decimal? Totalunit { get; set; }
 
+    /// <summary>
+    /// Kích thước vật lý tối đa của hộp quà/giỏ quà (Dài - Rộng - Cao)
+    /// Dùng để validate không gian thực tế khi thêm đồ vào giỏ
+    /// </summary>
+    public decimal? MaxLength { get; set; }
+    public decimal? MaxWidth { get; set; }
+    public decimal? MaxHeight { get; set; }
+    public decimal? MaxVolume => (MaxLength ?? 0) * (MaxWidth ?? 0) * (MaxHeight ?? 0);
+
     public string? Imageurl { get; set; }
 
     /// <summary>
