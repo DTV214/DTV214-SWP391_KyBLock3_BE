@@ -196,6 +196,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         {
             p.CalculateUnit();
             p.CalculateTotalPrice();
+            p.CalculateImportPrice();
 
             return new ProductDto()
             {
@@ -302,6 +303,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         {
             p.CalculateUnit();
             p.CalculateTotalPrice();
+            p.CalculateImportPrice();
             return new ProductDto
             {
                 Productid = p.Productid,
@@ -848,6 +850,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         {
             p.CalculateUnit();
             p.CalculateTotalPrice();
+            p.CalculateImportPrice();
 
             return new ProductDto
             {
@@ -977,6 +980,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         {
             p.CalculateUnit();
             p.CalculateTotalPrice();
+            p.CalculateImportPrice();
 
             return new ProductDto
             {
@@ -1041,6 +1045,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         {
             p.CalculateUnit();
             p.CalculateTotalPrice();
+            p.CalculateImportPrice();
 
             return new ProductDto
             {

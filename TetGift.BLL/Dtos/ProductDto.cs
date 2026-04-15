@@ -24,6 +24,8 @@ namespace TetGift.BLL.Dtos
         public decimal? Width { get; set; }
         public decimal? Height { get; set; }
         public bool IsCustom { get; set; } = false;
+        public decimal? ImportPrice { get; set; }
+        public decimal? Profit => Price - ImportPrice;
         public List<ProductDetailResponse>? ProductDetails { get; set; }
     }
     //DTO tạo sản phẩm đơn lẻ
@@ -42,6 +44,10 @@ namespace TetGift.BLL.Dtos
         [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Giá phải lớn hơn 0")]
         public decimal Price { get; set; }
+        [Required]
+        [Range(0, double.MaxValue, ErrorMessage = "Giá nhập phải lớn hơn 0 và lớn hơn price")]
+        public decimal? ImportPrice { get; set; }
+       
 
         [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Đơn vị (trọng lượng) phải lớn hơn 0")]

@@ -56,7 +56,7 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("DayCreate")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
                         .HasMaxLength(255)
@@ -360,10 +360,10 @@ namespace TetGift.DAL.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("LastMessageAt")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
@@ -474,7 +474,7 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsRead")
                         .HasColumnType("boolean");
@@ -621,7 +621,7 @@ namespace TetGift.DAL.Migrations
                         .HasColumnName("amount");
 
                     b.Property<DateTime?>("CreatedDate")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool?>("Ispayonline")
                         .HasColumnType("boolean")
@@ -697,6 +697,9 @@ namespace TetGift.DAL.Migrations
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
+
+                    b.Property<decimal?>("ImportPrice")
+                        .HasColumnType("numeric");
 
                     b.Property<decimal?>("Length")
                         .HasPrecision(18, 2)

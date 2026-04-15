@@ -17,6 +17,7 @@ public partial class Product
     public string? Description { get; set; }
 
     public decimal? Price { get; set; }
+    public decimal? ImportPrice { get; set; } // giá nhập (cost price)
     public string? Status { get; set; }
     public string? ImageUrl { get; set; }
 
@@ -49,6 +50,38 @@ public partial class Product
     public virtual ICollection<QuotationItem> QuotationItems { get; set; } = [];
 
     public virtual ICollection<Stock> Stocks { get; set; } = [];
+
+    /// <summary>
+    /// Calculates import price by summing up the import prices of all child products in ProductDetail
+    /// </summary>
+    public void CalculateImportPrice()
+    {
+        // Nếu là product thường
+        if (Configid == null)
+            return;
+
+        // Nếu là combo
+        if (ProductDetailProductparents == null || !ProductDetailProductparents.Any())
+        {
+            ImportPrice = 0;
+            return;
+        }
+
+        decimal total = 0;
+
+        foreach (var item in ProductDetailProductparents)
+        {
+            var child = item.Product;
+            if (child == null) continue;
+
+            var importPrice = child.ImportPrice ?? 0;
+            var quantity = item.Quantity ?? 1;
+
+            total += importPrice * quantity;
+        }
+
+        ImportPrice = total;
+    }
 
     /// <summary>
     /// Calculates total weight by summing up all ProductDetail items
