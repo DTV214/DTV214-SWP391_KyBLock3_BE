@@ -14,6 +14,9 @@ namespace TetGift.BLL.Dtos
 
         [Range(0.01, double.MaxValue, ErrorMessage = "Tổng đơn vị phải là số dương lớn hơn 0")]
         public decimal? Totalunit { get; set; }
+        public decimal? MaxLength { get; set; }
+        public decimal? MaxWidth { get; set; }
+        public decimal? MaxHeight { get; set; }
         public string? Imageurl { get; set; }
 
         public List<ConfigDetailDto> ConfigDetails { get; set; } = new();
@@ -27,6 +30,9 @@ namespace TetGift.BLL.Dtos
         public string Configname { get; set; } = null!;
         public string? Description { get; set; }
         public decimal Totalunit { get; set; }
+        public decimal? MaxLength { get; set; }
+        public decimal? MaxWidth { get; set; }
+        public decimal? MaxHeight { get; set; }
         public Dictionary<int, int> CategoryQuantities { get; set; } = new();
     }
 
@@ -36,7 +42,11 @@ namespace TetGift.BLL.Dtos
         public string Configname { get; set; } = null!;
         public string? Description { get; set; }
         public decimal Totalunit { get; set; }
+        public decimal? MaxLength { get; set; }
+        public decimal? MaxWidth { get; set; }
+        public decimal? MaxHeight { get; set; }
         public Dictionary<int, int> CategoryQuantities { get; set; } = new();
     }
 
 }
+

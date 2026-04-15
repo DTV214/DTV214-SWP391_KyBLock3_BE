@@ -17,10 +17,21 @@ public partial class Product
     public string? Description { get; set; }
 
     public decimal? Price { get; set; }
+    public decimal? ImportPrice { get; set; } // giá nhập (cost price)
     public string? Status { get; set; }
     public string? ImageUrl { get; set; }
 
     public decimal? Unit { get; set; }
+
+    /// <summary>
+    /// Kích thước vật lý của sản phẩm để validate khi xếp vào giỏ dynamic
+    /// </summary>
+    public decimal? Length { get; set; }
+    public decimal? Width { get; set; }
+    public decimal? Height { get; set; }
+
+    // Computed property: Thể tích (Dài x Rộng x Cao)
+    public decimal? Volume => (Length ?? 0) * (Width ?? 0) * (Height ?? 0);
 
     public virtual Account? Account { get; set; }
 
@@ -39,6 +50,38 @@ public partial class Product
     public virtual ICollection<QuotationItem> QuotationItems { get; set; } = [];
 
     public virtual ICollection<Stock> Stocks { get; set; } = [];
+
+    /// <summary>
+    /// Calculates import price by summing up the import prices of all child products in ProductDetail
+    /// </summary>
+    public void CalculateImportPrice()
+    {
+        // Nếu là product thường
+        if (Configid == null)
+            return;
+
+        // Nếu là combo
+        if (ProductDetailProductparents == null || !ProductDetailProductparents.Any())
+        {
+            ImportPrice = 0;
+            return;
+        }
+
+        decimal total = 0;
+
+        foreach (var item in ProductDetailProductparents)
+        {
+            var child = item.Product;
+            if (child == null) continue;
+
+            var importPrice = child.ImportPrice ?? 0;
+            var quantity = item.Quantity ?? 1;
+
+            total += importPrice * quantity;
+        }
+
+        ImportPrice = total;
+    }
 
     /// <summary>
     /// Calculates total weight by summing up all ProductDetail items
@@ -165,6 +208,53 @@ public partial class Product
         if (Unit > Config.Totalunit)
         {
             throw new Exception($"Tổng trọng lượng giỏ quà ({Unit}) vượt quá giới hạn cấu hình cho phép ({Config.Totalunit}).");
+        }
+    }
+
+    /// <summary>
+    /// Thuật toán đóng gói hàng (3D Bin packing validation) kiểm tra xem sản phẩm có lọt vào giỏ không.
+    /// 1. Kiểm tra kích thước hình học 3 chiều (đảm bảo không bị quá khổ nắp hộp)
+    /// 2. Kiểm tra tổng không gian thể tích (kèm theo hệ số chứa thực tế ~85%)
+    /// </summary>
+    public void ValidateSpaceDynamic(Product itemToAdd, int quantityToAdd = 1)
+    {
+        // 0. Bỏ qua nếu giỏ không bị ràng buộc bởi Config hoặc thiết lập kích thước chưa đầy đủ
+        if (Config == null || Config.MaxLength == null || Config.MaxWidth == null || Config.MaxHeight == null)
+            return; 
+
+        if (itemToAdd.Length == null || itemToAdd.Width == null || itemToAdd.Height == null)
+            throw new Exception($"Sản phẩm '{itemToAdd.Productname}' chưa có thông tin kích thước (Dài Rộng Cao) nên không thể đóng gói vào giỏ này.");
+
+        // TEST 1: Kích thước tuyệt đối (Sản phẩm có lọt vô khung giỏ không?)
+        // Sắp xếp các cạnh để mô phỏng việc xoay dọc ngang vật thể khi xếp vào hộp
+        var itemDims = new[] { itemToAdd.Length.Value, itemToAdd.Width.Value, itemToAdd.Height.Value }.OrderBy(x => x).ToArray();
+        var boxDims = new[] { Config.MaxLength.Value, Config.MaxWidth.Value, Config.MaxHeight.Value }.OrderBy(x => x).ToArray();
+
+        if (itemDims[0] > boxDims[0] || itemDims[1] > boxDims[1] || itemDims[2] > boxDims[2])
+        {
+            throw new Exception($"Kích thước của món '{itemToAdd.Productname}' ({itemToAdd.Length}x{itemToAdd.Width}x{itemToAdd.Height}) quá lớn, không lọt vừa giỏ quà này.");
+        }
+
+        // TEST 2: Thể tích còn lại có đủ chứa không? (Sử dụng hệ số lấp đầy 85% để mô phỏng kẽ hở xoay sở ngoài đời)
+        decimal currentTotalVolume = 0;
+        if (ProductDetailProductparents != null)
+        {
+            foreach (var detail in ProductDetailProductparents)
+            {
+                if (detail.Product != null)
+                {
+                    currentTotalVolume += (detail.Quantity ?? 0) * (detail.Product.Volume ?? 0);
+                }
+            }
+        }
+
+        decimal newItemsVolume = (itemToAdd.Volume ?? 0) * quantityToAdd;
+        decimal maxAllowedVolume = Config.MaxVolume ?? 0;
+        decimal packingFactor = 0.85m; // Thực tế không gian hộp chỉ chứa tối đa 85% vật phẩm, 15% là rỗng/kẽ hở
+
+        if (currentTotalVolume + newItemsVolume > maxAllowedVolume * packingFactor)
+        {
+            throw new Exception($"Tổng thể tích của giỏ/hộp đã quá đầy. Không còn đủ không gian để chứa thêm {quantityToAdd} x '{itemToAdd.Productname}'.");
         }
     }
 
