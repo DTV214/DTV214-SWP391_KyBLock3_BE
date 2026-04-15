@@ -221,7 +221,6 @@ namespace TetGift
             builder.Services.AddScoped<ICartService, CartService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
             builder.Services.AddScoped<IPaymentService, PaymentService>();
-            builder.Services.AddScoped<IWalletService, WalletService>();
             builder.Services.AddScoped<IDashboardService, DashboardService>();
             builder.Services.AddScoped<IBlogService, BlogService>();
             builder.Services.AddScoped<IAccountService, AccountService>();

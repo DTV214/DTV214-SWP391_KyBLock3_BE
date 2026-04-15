@@ -16,8 +16,6 @@ namespace TetGift.BLL.Dtos
         public string? Address { get; set; }
         public string? Role { get; set; }
         public string? Status { get; set; }
-        // Có thể thêm WalletBalance nếu cần sau này
-        public decimal WalletBalance { get; set; }
     }
 
     public class UpdateProfileRequest

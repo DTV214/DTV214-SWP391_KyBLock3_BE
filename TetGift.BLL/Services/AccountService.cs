@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore; // Nhớ using cái này để dùng Include
+﻿using CloudinaryDotNet.Core;
 using System;
+using System.Linq; // <-- Thêm thư viện này để dùng FirstOrDefault()
 using System.Threading.Tasks;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -21,11 +22,13 @@ namespace TetGift.BLL.Services
         {
             var repo = _unitOfWork.GetRepository<Account>();
 
-            // SỬA ĐỔI: Sử dụng Include để lấy luôn thông tin Wallet
-            var account = await repo.FindAsync(
-                predicate: a => a.Accountid == accountId,
-                include: q => q.Include(a => a.Wallet) // Join với bảng Wallet
+            // Lấy ra danh sách các account khớp điều kiện
+            var accounts = await repo.FindAsync(
+                predicate: a => a.Accountid == accountId
             );
+
+            // Lấy account đầu tiên (và duy nhất) trong danh sách đó
+            var account = accounts.FirstOrDefault();
 
             if (account == null)
                 throw new Exception("Tài khoản không tồn tại.");
@@ -39,10 +42,7 @@ namespace TetGift.BLL.Services
                 Phone = account.Phone,
                 Address = account.Address,
                 Role = account.Role,
-                Status = account.Status,
-
-                // MAP BALANCE: Nếu chưa có ví thì hiển thị 0
-                WalletBalance = account.Wallet?.Balance ?? 0
+                Status = account.Status
             };
         }
 

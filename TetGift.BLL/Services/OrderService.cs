@@ -14,19 +14,17 @@ public class OrderService : IOrderService
     private readonly ICartService _cartService;
     private readonly IPromotionService _promotionService;
     private readonly IAccountPromotionService _accountPromotionService;
-    private readonly IWalletService _walletService;
     private readonly IEmailSender _emailSender;
     private readonly IEmailTemplateRenderer _emailTemplateRenderer;
     private readonly IConfiguration _configuration;
 
-    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IWalletService walletService, IAccountPromotionService accountPromotionService, IEmailSender emailSender,
-        IEmailTemplateRenderer emailTemplateRenderer,
-        IConfiguration configuration)
+    public OrderService(IUnitOfWork uow, ICartService cartService, IPromotionService promotionService, IAccountPromotionService accountPromotionService, IEmailSender emailSender,
+         IEmailTemplateRenderer emailTemplateRenderer,
+         IConfiguration configuration)
     {
         _uow = uow;
         _cartService = cartService;
         _promotionService = promotionService;
-        _walletService = walletService;
         _accountPromotionService = accountPromotionService;
         _emailSender = emailSender;
         _emailTemplateRenderer = emailTemplateRenderer;
@@ -326,9 +324,6 @@ public class OrderService : IOrderService
         if (newStatus == OrderStatus.CANCELLED && currentStatus != OrderStatus.CANCELLED)
         {
             await RestoreStockAsync(order);
-
-            // Hoàn tiền vào ví nếu thanh toán bằng ví
-            await _walletService.RefundToWalletAsync(orderId);
         }
 
         order.Status = newStatus;
@@ -411,9 +406,6 @@ public class OrderService : IOrderService
         {
             // Process cancellation
             await RestoreStockAsync(order);
-
-            // Hoàn tiền vào ví (nếu đã thanh toán)
-            await _walletService.RefundToWalletAsync(orderId);
 
             // Update order status
             order.Status = OrderStatus.CANCELLED;
