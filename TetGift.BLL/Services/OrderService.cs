@@ -582,12 +582,13 @@ public class OrderService : IOrderService
         var movementRepo = _uow.GetRepository<StockMovement>();
         var productRepo = _uow.GetRepository<Product>();
 
-        // load order + details + product (bao gồm cả ProductDetail cho sản phẩm giỏ)
+        // load order + details + product (including child products' ImportPrice)
         var order = await orderRepo.FindAsync(
             o => o.Orderid == orderId,
             include: q => q.Include(x => x.OrderDetails)
                 .ThenInclude(od => od.Product)
-                .ThenInclude(p => p.ProductDetailProductparents)
+                    .ThenInclude(p => p.ProductDetailProductparents)
+                        .ThenInclude(pd => pd.Product) // ensure child product import prices are available
         );
 
         if (order == null) throw new Exception("Order not found.");
@@ -656,7 +657,7 @@ public class OrderService : IOrderService
             }
         }
 
-        // 2) Deduct theo FIFO trong transaction
+        // 2) Deduct theo FIFO trong transaction + compute cost & actual revenue
         _uow.BeginTransaction();
         try
         {
@@ -710,76 +711,118 @@ public class OrderService : IOrderService
                                     Quantity = -deduct,
                                     Movementdate = DateTime.Now,
                                     Note = $"Xuất kho sản phẩm con (ProductId={childPid}) cho đơn hàng #{order.Orderid}"
-                                });
+                            });
 
-                                remaining -= deduct;
-                            }
-
-                            if (remaining > 0)
-                                throw new Exception($"Unexpected thiếu hàng khi xuất kho sản phẩm con (ProductId={childPid}).");
+                            remaining -= deduct;
                         }
+
+                        if (remaining > 0)
+                            throw new Exception($"Unexpected thiếu hàng khi xuất kho sản phẩm con (ProductId={childPid}).");
                     }
-                }
-                // Sản phẩm thường: trừ stock trực tiếp
-                else
-                {
-                    var need = qty;
-
-                    var availableStocks = (await stockRepo.FindAsync(
-                            s => s.Productid == pid && s.Status == StockStatus.ACTIVE
-                        ))
-                        .OrderBy(s => s.Productiondate) // FIFO
-                        .ToList();
-
-                    var remaining = need;
-
-                    foreach (var stock in availableStocks)
-                    {
-                        if (remaining <= 0) break;
-
-                        var stockQty = stock.Stockquantity ?? 0;
-                        if (stockQty <= 0) continue;
-
-                        var deduct = Math.Min(remaining, stockQty);
-
-                        stock.Stockquantity = stockQty - deduct;
-                        if ((stock.Stockquantity ?? 0) <= 0)
-                            stock.Status = StockStatus.OUT_OF_STOCK;
-
-                        stockRepo.Update(stock);
-
-                        await movementRepo.AddAsync(new StockMovement
-                        {
-                            Stockid = stock.Stockid,
-                            Orderid = order.Orderid,
-                            Quantity = -deduct,
-                            Movementdate = DateTime.Now,
-                            Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
-                        });
-
-                        remaining -= deduct;
-                    }
-
-                    if (remaining > 0)
-                        throw new Exception($"Unexpected thiếu hàng khi xuất kho (ProductId={pid}).");
                 }
             }
+            // Sản phẩm thường: trừ stock trực tiếp
+            else
+            {
+                var need = qty;
 
-            // Status giữ nguyên CONFIRMED — Staff/Admin sẽ chuyển sang PROCESSING thủ công
-            orderRepo.Update(order);
+                var availableStocks = (await stockRepo.FindAsync(
+                        s => s.Productid == pid && s.Status == StockStatus.ACTIVE
+                    ))
+                    .OrderBy(s => s.Productiondate) // FIFO
+                    .ToList();
 
-            await _uow.SaveAsync();
-            _uow.CommitTransaction();
+                var remaining = need;
+
+                foreach (var stock in availableStocks)
+                {
+                    if (remaining <= 0) break;
+
+                    var stockQty = stock.Stockquantity ?? 0;
+                    if (stockQty <= 0) continue;
+
+                    var deduct = Math.Min(remaining, stockQty);
+
+                    stock.Stockquantity = stockQty - deduct;
+                    if ((stock.Stockquantity ?? 0) <= 0)
+                        stock.Status = StockStatus.OUT_OF_STOCK;
+
+                    stockRepo.Update(stock);
+
+                    await movementRepo.AddAsync(new StockMovement
+                    {
+                        Stockid = stock.Stockid,
+                        Orderid = order.Orderid,
+                        Quantity = -deduct,
+                        Movementdate = DateTime.Now,
+                        Note = $"Xuất kho cho đơn hàng #{order.Orderid}"
+                    });
+
+                    remaining -= deduct;
+                }
+
+                if (remaining > 0)
+                    throw new Exception($"Unexpected thiếu hàng khi xuất kho (ProductId={pid}).");
+            }
         }
-        catch (Exception ex)
+
+        // After successful stock deduction compute costs and actual revenue
+        // Compute total price before discount (sum of detail amounts or fallback)
+        decimal totalBeforeDiscount = 0m;
+        foreach (var od in order.OrderDetails)
         {
-            _uow.RollBack();
-
-            // nếu fail thì PAID_WAITING_STOCK
-            order.Status = OrderStatus.PAID_WAITING_STOCK;
-            orderRepo.Update(order);
-            await _uow.SaveAsync();
+            totalBeforeDiscount += od.Amount ?? ((od.Product?.Price ?? 0m) * (od.Quantity ?? 0));
         }
+
+        decimal finalPaid = order.Totalprice ?? totalBeforeDiscount;
+        decimal discountValue = totalBeforeDiscount - finalPaid; // may be 0
+
+        // Compute total cost (import price)
+        decimal totalCost = 0m;
+        foreach (var od in order.OrderDetails)
+        {
+            var qty = od.Quantity ?? 0;
+            var product = od.Product;
+
+            if (product != null && product.Configid != null && product.ProductDetailProductparents != null && product.ProductDetailProductparents.Any())
+            {
+                // Basket/combo: sum child's import price * childQty * number of baskets
+                foreach (var child in product.ProductDetailProductparents)
+                {
+                    var childImport = child.Product?.ImportPrice ?? 0m;
+                    var childQty = child.Quantity ?? 0;
+                    totalCost += childImport * childQty * qty;
+                }
+            }
+            else
+            {
+                var importPrice = product?.ImportPrice ?? 0m;
+                totalCost += importPrice * qty;
+            }
+        }
+
+        // Actual revenue = amount received after discount - totalCost
+        decimal actualRevenue = finalPaid - totalCost;
+
+        // Persist totals onto Order
+        order.Totalprice = totalCost;
+        order.ActualRevenue = actualRevenue;
+
+        // Status giữ nguyên CONFIRMED — Staff/Admin sẽ chuyển sang PROCESSING thủ công
+        orderRepo.Update(order);
+
+        await _uow.SaveAsync();
+        _uow.CommitTransaction();
+    }
+    catch (Exception ex)
+    {
+        _uow.RollBack();
+
+        // nếu fail thì PAID_WAITING_STOCK
+        order.Status = OrderStatus.PAID_WAITING_STOCK;
+        orderRepo.Update(order);
+        await _uow.SaveAsync();
+    }
     }
 
     public async Task AllocateStockForWaitingOrderAsync(int orderId)

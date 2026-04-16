@@ -398,4 +398,123 @@ public class DashboardService : IDashboardService
         var finalPrice = totalPrice - discountValue;
         return finalPrice > 0 ? finalPrice : 0;
     }
+
+    public async Task<RevenueChartDto> GetActualRevenueByTimeRangeAsync(TimeRangeRequest request)
+    {
+        var orderRepo = _uow.GetRepository<Order>();
+
+        var ordersQuery = orderRepo.Entities
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p.ProductDetailProductparents)
+                        .ThenInclude(pd => pd.Product)
+            .Include(o => o.Payments)
+            .Include(o => o.Promotion)
+            .AsQueryable();
+
+        if (request.StartDate.HasValue)
+            ordersQuery = ordersQuery.Where(o => o.Orderdatetime >= request.StartDate.Value);
+        if (request.EndDate.HasValue)
+        {
+            var endDate = request.EndDate.Value.AddDays(1);
+            ordersQuery = ordersQuery.Where(o => o.Orderdatetime < endDate);
+        }
+
+        // Only consider orders that were actually paid / confirmed or later statuses
+        var paidStatuses = new[] { OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED };
+        var paidOrders = await ordersQuery
+            .Where(o => o.Payments.Any(p => p.Status == PaymentStatus.SUCCESS) ||
+                        (o.Status != null && paidStatuses.Contains(o.Status)))
+            .ToListAsync();
+
+        var period = (request.Period ?? "day").ToLower();
+        var data = new List<RevenueChartDataDto>();
+
+        IEnumerable<IGrouping<object?, Order>> groups = period switch
+        {
+            "month" => paidOrders
+                .GroupBy(o => o.Orderdatetime.HasValue
+                    ? (object?)new DateTime(o.Orderdatetime.Value.Year, o.Orderdatetime.Value.Month, 1)
+                    : null),
+            "year" => paidOrders
+                .GroupBy(o => o.Orderdatetime?.Year as object),
+            _ => paidOrders
+                .GroupBy(o => o.Orderdatetime?.Date as object)
+        };
+
+        foreach (var g in groups.Where(g => g.Key != null).OrderBy(g => g.Key))
+        {
+            decimal groupRevenue = 0m;
+            var orders = g.ToList();
+            foreach (var order in orders)
+            {
+                if (order.ActualRevenue.HasValue)
+                {
+                    groupRevenue += order.ActualRevenue.Value;
+                    continue;
+                }
+
+                // fallback compute actual revenue:
+                // compute totalBeforeDiscount (sum of order detail amounts)
+                decimal totalBeforeDiscount = 0m;
+                if (order.OrderDetails != null)
+                {
+                    foreach (var od in order.OrderDetails)
+                        totalBeforeDiscount += od.Amount ?? ((od.Product?.Price ?? 0m) * (od.Quantity ?? 0));
+                }
+
+                decimal finalPaid = order.Totalprice ?? totalBeforeDiscount;
+
+                // compute total cost (import price)
+                decimal totalCost = 0m;
+                if (order.OrderDetails != null)
+                {
+                    foreach (var od in order.OrderDetails)
+                    {
+                        var qty = od.Quantity ?? 0;
+                        var product = od.Product;
+
+                        if (product != null && product.Configid != null && product.ProductDetailProductparents != null && product.ProductDetailProductparents.Any())
+                        {
+                            foreach (var child in product.ProductDetailProductparents)
+                            {
+                                var childImport = child.Product?.ImportPrice ?? 0m;
+                                var childQty = child.Quantity ?? 0;
+                                totalCost += childImport * childQty * qty;
+                            }
+                        }
+                        else
+                        {
+                            var importPrice = product?.ImportPrice ?? 0m;
+                            totalCost += importPrice * qty;
+                        }
+                    }
+                }
+
+                groupRevenue += (finalPaid - totalCost);
+            }
+
+            string label = period switch
+            {
+                "month" => ((DateTime)g.Key!).ToString("yyyy-MM"),
+                "year" => g.Key!.ToString() ?? string.Empty,
+                _ => ((DateTime)g.Key!).ToString("yyyy-MM-dd")
+            };
+
+            data.Add(new RevenueChartDataDto
+            {
+                Date = label,
+                Revenue = groupRevenue,
+                OrderCount = orders.Count
+            });
+        }
+
+        return new RevenueChartDto
+        {
+            Period = period,
+            Data = data,
+            TotalRevenue = data.Sum(d => d.Revenue),
+            TotalOrders = data.Sum(d => d.OrderCount)
+        };
+    }
 }
