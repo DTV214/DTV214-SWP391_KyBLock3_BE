@@ -233,6 +233,7 @@ namespace TetGift
             builder.Services.AddScoped<IInvoiceService, InvoiceService>();
             builder.Services.AddScoped<IFeedbackService, FeedbackService>();
             builder.Services.AddScoped<IContactService, ContactService>();
+            builder.Services.AddScoped<IStatisticService, StatisticService>();
             builder.Services.AddSignalR();
             // Đăng ký cấu hình CloudinarySettings
             builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
