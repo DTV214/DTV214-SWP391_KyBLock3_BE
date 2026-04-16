@@ -126,4 +126,28 @@ public class DashboardController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Lấy tổng doanh thu thực tế theo khoảng thời gian (day/month/year)
+    /// </summary>
+    [HttpGet("actual-revenue")]
+    public async Task<IActionResult> GetActualRevenue([FromQuery] TimeRangeRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Period))
+                request.Period = "day";
+            if (!request.StartDate.HasValue)
+                request.StartDate = DateTime.UtcNow.AddHours(7).AddDays(-30);
+            if (!request.EndDate.HasValue)
+                request.EndDate = DateTime.UtcNow.AddHours(7);
+
+            var total = await _dashboardService.GetActualRevenueByTimeRangeAsync(request);
+            return Ok(new { TotalActualRevenue = total });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }
