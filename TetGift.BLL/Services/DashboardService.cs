@@ -517,4 +517,53 @@ public class DashboardService : IDashboardService
             TotalOrders = data.Sum(d => d.OrderCount)
         };
     }
+
+    public async Task<List<CustomerOrderStatisticsDto>> GetCustomerOrderStatisticsAsync()
+    {
+        var accountRepo = _uow.GetRepository<Account>();
+        
+        // Lấy tất cả tài khoản có vai trò CUSTOMER hoặc có ít nhất 1 đơn hàng
+        var accounts = await accountRepo.Entities
+            .Where(a => a.Role == "CUSTOMER" || a.Orders.Any())
+            .Include(a => a.Orders)
+            .ToListAsync();
+
+        var stats = accounts.Select(c =>
+        {
+            var totalOrders = c.Orders.Count;
+            var successfulOrders = c.Orders.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.DELIVERED);
+            var cancelledOrders = c.Orders.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.CANCELLED);
+            
+            // Các trạng thái đang được xử lý hoặc đã thanh toán nhưng chưa hoàn tất
+            var processingOrders = c.Orders.Count(o => 
+                (o.Status ?? "").ToUpper() == OrderStatus.CONFIRMED || 
+                (o.Status ?? "").ToUpper() == OrderStatus.PROCESSING || 
+                (o.Status ?? "").ToUpper() == OrderStatus.SHIPPED || 
+                (o.Status ?? "").ToUpper() == OrderStatus.PAID_WAITING_STOCK);
+
+            var totalSpent = c.Orders
+                .Where(o => (o.Status ?? "").ToUpper() == OrderStatus.DELIVERED)
+                .Sum(o => o.Totalprice ?? 0);
+
+            var successRate = totalOrders > 0 
+                ? Math.Round((double)successfulOrders / totalOrders * 100, 2) 
+                : 0;
+
+            return new CustomerOrderStatisticsDto
+            {
+                AccountId = c.Accountid,
+                FullName = c.Fullname,
+                Email = c.Email,
+                TotalOrders = totalOrders,
+                SuccessfulOrders = successfulOrders,
+                CancelledOrders = cancelledOrders,
+                ProcessingOrders = processingOrders,
+                TotalSpent = totalSpent,
+                SuccessRate = successRate
+            };
+        }).ToList();
+
+        // Sắp xếp theo tổng chi tiêu giảm dần
+        return stats.OrderByDescending(s => s.TotalSpent).ToList();
+    }
 }

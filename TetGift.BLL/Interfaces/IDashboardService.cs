@@ -9,5 +9,7 @@ public interface IDashboardService
     Task<AbandonedCartDto> GetAbandonedCartsAsync(int? days = null);
     Task<AccountChartDto> GetAccountStatisticsAsync(TimeRangeRequest request);
     Task<DashboardSummaryDto> GetDashboardSummaryAsync(TimeRangeRequest? request = null);
-    Task<RevenueChartDto> GetActualRevenueByTimeRangeAsync(TimeRangeRequest request);
+
+    // Thống kê đơn hàng cho admin (Customer Total Orders & Success Rate)
+    Task<List<CustomerOrderStatisticsDto>> GetCustomerOrderStatisticsAsync();
 }

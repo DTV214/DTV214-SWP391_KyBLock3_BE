@@ -18,6 +18,23 @@ public class DashboardController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy thống kê tổng đơn hàng và hiệu suất mua của khách hàng
+    /// </summary>
+    [HttpGet("customer-statistics")]
+    public async Task<IActionResult> GetCustomerStatistics()
+    {
+        try
+        {
+            var result = await _dashboardService.GetCustomerOrderStatisticsAsync();
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Lấy dữ liệu revenue theo khoảng thời gian (day/month/year)
     /// </summary>
     [HttpGet("revenue")]

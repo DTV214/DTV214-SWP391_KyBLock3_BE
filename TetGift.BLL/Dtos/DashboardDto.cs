@@ -79,3 +79,16 @@ public class DashboardSummaryDto
     public OrderStatusStatsDto Orders { get; set; } = new();
     public AccountChartDto NewAccounts { get; set; } = new();
 }
+
+public class CustomerOrderStatisticsDto
+{
+    public int AccountId { get; set; }
+    public string? FullName { get; set; }
+    public string? Email { get; set; }
+    public int TotalOrders { get; set; }
+    public int SuccessfulOrders { get; set; }
+    public int CancelledOrders { get; set; }
+    public int ProcessingOrders { get; set; }
+    public decimal TotalSpent { get; set; }
+    public double SuccessRate { get; set; } // (SuccessfulOrders / TotalOrders) * 100
+}
