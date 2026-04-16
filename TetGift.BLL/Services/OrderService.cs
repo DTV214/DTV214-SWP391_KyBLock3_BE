@@ -361,7 +361,7 @@ public class OrderService : IOrderService
     }
 
     // ========================================================
-    // LUỒNG HỦY ĐƠN (UNHAPPY CASE) BƯỚC 2
+    // LUỒNG HỦY ĐƠN 
     // ========================================================
 
     public async Task<OrderResponseDto> CancelOrderAsync(int orderId, int accountId, string userRole)
@@ -381,21 +381,14 @@ public class OrderService : IOrderService
         var currentStatus = order.Status ?? OrderStatus.PENDING;
         var normalizedRole = userRole.ToUpper();
 
-        // 1. Kiểm tra giới hạn 3 giờ
-        var orderTime = order.Orderdatetime ?? DateTime.Now;
-        if ((DateTime.Now - orderTime).TotalHours > 3 && normalizedRole != "ADMIN")
-        {
-            throw new Exception("Đã quá thời gian cho phép hủy đơn (3 giờ). Vui lòng liên hệ hotline.");
-        }
-
-        // 2. Validate: Không thể hủy nếu đã SHIPPED, DELIVERED hoặc CANCELLED
-        if (currentStatus == OrderStatus.SHIPPED || currentStatus == OrderStatus.DELIVERED)
-            throw new Exception("Đơn hàng đang giao hoặc đã giao, không thể yêu cầu hủy.");
+        // 1. Validate: Cấm hủy nếu đã qua bước xử lý đóng gói
+        if (currentStatus == OrderStatus.PROCESSING || currentStatus == OrderStatus.SHIPPED || currentStatus == OrderStatus.DELIVERED)
+            throw new Exception("Đơn hàng đang xử lý hoặc đã giao, không thể yêu cầu hủy.");
 
         if (currentStatus == OrderStatus.CANCELLED || currentStatus == "CANCEL_REQUESTED")
             throw new Exception("Đơn hàng đã hủy hoặc đang chờ duyệt hủy.");
 
-        // 3. Phân luồng xử lý
+        // 2. Phân luồng xử lý (Chỉ các trạng thái PENDING, CONFIRMED, PAID_WAITING_STOCK mới lọt vào đây)
         if (normalizedRole == "ADMIN")
         {
             // Admin thì cho phép hủy thẳng và hoàn kho luôn (Quyền tối cao)
@@ -500,12 +493,15 @@ public class OrderService : IOrderService
         {
             { OrderStatus.PENDING, new List<string> { OrderStatus.CONFIRMED, OrderStatus.CANCELLED, "CANCEL_REQUESTED" } },
             { OrderStatus.CONFIRMED, new List<string> { OrderStatus.PROCESSING, OrderStatus.CANCELLED, "CANCEL_REQUESTED" } },
-            { OrderStatus.PAID_WAITING_STOCK, new List<string> { OrderStatus.CONFIRMED, "CANCEL_REQUESTED" } },
-            { OrderStatus.PROCESSING, new List<string> { OrderStatus.SHIPPED, OrderStatus.CANCELLED, "CANCEL_REQUESTED" } },
+            { OrderStatus.PAID_WAITING_STOCK, new List<string> { OrderStatus.CONFIRMED, "CANCEL_REQUESTED", OrderStatus.CANCELLED } },
+            
+            // XÓA CANCEL_REQUESTED Ở TRẠNG THÁI PROCESSING
+            { OrderStatus.PROCESSING, new List<string> { OrderStatus.SHIPPED, OrderStatus.CANCELLED } },
+
             { OrderStatus.SHIPPED, new List<string> { OrderStatus.DELIVERED, OrderStatus.CANCELLED } },
-            { "CANCEL_REQUESTED", new List<string> { OrderStatus.CANCELLED } }, // Trạng thái mới
-            { OrderStatus.DELIVERED, new List<string> { } }, // Không thể chuyển từ DELIVERED
-            { OrderStatus.CANCELLED, new List<string> { } } // Không thể chuyển từ CANCELLED
+            { "CANCEL_REQUESTED", new List<string> { OrderStatus.CANCELLED } },
+            { OrderStatus.DELIVERED, new List<string> { } },
+            { OrderStatus.CANCELLED, new List<string> { } }
         };
 
         if (!validTransitions.ContainsKey(currentStatus))
