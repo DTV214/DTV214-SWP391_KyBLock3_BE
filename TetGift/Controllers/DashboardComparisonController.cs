@@ -50,5 +50,39 @@ namespace TetGift.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        /// <summary>
+        /// So sánh doanh thu theo 12 tháng giữa 2 năm (dùng Totalprice của Order)
+        /// </summary>
+        [HttpGet("yearly-order-revenue-comparison")]
+        public async Task<IActionResult> GetYearlyOrderRevenueComparison([FromQuery] YearComparisonRequest request)
+        {
+            try
+            {
+                var result = await _comparisonService.GetYearlyOrderRevenueComparisonAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// So sánh lợi nhuận thực tế theo 12 tháng giữa 2 năm
+        /// </summary>
+        [HttpGet("yearly-actual-revenue-comparison")]
+        public async Task<IActionResult> GetYearlyActualRevenueComparison([FromQuery] YearComparisonRequest request)
+        {
+            try
+            {
+                var result = await _comparisonService.GetYearlyActualRevenueComparisonAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

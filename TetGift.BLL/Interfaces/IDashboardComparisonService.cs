@@ -6,5 +6,8 @@ namespace TetGift.BLL.Interfaces
     {
         Task<MonthlyComparisonChartDto> GetMonthlyOrderRevenueComparisonAsync(MonthComparisonRequest request);
         Task<MonthlyComparisonChartDto> GetMonthlyActualRevenueComparisonAsync(MonthComparisonRequest request);
+
+        Task<YearComparisonChartDto> GetYearlyOrderRevenueComparisonAsync(YearComparisonRequest request);
+        Task<YearComparisonChartDto> GetYearlyActualRevenueComparisonAsync(YearComparisonRequest request);
     }
 }
