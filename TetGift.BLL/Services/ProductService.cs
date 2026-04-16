@@ -173,6 +173,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             {
                 createdProduct.CalculateUnit();
                 createdProduct.CalculateTotalPrice();
+                createdProduct.CalculateImportPrice();
                 _uow.GetRepository<Product>().Update(createdProduct);
                 await _uow.SaveAsync();
             }
@@ -192,6 +193,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             include: p => p.Include(p => p.Stocks)
                 .Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product)
             );
+
         return products.Select(p =>
         {
             p.CalculateUnit();
@@ -208,6 +210,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 Productname = p.Productname,
                 Description = p.Description,
                 Price = p.Price,
+                ImportPrice = p.ImportPrice,
                 TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
                 Stocks = p.Stocks?.Select(s => new StockDto
                 {
@@ -232,12 +235,6 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
 
     public async Task<ProductDto?> GetByIdAsync(int id)
     {
-        //var product = await _uow.GetRepository<Product>().FindAsync(
-        //    p => p.Productid == id 
-        //    && !p.Status.Equals(ProductStatus.DELETED),
-        //    include: p => p.Include(p => p.Stocks)
-        //        .Include(p => p.ProductDetailProductparents).ThenInclude(pd => pd.Product).ThenInclude(s => s.Stocks)
-        //    );
         var product = await _uow.GetRepository<Product>().FindAsync(
             p => p.Productid == id,
             include: p => p.Include(p => p.Stocks)
@@ -246,6 +243,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         if (product == null) return null;
         product.CalculateUnit();
         product.CalculateTotalPrice();
+        product.CalculateImportPrice();
 
         return new ProductDto
         {
@@ -257,6 +255,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             Productname = product.Productname,
             Description = product.Description,
             Price = product.Price,
+            ImportPrice = product.ImportPrice,
             TotalQuantity = product.Stocks?.Sum(s => s.Stockquantity) ?? 0,
             Stocks = product.Stocks?.Select(s => new StockDto
             {
@@ -271,9 +270,9 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             }).ToList(),
             Status = product.Status,
             Unit = product.Unit,
-                Length = product.Length,
-                Width = product.Width,
-                Height = product.Height,
+            Length = product.Length,
+            Width = product.Width,
+            Height = product.Height,
             ImageUrl = product.ImageUrl,
             ProductDetails = product.ProductDetailProductparents?.Select(pd => new ProductDetailResponse
             {
@@ -284,6 +283,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 Productname = pd.Product?.Productname,
                 Unit = pd.Product?.Unit,
                 Price = pd.Product?.Price,
+                //ImportPrice = pd.Product?.ImportPrice,
                 Imageurl = pd.Product?.ImageUrl,
                 Quantity = pd.Quantity,
                 ChildProduct = null
@@ -314,6 +314,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 Productname = p.Productname,
                 Description = p.Description,
                 Price = p.Price,
+                ImportPrice = p.ImportPrice,
                 TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
                 Stocks = p.Stocks?.Select(s => new StockDto
                 {
@@ -359,6 +360,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         {
             basket.CalculateUnit();
             basket.CalculateTotalPrice();
+            basket.CalculateImportPrice();
 
             return new CustomerBasketDto
             {
@@ -494,12 +496,12 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         // 2. Validate blank string 
         if (dto.Sku != null)
         {
-            if (string.IsNullOrWhiteSpace(dto.Sku)) throw new Exception("SKU khĂ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.");
+            if (string.IsNullOrWhiteSpace(dto.Sku)) throw new Exception("SKU khĂ´ng Ä‘Æ°á»£c Ä‘ă»ƒ trá»‘ng.");
             entity.Sku = dto.Sku;
         }
         if (dto.Productname != null)
         {
-            if (string.IsNullOrWhiteSpace(dto.Productname)) throw new Exception("TĂªn khĂ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.");
+            if (string.IsNullOrWhiteSpace(dto.Productname)) throw new Exception("TĂªn khĂ´ng Ä‘Æ°á»£c Ä‘ă»ƒ trá»‘ng.");
             entity.Productname = dto.Productname;
         }
         if (dto.Status != null)
@@ -507,7 +509,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             if (string.IsNullOrWhiteSpace(dto.Status)
                 || (!dto.Status.Equals(ProductStatus.ACTIVE) && !dto.Status.Equals(ProductStatus.INACTIVE)
                 && !dto.Status.Equals("OUT_OF_STOCK")
-                )) throw new Exception("Tráº¡ng thĂ¡i khĂ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng hoáº·c sai syntax.");
+                )) throw new Exception("Tráº¡ng thĂ¡i khĂ´ng Ä‘Æ°á»£c Ä‘ă»ƒ trá»‘ng hoáº·c sai syntax.");
             entity.Status = dto.Status;
         }
 
@@ -551,7 +553,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
     {
         var repo = _uow.GetRepository<Product>();
 
-        // â”€â”€â”€ 1. Identify the requesting user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // â”€â”€â”€ 1. Identify the requesting user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         var requestorList = await _uow.GetRepository<Account>().FindAsync(
             a => a.Accountid == requestingAccountId
         );
@@ -1367,6 +1369,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 Productname = p.Productname,
                 Description = p.Description,
                 Price = p.Price,
+                ImportPrice = p.ImportPrice,
                 Status = p.Status,
                 Unit = p.Unit,
                 Length = p.Length,

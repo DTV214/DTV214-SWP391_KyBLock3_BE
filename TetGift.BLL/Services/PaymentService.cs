@@ -15,13 +15,15 @@ public class PaymentService : IPaymentService
     private readonly IConfiguration _configuration;
     private readonly IEmailSender _emailSender;
     private readonly IEmailTemplateRenderer _templateRenderer;
+    private readonly IOrderService _orderService; // new
 
-    public PaymentService(IUnitOfWork uow, IConfiguration configuration, IEmailSender emailSender, IEmailTemplateRenderer templateRenderer)
+    public PaymentService(IUnitOfWork uow, IConfiguration configuration, IEmailSender emailSender, IEmailTemplateRenderer templateRenderer, IOrderService orderService)
     {
         _uow = uow;
         _configuration = configuration;
         _emailSender = emailSender;
         _templateRenderer = templateRenderer;
+        _orderService = orderService;
     }
 
     public async Task<PaymentResponseDto> CreatePaymentAsync(int orderId, int accountId, string? clientIp = null, string? paymentMethod = null)
@@ -188,15 +190,27 @@ public class PaymentService : IPaymentService
 
         await _uow.SaveAsync();
 
+        // AFTER saving confirmation: try allocate stock and compute ActualRevenue
         if (justConfirmedOrder && confirmedOrder != null)
         {
+            try
+            {
+                // Try to allocate stock and compute/persist ActualRevenue.
+                // OrderService.TryAllocateStockAfterPaymentAsync already computes and persists ActualRevenue.
+                await _orderService.TryAllocateStockAfterPaymentAsync(confirmedOrder.Orderid);
+            }
+            catch
+            {
+                // swallow/log — do not fail IPN response. Allocation may be retried manually.
+            }
+
             try
             {
                 await SendOrderPaymentSuccessEmailAsync(confirmedOrder);
             }
             catch (Exception ex)
             {
-                throw new Exception("Payment success nhưng gửi email lỗi: " + ex.Message);
+                // Email failure should not break payment flow
             }
         }
 
@@ -289,11 +303,20 @@ public class PaymentService : IPaymentService
             {
                 try
                 {
+                    await _orderService.TryAllocateStockAfterPaymentAsync(confirmedOrder.Orderid);
+                }
+                catch
+                {
+                    // swallow/log
+                }
+
+                try
+                {
                     await SendOrderPaymentSuccessEmailAsync(confirmedOrder);
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception("Payment success nhưng gửi email lỗi: " + ex.Message);
+                    // Email failure should not break user flow
                 }
             }
         }
