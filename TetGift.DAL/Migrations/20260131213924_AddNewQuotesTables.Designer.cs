@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TetGift.DAL.Context;
@@ -11,9 +12,11 @@ using TetGift.DAL.Context;
 namespace TetGift.DAL.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260131213924_AddNewQuotesTables")]
+    partial class AddNewQuotesTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -51,12 +54,6 @@ namespace TetGift.DAL.Migrations
                     b.Property<string>("Address")
                         .HasColumnType("text")
                         .HasColumnName("address");
-
-                    b.Property<int?>("ConversationId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DayCreate")
-                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Email")
                         .HasMaxLength(255)
@@ -117,101 +114,10 @@ namespace TetGift.DAL.Migrations
                     b.HasKey("Accountid")
                         .HasName("account_pkey");
 
-                    b.HasIndex("ConversationId");
-
                     b.HasIndex(new[] { "Username" }, "account_username_key")
                         .IsUnique();
 
                     b.ToTable("account", (string)null);
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.AccountAddress", b =>
-                {
-                    b.Property<int>("AccountAddressId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("account_address_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("AccountAddressId"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("integer")
-                        .HasColumnName("accountid");
-
-                    b.Property<string>("AddressLine")
-                        .HasColumnType("text")
-                        .HasColumnName("address_line");
-
-                    b.Property<string>("Customeremail")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Customername")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Customerphone")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<bool>("IsDefault")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_default");
-
-                    b.Property<string>("Label")
-                        .HasColumnType("text")
-                        .HasColumnName("label");
-
-                    b.Property<decimal?>("Latitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("numeric(10,7)")
-                        .HasColumnName("latitude");
-
-                    b.Property<decimal?>("Longitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("numeric(10,7)")
-                        .HasColumnName("longitude");
-
-                    b.HasKey("AccountAddressId")
-                        .HasName("account_address_pkey");
-
-                    b.HasIndex("AccountId");
-
-                    b.ToTable("account_address", (string)null);
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.AccountPromotion", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PromotionId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("Quantity")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("UsedQuantity")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
-
-                    b.HasIndex("PromotionId");
-
-                    b.ToTable("AccountPromotion");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Blog", b =>
@@ -237,9 +143,6 @@ namespace TetGift.DAL.Migrations
                         .HasColumnName("creationdate")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("text");
-
                     b.Property<bool?>("Isdeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -249,9 +152,6 @@ namespace TetGift.DAL.Migrations
                     b.Property<string>("Title")
                         .HasColumnType("text")
                         .HasColumnName("title");
-
-                    b.Property<string>("VideoUrl")
-                        .HasColumnType("text");
 
                     b.HasKey("Blogid")
                         .HasName("blog_pkey");
@@ -351,31 +251,6 @@ namespace TetGift.DAL.Migrations
                     b.ToTable("config_detail", (string)null);
                 });
 
-            modelBuilder.Entity("TetGift.DAL.Entities.Conversation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime?>("LastMessageAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("Conversations");
-                });
-
             modelBuilder.Entity("TetGift.DAL.Entities.Custom", b =>
                 {
                     b.Property<int>("Customid")
@@ -458,44 +333,6 @@ namespace TetGift.DAL.Migrations
                     b.ToTable("feedback", (string)null);
                 });
 
-            modelBuilder.Entity("TetGift.DAL.Entities.Message", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ConversationId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("boolean");
-
-                    b.Property<int?>("OrderId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SenderId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationId");
-
-                    b.HasIndex("OrderId");
-
-                    b.HasIndex("SenderId");
-
-                    b.ToTable("Messages");
-                });
-
             modelBuilder.Entity("TetGift.DAL.Entities.Order", b =>
                 {
                     b.Property<int>("Orderid")
@@ -542,10 +379,6 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("promotionid");
 
-                    b.Property<DateTime?>("Shippeddate")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("shippeddate");
-
                     b.Property<string>("Status")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -555,10 +388,6 @@ namespace TetGift.DAL.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("totalprice");
-
-                    b.Property<int?>("isQuotation")
-                        .HasColumnType("integer")
-                        .HasColumnName("isquotation");
 
                     b.HasKey("Orderid")
                         .HasName("orders_pkey");
@@ -620,9 +449,6 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("amount");
 
-                    b.Property<DateTime?>("CreatedDate")
-                        .HasColumnType("timestamp without time zone");
-
                     b.Property<bool?>("Ispayonline")
                         .HasColumnType("boolean")
                         .HasColumnName("ispayonline");
@@ -631,36 +457,20 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("orderid");
 
-                    b.Property<string>("Paymentmethod")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("paymentmethod");
-
                     b.Property<string>("Status")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("status");
-
-                    b.Property<string>("Transactionno")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("transactionno");
 
                     b.Property<string>("Type")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("type");
 
-                    b.Property<int?>("Walletid")
-                        .HasColumnType("integer")
-                        .HasColumnName("walletid");
-
                     b.HasKey("Paymentid")
                         .HasName("payment_pkey");
 
                     b.HasIndex("Orderid");
-
-                    b.HasIndex("Walletid");
 
                     b.ToTable("payment", (string)null);
                 });
@@ -690,18 +500,8 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
-                    b.Property<decimal?>("Height")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("height");
-
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
-
-                    b.Property<decimal?>("Length")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("length");
 
                     b.Property<decimal?>("Price")
                         .HasPrecision(18, 2)
@@ -727,11 +527,6 @@ namespace TetGift.DAL.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("unit");
-
-                    b.Property<decimal?>("Width")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("width");
 
                     b.HasKey("Productid")
                         .HasName("product_pkey");
@@ -795,21 +590,6 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("isdeleted");
-
-                    b.Property<decimal?>("MaxHeight")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxheight");
-
-                    b.Property<decimal?>("MaxLength")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxlength");
-
-                    b.Property<decimal?>("MaxWidth")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxwidth");
 
                     b.Property<string>("Suitablesuggestion")
                         .HasColumnType("text")
@@ -877,36 +657,14 @@ namespace TetGift.DAL.Migrations
                         .HasColumnName("discountvalue");
 
                     b.Property<DateTime?>("Expirydate")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("expirydate");
-
-                    b.Property<bool?>("IsLimited")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool?>("IsPercentage")
-                        .HasColumnType("boolean");
 
                     b.Property<bool?>("Isdeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("isdeleted");
-
-                    b.Property<int?>("LimitedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("MaxDiscountPrice")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("MinPriceToApply")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime?>("StartTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("StartTime");
-
-                    b.Property<int?>("UsedCount")
-                        .HasColumnType("integer");
 
                     b.HasKey("Promotionid")
                         .HasName("promotion_pkey");
@@ -1197,53 +955,6 @@ namespace TetGift.DAL.Migrations
                     b.ToTable("quotation_message", (string)null);
                 });
 
-            modelBuilder.Entity("TetGift.DAL.Entities.RequestContact", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("CustomerName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("customer_name");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("email");
-
-                    b.Property<bool>("IsContacted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_contacted");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("text")
-                        .HasColumnName("note");
-
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("phone");
-
-                    b.HasKey("Id")
-                        .HasName("request_contact_pkey");
-
-                    b.ToTable("request_contact", (string)null);
-                });
-
             modelBuilder.Entity("TetGift.DAL.Entities.Stock", b =>
                 {
                     b.Property<int>("Stockid")
@@ -1329,206 +1040,6 @@ namespace TetGift.DAL.Migrations
                     b.ToTable("stock_movement", (string)null);
                 });
 
-            modelBuilder.Entity("TetGift.DAL.Entities.StoreLocation", b =>
-                {
-                    b.Property<int>("StoreLocationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("store_location_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("StoreLocationId"));
-
-                    b.Property<string>("AddressLine")
-                        .HasColumnType("text")
-                        .HasColumnName("address_line");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<decimal>("Latitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("numeric(10,7)")
-                        .HasColumnName("latitude");
-
-                    b.Property<decimal>("Longitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("numeric(10,7)")
-                        .HasColumnName("longitude");
-
-                    b.Property<string>("Name")
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<string>("OpenHoursText")
-                        .HasColumnType("text")
-                        .HasColumnName("open_hours_text");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasColumnType("text")
-                        .HasColumnName("phone_number");
-
-                    b.HasKey("StoreLocationId")
-                        .HasName("store_location_pkey");
-
-                    b.ToTable("store_location", (string)null);
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.Wallet", b =>
-                {
-                    b.Property<int>("Walletid")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("walletid");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Walletid"));
-
-                    b.Property<int>("Accountid")
-                        .HasColumnType("integer")
-                        .HasColumnName("accountid");
-
-                    b.Property<decimal>("Balance")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasDefaultValue(0m)
-                        .HasColumnName("balance");
-
-                    b.Property<DateTime>("Createdat")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("createdat")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasDefaultValue("ACTIVE")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime?>("Updatedat")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("updatedat");
-
-                    b.HasKey("Walletid")
-                        .HasName("wallet_pkey");
-
-                    b.HasIndex(new[] { "Accountid" }, "wallet_accountid_key")
-                        .IsUnique();
-
-                    b.ToTable("wallet", (string)null);
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.WalletTransaction", b =>
-                {
-                    b.Property<int>("Transactionid")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("transactionid");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Transactionid"));
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("amount");
-
-                    b.Property<decimal>("Balanceafter")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("balanceafter");
-
-                    b.Property<decimal>("Balancebefore")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("balancebefore");
-
-                    b.Property<DateTime>("Createdat")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("createdat")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<int?>("Orderid")
-                        .HasColumnType("integer")
-                        .HasColumnName("orderid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasDefaultValue("SUCCESS")
-                        .HasColumnName("status");
-
-                    b.Property<string>("Transactiontype")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("transactiontype");
-
-                    b.Property<int>("Walletid")
-                        .HasColumnType("integer")
-                        .HasColumnName("walletid");
-
-                    b.HasKey("Transactionid")
-                        .HasName("wallet_transaction_pkey");
-
-                    b.HasIndex("Orderid");
-
-                    b.HasIndex("Walletid");
-
-                    b.ToTable("wallet_transaction", (string)null);
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.Account", b =>
-                {
-                    b.HasOne("TetGift.DAL.Entities.Conversation", "Conversation")
-                        .WithMany()
-                        .HasForeignKey("ConversationId");
-
-                    b.Navigation("Conversation");
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.AccountAddress", b =>
-                {
-                    b.HasOne("TetGift.DAL.Entities.Account", "Account")
-                        .WithMany()
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("account_address_accountid_fkey");
-
-                    b.Navigation("Account");
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.AccountPromotion", b =>
-                {
-                    b.HasOne("TetGift.DAL.Entities.Account", "Account")
-                        .WithMany("AccountPromotions")
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TetGift.DAL.Entities.Promotion", "Promotion")
-                        .WithMany("AccountPromotions")
-                        .HasForeignKey("PromotionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Account");
-
-                    b.Navigation("Promotion");
-                });
-
             modelBuilder.Entity("TetGift.DAL.Entities.Blog", b =>
                 {
                     b.HasOne("TetGift.DAL.Entities.Account", "Account")
@@ -1583,17 +1094,6 @@ namespace TetGift.DAL.Migrations
                     b.Navigation("Config");
                 });
 
-            modelBuilder.Entity("TetGift.DAL.Entities.Conversation", b =>
-                {
-                    b.HasOne("TetGift.DAL.Entities.Account", "User")
-                        .WithOne()
-                        .HasForeignKey("TetGift.DAL.Entities.Conversation", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("TetGift.DAL.Entities.Custom", b =>
                 {
                     b.HasOne("TetGift.DAL.Entities.OrderDetail", "Orderdetail")
@@ -1619,32 +1119,6 @@ namespace TetGift.DAL.Migrations
                     b.Navigation("Account");
 
                     b.Navigation("Order");
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.Message", b =>
-                {
-                    b.HasOne("TetGift.DAL.Entities.Conversation", "Conversation")
-                        .WithMany("Messages")
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TetGift.DAL.Entities.Order", "Order")
-                        .WithMany()
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("TetGift.DAL.Entities.Account", "Sender")
-                        .WithMany()
-                        .HasForeignKey("SenderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Conversation");
-
-                    b.Navigation("Order");
-
-                    b.Navigation("Sender");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Order", b =>
@@ -1688,14 +1162,7 @@ namespace TetGift.DAL.Migrations
                         .HasForeignKey("Orderid")
                         .HasConstraintName("payment_orderid_fkey");
 
-                    b.HasOne("TetGift.DAL.Entities.Wallet", "Wallet")
-                        .WithMany("Payments")
-                        .HasForeignKey("Walletid")
-                        .HasConstraintName("payment_walletid_fkey");
-
                     b.Navigation("Order");
-
-                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Product", b =>
@@ -1847,42 +1314,8 @@ namespace TetGift.DAL.Migrations
                     b.Navigation("Stock");
                 });
 
-            modelBuilder.Entity("TetGift.DAL.Entities.Wallet", b =>
-                {
-                    b.HasOne("TetGift.DAL.Entities.Account", "Account")
-                        .WithOne("Wallet")
-                        .HasForeignKey("TetGift.DAL.Entities.Wallet", "Accountid")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("wallet_accountid_fkey");
-
-                    b.Navigation("Account");
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.WalletTransaction", b =>
-                {
-                    b.HasOne("TetGift.DAL.Entities.Order", "Order")
-                        .WithMany("WalletTransactions")
-                        .HasForeignKey("Orderid")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("wallet_transaction_orderid_fkey");
-
-                    b.HasOne("TetGift.DAL.Entities.Wallet", "Wallet")
-                        .WithMany("WalletTransactions")
-                        .HasForeignKey("Walletid")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("wallet_transaction_walletid_fkey");
-
-                    b.Navigation("Order");
-
-                    b.Navigation("Wallet");
-                });
-
             modelBuilder.Entity("TetGift.DAL.Entities.Account", b =>
                 {
-                    b.Navigation("AccountPromotions");
-
                     b.Navigation("Blogs");
 
                     b.Navigation("Carts");
@@ -1894,18 +1327,11 @@ namespace TetGift.DAL.Migrations
                     b.Navigation("Products");
 
                     b.Navigation("Quotations");
-
-                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Cart", b =>
                 {
                     b.Navigation("CartDetails");
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.Conversation", b =>
-                {
-                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Order", b =>
@@ -1919,8 +1345,6 @@ namespace TetGift.DAL.Migrations
                     b.Navigation("Quotations");
 
                     b.Navigation("StockMovements");
-
-                    b.Navigation("WalletTransactions");
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.OrderDetail", b =>
@@ -1959,8 +1383,6 @@ namespace TetGift.DAL.Migrations
 
             modelBuilder.Entity("TetGift.DAL.Entities.Promotion", b =>
                 {
-                    b.Navigation("AccountPromotions");
-
                     b.Navigation("Orders");
                 });
 
@@ -1983,13 +1405,6 @@ namespace TetGift.DAL.Migrations
             modelBuilder.Entity("TetGift.DAL.Entities.Stock", b =>
                 {
                     b.Navigation("StockMovements");
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.Wallet", b =>
-                {
-                    b.Navigation("Payments");
-
-                    b.Navigation("WalletTransactions");
                 });
 #pragma warning restore 612, 618
         }

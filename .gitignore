@@ -363,5 +363,5 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Entity Framework Core Migrations & Snapshots
-**/Migrations/*.cs
-*ModelSnapshot.cs
+# **/Migrations/*.cs
+# *ModelSnapshot.cs

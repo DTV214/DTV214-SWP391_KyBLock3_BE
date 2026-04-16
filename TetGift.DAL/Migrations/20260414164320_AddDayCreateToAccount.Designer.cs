@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TetGift.DAL.Context;
@@ -11,9 +12,11 @@ using TetGift.DAL.Context;
 namespace TetGift.DAL.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260414164320_AddDayCreateToAccount")]
+    partial class AddDayCreateToAccount
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -690,18 +693,8 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
-                    b.Property<decimal?>("Height")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("height");
-
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
-
-                    b.Property<decimal?>("Length")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("length");
 
                     b.Property<decimal?>("Price")
                         .HasPrecision(18, 2)
@@ -727,11 +720,6 @@ namespace TetGift.DAL.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("unit");
-
-                    b.Property<decimal?>("Width")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("width");
 
                     b.HasKey("Productid")
                         .HasName("product_pkey");
@@ -795,21 +783,6 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("isdeleted");
-
-                    b.Property<decimal?>("MaxHeight")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxheight");
-
-                    b.Property<decimal?>("MaxLength")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxlength");
-
-                    b.Property<decimal?>("MaxWidth")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxwidth");
 
                     b.Property<string>("Suitablesuggestion")
                         .HasColumnType("text")

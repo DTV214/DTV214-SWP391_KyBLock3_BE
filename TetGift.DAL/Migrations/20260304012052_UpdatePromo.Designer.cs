@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TetGift.DAL.Context;
@@ -11,9 +12,11 @@ using TetGift.DAL.Context;
 namespace TetGift.DAL.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260304012052_UpdatePromo")]
+    partial class UpdatePromo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -54,9 +57,6 @@ namespace TetGift.DAL.Migrations
 
                     b.Property<int?>("ConversationId")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DayCreate")
-                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Email")
                         .HasMaxLength(255)
@@ -141,15 +141,6 @@ namespace TetGift.DAL.Migrations
                     b.Property<string>("AddressLine")
                         .HasColumnType("text")
                         .HasColumnName("address_line");
-
-                    b.Property<string>("Customeremail")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Customername")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Customerphone")
-                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -237,9 +228,6 @@ namespace TetGift.DAL.Migrations
                         .HasColumnName("creationdate")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("text");
-
                     b.Property<bool?>("Isdeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -249,9 +237,6 @@ namespace TetGift.DAL.Migrations
                     b.Property<string>("Title")
                         .HasColumnType("text")
                         .HasColumnName("title");
-
-                    b.Property<string>("VideoUrl")
-                        .HasColumnType("text");
 
                     b.HasKey("Blogid")
                         .HasName("blog_pkey");
@@ -360,10 +345,10 @@ namespace TetGift.DAL.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("LastMessageAt")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
@@ -474,7 +459,7 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsRead")
                         .HasColumnType("boolean");
@@ -541,10 +526,6 @@ namespace TetGift.DAL.Migrations
                     b.Property<int?>("Promotionid")
                         .HasColumnType("integer")
                         .HasColumnName("promotionid");
-
-                    b.Property<DateTime?>("Shippeddate")
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("shippeddate");
 
                     b.Property<string>("Status")
                         .HasMaxLength(50)
@@ -621,7 +602,7 @@ namespace TetGift.DAL.Migrations
                         .HasColumnName("amount");
 
                     b.Property<DateTime?>("CreatedDate")
-                        .HasColumnType("timestamp without time zone");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool?>("Ispayonline")
                         .HasColumnType("boolean")
@@ -690,18 +671,8 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
-                    b.Property<decimal?>("Height")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("height");
-
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
-
-                    b.Property<decimal?>("Length")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("length");
 
                     b.Property<decimal?>("Price")
                         .HasPrecision(18, 2)
@@ -727,11 +698,6 @@ namespace TetGift.DAL.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("unit");
-
-                    b.Property<decimal?>("Width")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("width");
 
                     b.HasKey("Productid")
                         .HasName("product_pkey");
@@ -795,21 +761,6 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("isdeleted");
-
-                    b.Property<decimal?>("MaxHeight")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxheight");
-
-                    b.Property<decimal?>("MaxLength")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxlength");
-
-                    b.Property<decimal?>("MaxWidth")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("maxwidth");
 
                     b.Property<string>("Suitablesuggestion")
                         .HasColumnType("text")
@@ -876,8 +827,11 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("discountvalue");
 
+                    b.Property<DateTime?>("EndTime")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("Expirydate")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("expirydate");
 
                     b.Property<bool?>("IsLimited")
@@ -902,8 +856,7 @@ namespace TetGift.DAL.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<DateTime?>("StartTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("StartTime");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("UsedCount")
                         .HasColumnType("integer");
@@ -1195,53 +1148,6 @@ namespace TetGift.DAL.Migrations
                     b.HasIndex("Quotationid");
 
                     b.ToTable("quotation_message", (string)null);
-                });
-
-            modelBuilder.Entity("TetGift.DAL.Entities.RequestContact", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp without time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("CustomerName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("customer_name");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("email");
-
-                    b.Property<bool>("IsContacted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_contacted");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("text")
-                        .HasColumnName("note");
-
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("phone");
-
-                    b.HasKey("Id")
-                        .HasName("request_contact_pkey");
-
-                    b.ToTable("request_contact", (string)null);
                 });
 
             modelBuilder.Entity("TetGift.DAL.Entities.Stock", b =>
