@@ -21,11 +21,12 @@ public class DashboardController : ControllerBase
     /// Lấy thống kê tổng đơn hàng và hiệu suất mua của khách hàng
     /// </summary>
     [HttpGet("customer-statistics")]
-    public async Task<IActionResult> GetCustomerStatistics()
+    public async Task<IActionResult> GetCustomerStatistics([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
     {
         try
         {
-            var result = await _dashboardService.GetCustomerOrderStatisticsAsync();
+            var request = new TimeRangeRequest { StartDate = startDate, EndDate = endDate };
+            var result = await _dashboardService.GetCustomerOrderStatisticsAsync(request);
             return Ok(result);
         }
         catch (Exception ex)

@@ -21,7 +21,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             || dto.Price <= 0
             || dto.Unit <= 0)
         {
-            throw new Exception("Thiáº¿u thĂ´ng tin báº¯t buá»™c cho sáº£n pháº©m thÆ°á»ng (SKU, Name, Price, Unit).");
+            throw new Exception("Thiếu thông tin bắt buộc cho sản phẩm thường (SKU, Name, Price, Unit).");
         }
 
         // Note: Accountid will be set from authenticated user context in controller
@@ -40,12 +40,12 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         // Validate required fields
         if (string.IsNullOrWhiteSpace(dto.Productname))
         {
-            throw new Exception("TĂªn sáº£n pháº©m khĂ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.");
+            throw new Exception("Tên sản phẩm không được để trống.");
         }
 
         if (dto.ProductDetails == null || !dto.ProductDetails.Any())
         {
-            throw new Exception("Giá» quĂ  pháº£i cĂ³ Ă­t nháº¥t 1 sáº£n pháº©m.");
+            throw new Exception("Giỏ quà phải có ít nhất 1 sản phẩm.");
         }
 
         // Validate foreign keys (Config and Account)
@@ -59,7 +59,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         );
 
         if (config == null)
-            throw new Exception($"KhĂ´ng tĂ¬m tháº¥y cáº¥u hĂ¬nh giá» quĂ  vá»›i ID {dto.Configid}.");
+            throw new Exception($"Không tìm thấy cấu hình giỏ quà với ID {dto.Configid}.");
 
         // Validate all ProductIds in ProductDetails exist and match config requirements
         decimal totalWeight = 0;
@@ -69,7 +69,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         foreach (var detail in dto.ProductDetails)
         {
             if (!detail.Productid.HasValue)
-                throw new Exception("ProductId khĂ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng trong ProductDetails.");
+                throw new Exception("ProductId không được để trống trong ProductDetails.");
 
             var product = await _uow.GetRepository<Product>().FindAsync(
                 p => p.Productid == detail.Productid.Value && !p.Status.Equals(ProductStatus.DELETED),
@@ -77,7 +77,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             );
 
             if (product == null)
-                throw new Exception($"Sáº£n pháº©m vá»›i ID {detail.Productid} khĂ´ng tá»“n táº¡i hoáº·c Ä‘Ă£ bá»‹ xĂ³a.");
+                throw new Exception($"Sản phẩm với ID {detail.Productid} không tồn tại hoặc đã bị xóa.");
 
             // Validate product category belongs to config's allowed categories
             if (validCategoryIds.Any())
@@ -87,8 +87,8 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                     var allowedCategories = string.Join(", ",
                         config.ConfigDetails?.Select(cd => cd.Category?.Categoryname ?? "N/A") ?? new List<string>());
                     throw new Exception(
-                        $"Sáº£n pháº©m '{product.Productname}' thuá»™c danh má»¥c khĂ´ng há»£p lá»‡. " +
-                        $"Danh má»¥c cho phĂ©p: {allowedCategories}");
+                        $"Sản phẩm '{product.Productname}' thuộc danh mục không hợp lệ. " +
+                        $"Danh mục cho phép: {allowedCategories}");
                 }
             }
 
@@ -99,16 +99,16 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             {
                 if (!product.Length.HasValue || !product.Width.HasValue || !product.Height.HasValue)
                 {
-                    throw new Exception($"Sáº£n pháº©m '{product.Productname}' thiáº¿u thĂ´ng tin kĂ­ch thÆ°á»›c nĂªn khĂ´ng thá»ƒ xáº¿p vĂ o giá».");
+                    throw new Exception($"Sản phẩm '{product.Productname}' thiếu thông tin kích thước nên không thể xếp vào giỏ.");
                 }
 
-                // TEST 1: Chiá»u lá»t khung
+                // TEST 1: Chiều lọt khung
                 var itemDims = new[] { product.Length.Value, product.Width.Value, product.Height.Value }.OrderBy(x => x).ToArray();
                 var boxDims = new[] { config.MaxLength.Value, config.MaxWidth.Value, config.MaxHeight.Value }.OrderBy(x => x).ToArray();
 
                 if (itemDims[0] > boxDims[0] || itemDims[1] > boxDims[1] || itemDims[2] > boxDims[2])
                 {
-                    throw new Exception($"KĂ­ch thÆ°á»›c cá»§a mĂ³n '{product.Productname}' ({product.Length}x{product.Width}x{product.Height}) quĂ¡ lá»›n, khĂ´ng lá»t vá»«a giá» quĂ .");
+                    throw new Exception($"Kích thước của món '{product.Productname}' ({product.Length}x{product.Width}x{product.Height}) quá lớn, không lọt vừa giỏ quà.");
                 }
 
                 totalVolume += (product.Volume ?? 0) * quantity;
@@ -121,15 +121,15 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         // Validate total Volume doesn't exceed 85% of box capacity (packing factor)
         if (config.MaxVolume.HasValue && totalVolume > config.MaxVolume.Value * 0.85m)
         {
-            throw new Exception($"Tá»•ng thá»ƒ tĂ­ch cá»§a giá»/há»™p Ä‘Ă£ quĂ¡ Ä‘áº§y do sá»©c chá»©a váº­t lĂ½ cĂ³ háº¡n. Vui lĂ²ng giáº£m sá»‘ lÆ°á»£ng cĂ¡c mĂ³n Ä‘á»“.");
+            throw new Exception($"Tổng thể tích của giỏ/hộp đã quá đầy do sức chứa vật lý có hạn. Vui lòng giảm số lượng các món đồ.");
         }
 
         // Validate total weight doesn't exceed config limit
         if (config.Totalunit.HasValue && totalWeight > config.Totalunit.Value)
         {
             throw new Exception(
-                $"Tá»•ng trá»ng lÆ°á»£ng giá» quĂ  ({totalWeight}g) vÆ°á»£t quĂ¡ giá»›i háº¡n cho phĂ©p ({config.Totalunit.Value}g). " +
-                $"Vui lĂ²ng giáº£m sá»‘ lÆ°á»£ng sáº£n pháº©m.");
+                $"Tổng trọng lượng giỏ quà ({totalWeight}g) vượt quá giới hạn cho phép ({config.Totalunit.Value}g). " +
+                $"Vui lòng giảm số lượng sản phẩm.");
         }
 
         // Create Product entity (combo/basket)
@@ -338,7 +338,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
     }
 
     /// <summary>
-    /// Get customer's custom baskets (giá» quĂ  tá»± táº¡o)
+    /// Get customer's custom baskets (giỏ quà tự tạo)
     /// Returns parent product (basket) with child products details
     /// </summary>
     public async Task<IEnumerable<CustomerBasketDto>> GetCustomerBasketsByAccountIdAsync(int accountId)
@@ -435,13 +435,13 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         );
 
         if (product == null)
-            throw new Exception("KhĂ´ng tĂ¬m tháº¥y sáº£n pháº©m.");
+            throw new Exception("Không tìm thấy sản phẩm.");
 
-        // XĂ³a táº¥t cáº£ ProductDetail liĂªn káº¿t (child items) cá»§a template nĂ y
+        // Xóa tất cả ProductDetail liên kết (child items) của template này
         if (product.ProductDetailProductparents?.Count > 0)
             productDetailRepo.DeleteRange(product.ProductDetailProductparents.ToList());
 
-        // XĂ³a vÄ©nh viá»…n sáº£n pháº©m template
+        // Xóa vĩnh viễn sản phẩm template
         productRepo.Delete(product);
         await _uow.SaveAsync();
 
@@ -455,7 +455,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             var account = await _uow.GetRepository<Account>().FindAsync(
                 a => a.Accountid == accountId.Value && a.Status.Equals(ProductStatus.ACTIVE)
                 );
-            if (!account.Any()) throw new Exception($"AccountId {accountId} khĂ´ng tá»“n táº¡i.");
+            if (!account.Any()) throw new Exception($"AccountId {accountId} không tồn tại.");
         }
 
         if (configId.HasValue)
@@ -463,7 +463,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             var config = await _uow.GetRepository<ProductConfig>().FindAsync(
                 c => c.Configid == configId.Value && c.Isdeleted == false
                 );
-            if (!config.Any()) throw new Exception($"ConfigId {configId} khĂ´ng tá»“n táº¡i.");
+            if (!config.Any()) throw new Exception($"ConfigId {configId} không tồn tại.");
         }
 
         if (categoryId.HasValue)
@@ -471,7 +471,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             var category = await _uow.GetRepository<ProductCategory>().FindAsync(
                 c => c.Categoryid == categoryId.Value && c.Isdeleted == false
                 );
-            if (!category.Any()) throw new Exception($"CategoryId {categoryId} khĂ´ng tá»“n táº¡i.");
+            if (!category.Any()) throw new Exception($"CategoryId {categoryId} không tồn tại.");
         }
     }
 
@@ -481,7 +481,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         var result = await repo.FindAsync(
             e => e.Productid == dto.Productid && !e.Status.Equals(ProductStatus.DELETED)
             );
-        if (!result.Any()) throw new Exception("KhĂ´ng tĂ¬m tháº¥y sáº£n pháº©m.");
+        if (!result.Any()) throw new Exception("Không tìm thấy sản phẩm.");
         var entity = result.First();
 
         #region Validation Cate, Blank String, Number Property
@@ -496,12 +496,12 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         // 2. Validate blank string 
         if (dto.Sku != null)
         {
-            if (string.IsNullOrWhiteSpace(dto.Sku)) throw new Exception("SKU khĂ´ng Ä‘Æ°á»£c Ä‘ă»ƒ trá»‘ng.");
+            if (string.IsNullOrWhiteSpace(dto.Sku)) throw new Exception("SKU không được để trống.");
             entity.Sku = dto.Sku;
         }
         if (dto.Productname != null)
         {
-            if (string.IsNullOrWhiteSpace(dto.Productname)) throw new Exception("TĂªn khĂ´ng Ä‘Æ°á»£c Ä‘ă»ƒ trá»‘ng.");
+            if (string.IsNullOrWhiteSpace(dto.Productname)) throw new Exception("Tên không được để trống.");
             entity.Productname = dto.Productname;
         }
         if (dto.Status != null)
@@ -509,19 +509,24 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             if (string.IsNullOrWhiteSpace(dto.Status)
                 || (!dto.Status.Equals(ProductStatus.ACTIVE) && !dto.Status.Equals(ProductStatus.INACTIVE)
                 && !dto.Status.Equals("OUT_OF_STOCK")
-                )) throw new Exception("Tráº¡ng thĂ¡i khĂ´ng Ä‘Æ°á»£c Ä‘ă»ƒ trá»‘ng hoáº·c sai syntax.");
+                )) throw new Exception("Trạng thái không được để trống hoặc sai syntax.");
             entity.Status = dto.Status;
         }
 
-        // 3. Validate sá»‘ dÆ°Æ¡ng
+        // 3. Validate số dương
         if (dto.Price.HasValue)
         {
-            if (dto.Price <= 0) throw new Exception("GiĂ¡ pháº£i lá»›n hÆ¡n 0.");
+            if (dto.Price <= 0) throw new Exception("Giá phải lớn hơn 0.");
             entity.Price = dto.Price;
+        }
+        if (dto.ImportPrice.HasValue)
+        {
+            if (dto.ImportPrice < 0) throw new Exception("Giá nhập không được nhỏ hơn 0.");
+            entity.ImportPrice = dto.ImportPrice;
         }
         if (dto.Unit.HasValue)
         {
-            if (dto.Unit <= 0) throw new Exception("ÄÆ¡n vá»‹ pháº£i lá»›n hÆ¡n 0.");
+            if (dto.Unit <= 0) throw new Exception("Đơn vị phải lớn hơn 0.");
             entity.Unit = dto.Unit;
             entity.Length = dto.Length;
             entity.Width = dto.Width;
@@ -543,17 +548,17 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
     /// Update custom basket/combo product.
     /// 
     /// Business rules:
-    ///   â€¢ Admin/Staff can only edit baskets they (or other admin/staff) created â€” NOT customer baskets.
-    ///   â€¢ Customer can only edit their own baskets.
-    ///   â€¢ A TEMPLATE basket (admin-created) cannot be edited by customers â€” they must clone it first.
-    ///   â€¢ Admin/Staff may transition status freely (DRAFT / ACTIVE / INACTIVE / TEMPLATE).
-    ///   â€¢ Customer may only use DRAFT or ACTIVE.
+    ///   • Admin/Staff can only edit baskets they (or other admin/staff) created — NOT customer baskets.
+    ///   • Customer can only edit their own baskets.
+    ///   • A TEMPLATE basket (admin-created) cannot be edited by customers — they must clone it first.
+    ///   • Admin/Staff may transition status freely (DRAFT / ACTIVE / INACTIVE / TEMPLATE).
+    ///   • Customer may only use DRAFT or ACTIVE.
     /// </summary>
     public async Task<UpdateProductDto> UpdateCustomAsync(int productId, UpdateComboProductRequest dto, int? requestingAccountId)
     {
         var repo = _uow.GetRepository<Product>();
 
-        // â”€â”€â”€ 1. Identify the requesting user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ————————————————————————————————————————————————————————————————————————————————
         var requestorList = await _uow.GetRepository<Account>().FindAsync(
             a => a.Accountid == requestingAccountId
         );
@@ -563,7 +568,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         bool requestorIsAdminOrStaff = requestor?.Role.Equals(UserRole.ADMIN) == true
                                      || requestor?.Role.Equals(UserRole.STAFF) == true;
 
-        // â”€â”€â”€ 2. Fetch the basket (customers may only see their own) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ————————————————————————————————————————————————————————————————————————————————
         var product = await repo.FindAsync(
             p => p.Productid == productId
                 && p.Configid.HasValue                                             // must be a basket/combo
@@ -579,49 +584,49 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
 
         if (product == null)
             throw new Exception(requestorIsCustomer
-                ? "KhĂ´ng tĂ¬m tháº¥y giá» quĂ  cá»§a báº¡n hoáº·c báº¡n khĂ´ng cĂ³ quyá»n chá»‰nh sá»­a."
-                : "KhĂ´ng tĂ¬m tháº¥y giá» quĂ  hoáº·c sáº£n pháº©m khĂ´ng pháº£i giá» quĂ  tĂ¹y chá»‰nh.");
+                ? "Không tìm thấy giỏ quà của bạn hoặc bạn không có quyền chỉnh sửa."
+                : "Không tìm thấy giỏ quà hoặc sản phẩm không phải giỏ quà tùy chỉnh.");
 
         var response = new UpdateProductDto();
 
-        // â”€â”€â”€ 3. Determine basket origin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ————————————————————————————————————————————————————————————————————————————————
         //   isCustomerBasket  = basket was created by a customer (cloned from template or self-composed)
         //   isAdminBasket     = basket was created by admin / staff (includes templates)
         bool isCustomerBasket = product.Account?.Role.Equals(UserRole.CUSTOMER) == true;
         bool isAdminBasket = !isCustomerBasket;
 
-        // â”€â”€â”€ 4. Access-control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        // Admin/Staff must NOT touch customer baskets â€” those belong to the customer.
+        // ————————————————————————————————————————————————————————————————————————————————
+        // Admin/Staff must NOT touch customer baskets — those belong to the customer.
         if (requestorIsAdminOrStaff && isCustomerBasket)
             throw new Exception(
-                "Admin/Staff khĂ´ng thá»ƒ chá»‰nh sá»­a giá» quĂ  cá»§a khĂ¡ch hĂ ng. " +
-                "Chá»‰ chĂ­nh khĂ¡ch hĂ ng má»›i cĂ³ quyá»n chá»‰nh sá»­a giá» quĂ  cá»§a há».");
+                "Admin/Staff không thể chỉnh sửa giỏ quà của khách hàng. " +
+                "Chỉ chính khách hàng mới có quyền chỉnh sửa giỏ quà của họ.");
 
-        // Customer must NOT touch admin-managed (template) baskets directly â€” they must clone first.
+        // Customer must NOT touch admin-managed (template) baskets directly — they must clone first.
         if (requestorIsCustomer && isAdminBasket)
             throw new Exception(
-                "KhĂ´ng thá»ƒ chá»‰nh sá»­a giá» quĂ  máº«u cá»§a admin. " +
-                "Vui lĂ²ng clone template Ä‘á»ƒ táº¡o báº£n sao riĂªng trÆ°á»›c khi chá»‰nh sá»­a.");
+                "Không thể chỉnh sửa giỏ quà mẫu của admin. " +
+                "Vui lòng clone template để tạo bản sao riêng trước khi chỉnh sửa.");
 
-        // â”€â”€â”€ 5. Per-role field & status restrictions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ————————————————————————————————————————————————————————————————————————————————
         if (requestorIsCustomer)
         {
             // Customer's own basket: must not be in TEMPLATE state
             if (product.Status == ProductStatus.TEMPLATE)
-                throw new Exception("KhĂ´ng thá»ƒ chá»‰nh sá»­a template giá» quĂ . Vui lĂ²ng clone template trÆ°á»›c.");
+                throw new Exception("Không thể chỉnh sửa template giỏ quà. Vui lòng clone template trước.");
 
-            // Customer may only transition between DRAFT â†” ACTIVE
+            // Customer may only transition between DRAFT ↔ ACTIVE
             if (dto.Status != null &&
                 !new[] { ProductStatus.DRAFT, ProductStatus.ACTIVE }.Contains(dto.Status))
-                throw new Exception("KhĂ¡ch hĂ ng chá»‰ cĂ³ thá»ƒ Ä‘áº·t tráº¡ng thĂ¡i DRAFT hoáº·c ACTIVE.");
+                throw new Exception("Khách hàng chỉ có thể đặt trạng thái DRAFT hoặc ACTIVE.");
         }
         else
         {
             // Admin/Staff: any status except DELETED (use DELETE API for that)
             if (dto.Status != null && dto.Status.Equals(ProductStatus.DELETED))
                 throw new Exception(
-                    "KhĂ´ng thá»ƒ Ä‘áº·t tráº¡ng thĂ¡i DELETED qua API nĂ y. " +
-                    "Vui lĂ²ng sá»­ dá»¥ng API xĂ³a sáº£n pháº©m (DELETE /products/{id}).");
+                    "Không thể đặt trạng thái DELETED qua API này. " +
+                    "Vui lòng sử dụng API xóa sản phẩm (DELETE /products/{id}).");
         }
 
         // â”€â”€â”€ 6. Apply basic field updates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -654,7 +659,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             foreach (var detail in dto.ProductDetails)
             {
                 if (!detail.Productid.HasValue)
-                    throw new Exception("ProductId khĂ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng trong ProductDetails.");
+                    throw new Exception("ProductId không được để trống trong ProductDetails.");
 
                 var childProduct = await _uow.GetRepository<Product>().FindAsync(
                     p => p.Productid == detail.Productid.Value
@@ -663,7 +668,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 );
 
                 if (childProduct == null)
-                    throw new Exception($"Sáº£n pháº©m vá»›i ID {detail.Productid} khĂ´ng tá»“n táº¡i hoáº·c khĂ´ng kháº£ dá»¥ng.");
+                    throw new Exception($"Sản phẩm với ID {detail.Productid} không tồn tại hoặc không khả dụng.");
 
                 // Validate product category is allowed by this config
                 if (product.Config != null && validCategoryIds.Any())
@@ -675,8 +680,8 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                                 .Select(cd => cd.Category?.Categoryname ?? "N/A")
                             ?? Enumerable.Empty<string>());
                         throw new Exception(
-                            $"Sáº£n pháº©m '{childProduct.Productname}' thuá»™c danh má»¥c khĂ´ng há»£p lá»‡. " +
-                            $"Danh má»¥c cho phĂ©p: {allowed}");
+                            $"Sản phẩm '{childProduct.Productname}' thuộc danh mục không hợp lệ. " +
+                            $"Danh mục cho phép: {allowed}");
                     }
                 }
 
@@ -687,14 +692,14 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 {
                     if (!childProduct.Length.HasValue || !childProduct.Width.HasValue || !childProduct.Height.HasValue)
                     {
-                        throw new Exception($"Sáº£n pháº©m '{childProduct.Productname}' thiáº¿u thĂ´ng tin kĂ­ch thÆ°á»›c.");
+                        throw new Exception($"Sản phẩm '{childProduct.Productname}' thiếu thông tin kích thước.");
                     }
                     var itemDims = new[] { childProduct.Length.Value, childProduct.Width.Value, childProduct.Height.Value }.OrderBy(x => x).ToArray();
                     var boxDims = new[] { product.Config.MaxLength.Value, product.Config.MaxWidth.Value, product.Config.MaxHeight.Value }.OrderBy(x => x).ToArray();
 
                     if (itemDims[0] > boxDims[0] || itemDims[1] > boxDims[1] || itemDims[2] > boxDims[2])
                     {
-                        throw new Exception($"KĂ­ch thÆ°á»›c cá»§a '{childProduct.Productname}' khĂ´ng lá»t vá»«a giá»/há»™p.");
+                        throw new Exception($"Kích thước của '{childProduct.Productname}' không lọt vừa giỏ/hộp.");
                     }
                     totalVolume += (childProduct.Volume ?? 0) * quantity;
                 }
@@ -709,25 +714,25 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                         s => s.Productid == detail.Productid && s.Status == StockStatus.ACTIVE
                     );
                     if ((stocks.Sum(s => s.Stockquantity) ?? 0) == 0)
-                        throw new Exception($"Sáº£n pháº©m '{childProduct.Productname}' hiá»‡n Ä‘ang háº¿t hĂ ng.");
+                        throw new Exception($"Sản phẩm '{childProduct.Productname}' hiện đang hết hàng.");
                 }
             }
 
-            // â”€â”€ Volume limit check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ——— Volume limit check ——————————————————————————————————————————————————————————
             if (product.Config?.MaxVolume.HasValue == true && totalVolume > product.Config.MaxVolume.Value * 0.85m)
             {
-                throw new Exception($"Tá»•ng thá»ƒ tĂch cá»§a giá»/há»™p Ä‘Ă£ quĂ¡ Ä‘áº§y do sá»©c chá»©a váº­t lĂ½ cĂ³ háº¡n. Vui lĂ²ng giáº£m sá»‘ lÆ°á»£ng cĂ¡c mĂ³n Ä‘á»“.");
+                throw new Exception($"Tổng thể tích của giỏ/hộp đã quá đầy do sức chứa vật lý có hạn. Vui lòng giảm số lượng các món đồ.");
             }
 
-            // â”€â”€ Weight limit check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ——— Weight limit check ——————————————————————————————————————————————————————————
             if (product.Config?.Totalunit.HasValue == true && totalWeight > product.Config.Totalunit.Value)
             {
                 throw new Exception(
-                    $"Tá»•ng trá»ng lÆ°á»£ng giá» quĂ  ({totalWeight}g) vÆ°á»£t quĂ¡ giá»›i háº¡n cho phĂ©p ({product.Config.Totalunit.Value}g). " +
-                    $"Vui lĂ²ng giáº£m sá»‘ lÆ°á»£ng sáº£n pháº©m.");
+                    $"Tổng trọng lượng giỏ quà ({totalWeight}g) vượt quá giới hạn cho phép ({product.Config.Totalunit.Value}g). " +
+                    $"Vui lòng giảm số lượng sản phẩm.");
             }
 
-            // â”€â”€ Replace ProductDetails (delete old, insert new) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ——— Replace ProductDetails (delete old, insert new) ——————————————————————————————
             var detailRepo = _uow.GetRepository<ProductDetail>();
             var oldDetails = product.ProductDetailProductparents.ToList();
             if (oldDetails.Any())
@@ -745,7 +750,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             await detailRepo.AddRangeAsync(newDetails);
         }
 
-        // â”€â”€â”€ 9. Persist and recalculate weight/price â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ——— 9. Persist and recalculate weight/price ——————————————————————————————————————
         repo.Update(product);
         await _uow.SaveAsync();
 
@@ -767,7 +772,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 if (updatedProduct.Config?.Totalunit.HasValue == true
                     && updatedProduct.Unit > updatedProduct.Config.Totalunit.Value)
                 {
-                    response.Warning = $"Cáº£nh bĂ¡o: Trá»ng lÆ°á»£ng giá» quĂ  ({updatedProduct.Unit}) vÆ°á»£t quĂ¡ giá»›i háº¡n cáº¥u hĂ¬nh ({updatedProduct.Config.Totalunit.Value}).";
+                    response.Warning = $"Cảnh báo: Trọng lượng giỏ quà ({updatedProduct.Unit}) vượt quá giới hạn cấu hình ({updatedProduct.Config.Totalunit.Value}).";
                 }
 
                 repo.Update(updatedProduct);
@@ -795,7 +800,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         );
 
         if (product == null)
-            throw new Exception("KhĂ´ng tĂ¬m tháº¥y sáº£n pháº©m.");
+            throw new Exception("Không tìm thấy sản phẩm.");
 
         // Recalculate to ensure up-to-date values
         product.CalculateUnit();
@@ -1027,7 +1032,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
     }
 
     /// <summary>
-    /// Láº¥y giá» quĂ  ACTIVE cá»§a admin/staff cho trang shop (khĂ¡ch hĂ ng duyá»‡t)
+    /// Lấy giỏ quà ACTIVE của admin/staff cho trang shop (khách hàng duyệt)
     /// </summary>
     public async Task<IEnumerable<ProductDto>> GetShopBasketsAsync()
     {
@@ -1105,10 +1110,10 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         );
 
         if (template == null)
-            throw new Exception("Giá» quĂ  khĂ´ng tá»“n táº¡i hoáº·c khĂ´ng kháº£ dá»¥ng.");
+            throw new Exception("Giỏ quà không tồn tại hoặc không khả dụng.");
 
         if (!template.Configid.HasValue)
-            throw new Exception("Giá» quĂ  khĂ´ng há»£p lá»‡ (thiáº¿u cáº¥u hĂ¬nh).");
+            throw new Exception("Giỏ quà không hợp lệ (thiếu cấu hình).");
 
         // Validate customer account exists
         await ValidateForeignKeys(customerId, null, null);
@@ -1118,10 +1123,10 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         {
             Configid = template.Configid,
             Accountid = customerId,
-            Productname = customName ?? $"Báº£n sao cá»§a {template.Productname}",
+            Productname = customName ?? $"Bản sao của {template.Productname}",
             Description = template.Description,
             ImageUrl = template.ImageUrl,
-            Status = ProductStatus.DRAFT,  // Customer cĂ³ thá»ƒ chá»‰nh sá»­a
+            Status = ProductStatus.DRAFT,  // Customer có thể chỉnh sửa
             Unit = template.Unit,
             Price = template.Price
         };
@@ -1157,7 +1162,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         );
 
         if (clonedBasket == null)
-            throw new Exception("Lá»—i khi táº¡o giá» quĂ  clone.");
+            throw new Exception("Lỗi khi tạo giỏ quà clone.");
 
         clonedBasket.CalculateUnit();
         clonedBasket.CalculateTotalPrice();
@@ -1213,10 +1218,10 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         );
 
         if (product == null)
-            throw new Exception("Sáº£n pháº©m khĂ´ng tá»“n táº¡i.");
+            throw new Exception("Sản phẩm khĂ´ng tá»“n táº¡i.");
 
         if (!product.Configid.HasValue)
-            throw new Exception("Chá»‰ cĂ³ thá»ƒ Ä‘áº·t giá» quĂ  (cĂ³ cáº¥u hĂ¬nh) lĂ m template.");
+            throw new Exception("Chá»‰ cĂ³ thá»ƒ Ä‘áº·t giá» quĂ  (cĂ³ cấu hình) lĂ m template.");
 
         product.Status = ProductStatus.TEMPLATE;
         repo.Update(product);
@@ -1236,7 +1241,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             throw new Exception("Template khĂ´ng tá»“n táº¡i.");
 
         if (product.Status != ProductStatus.TEMPLATE)
-            throw new Exception("Sáº£n pháº©m nĂ y khĂ´ng pháº£i template.");
+            throw new Exception("Sản phẩm nĂ y khĂ´ng pháº£i template.");
 
         product.Status = ProductStatus.ACTIVE;
         repo.Update(product);
@@ -1294,7 +1299,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             query = query.Where(p => p.Price <= productQuery.MaxPrice);
         }
 
-        // 5. Filter sáº£n pháº©m Ä‘Æ¡n
+        // 5. Filter sản phẩm Ä‘Æ¡n
         if (productQuery.IsSingleProduct ?? false)
         {
             query = query.Where(p => p.Configid == null);

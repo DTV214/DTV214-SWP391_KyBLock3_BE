@@ -12,5 +12,5 @@ public interface IDashboardService
 
     // Thống kê đơn hàng cho admin (Customer Total Orders & Success Rate)
     Task<RevenueChartDto> GetActualRevenueByTimeRangeAsync(TimeRangeRequest request);
-    Task<List<CustomerOrderStatisticsDto>> GetCustomerOrderStatisticsAsync();
+    Task<List<CustomerOrderStatisticsDto>> GetCustomerOrderStatisticsAsync(TimeRangeRequest? request = null);
 }

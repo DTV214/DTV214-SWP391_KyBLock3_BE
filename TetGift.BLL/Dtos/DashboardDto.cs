@@ -90,5 +90,6 @@ public class CustomerOrderStatisticsDto
     public int CancelledOrders { get; set; }
     public int ProcessingOrders { get; set; }
     public decimal TotalSpent { get; set; }
+    public decimal TotalSpentAllTime { get; set; }
     public double SuccessRate { get; set; } // (SuccessfulOrders / TotalOrders) * 100
 }

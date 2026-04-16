@@ -518,7 +518,7 @@ public class DashboardService : IDashboardService
         };
     }
 
-    public async Task<List<CustomerOrderStatisticsDto>> GetCustomerOrderStatisticsAsync()
+    public async Task<List<CustomerOrderStatisticsDto>> GetCustomerOrderStatisticsAsync(TimeRangeRequest? request = null)
     {
         var accountRepo = _uow.GetRepository<Account>();
         
@@ -528,28 +528,65 @@ public class DashboardService : IDashboardService
             .Include(a => a.Orders)
             .ToListAsync();
 
-        var stats = accounts.Select(c =>
+        var stats = new List<CustomerOrderStatisticsDto>();
+        
+        var paidStatuses = new[] { 
+            OrderStatus.DELIVERED, 
+            OrderStatus.CONFIRMED, 
+            OrderStatus.PROCESSING, 
+            OrderStatus.SHIPPED, 
+            OrderStatus.PAID_WAITING_STOCK 
+        };
+
+        foreach (var c in accounts)
         {
-            var totalOrders = c.Orders.Count;
-            var successfulOrders = c.Orders.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.DELIVERED);
-            var cancelledOrders = c.Orders.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.CANCELLED);
+            // Tính tổng chi tiêu TẤT CẢ các khoảng thời gian (All-Time) trước khi lọc (bao gồm các đơn đang xử lý/đã thanh toán)
+            var totalSpentAllTime = c.Orders
+                .Where(o => o.Status != null && paidStatuses.Contains(o.Status.ToUpper()))
+                .Sum(o => o.Totalprice ?? 0);
+
+            // Lọc đơn hàng theo thời gian
+            var ordersInTimeRange = c.Orders.AsEnumerable();
+
+            if (request != null)
+            {
+                if (request.StartDate.HasValue)
+                {
+                    ordersInTimeRange = ordersInTimeRange.Where(o => o.Orderdatetime >= request.StartDate.Value);
+                }
+                if (request.EndDate.HasValue)
+                {
+                    var endDate = request.EndDate.Value.AddDays(1);
+                    ordersInTimeRange = ordersInTimeRange.Where(o => o.Orderdatetime < endDate);
+                }
+            }
+
+            var ordersList = ordersInTimeRange.ToList();
+
+            // CHỈ lấy khách đã từng có đơn hàng (>= 1).
+            // Nếu khoảng thời gian này không có đơn hàng nào, bỏ qua.
+            if (!ordersList.Any()) continue;
+
+            var totalOrders = ordersList.Count;
+            var successfulOrders = ordersList.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.DELIVERED);
+            var cancelledOrders = ordersList.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.CANCELLED);
             
             // Các trạng thái đang được xử lý hoặc đã thanh toán nhưng chưa hoàn tất
-            var processingOrders = c.Orders.Count(o => 
+            var processingOrders = ordersList.Count(o => 
                 (o.Status ?? "").ToUpper() == OrderStatus.CONFIRMED || 
                 (o.Status ?? "").ToUpper() == OrderStatus.PROCESSING || 
                 (o.Status ?? "").ToUpper() == OrderStatus.SHIPPED || 
                 (o.Status ?? "").ToUpper() == OrderStatus.PAID_WAITING_STOCK);
 
-            var totalSpent = c.Orders
-                .Where(o => (o.Status ?? "").ToUpper() == OrderStatus.DELIVERED)
+            var totalSpent = ordersList
+                .Where(o => o.Status != null && paidStatuses.Contains(o.Status.ToUpper()))
                 .Sum(o => o.Totalprice ?? 0);
 
             var successRate = totalOrders > 0 
                 ? Math.Round((double)successfulOrders / totalOrders * 100, 2) 
                 : 0;
 
-            return new CustomerOrderStatisticsDto
+            stats.Add(new CustomerOrderStatisticsDto
             {
                 AccountId = c.Accountid,
                 FullName = c.Fullname,
@@ -559,9 +596,10 @@ public class DashboardService : IDashboardService
                 CancelledOrders = cancelledOrders,
                 ProcessingOrders = processingOrders,
                 TotalSpent = totalSpent,
+                TotalSpentAllTime = totalSpentAllTime,
                 SuccessRate = successRate
-            };
-        }).ToList();
+            });
+        }
 
         // Sắp xếp theo tổng chi tiêu giảm dần
         return stats.OrderByDescending(s => s.TotalSpent).ToList();
