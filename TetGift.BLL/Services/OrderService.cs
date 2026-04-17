@@ -1089,6 +1089,7 @@ public class OrderService : IOrderService
             TotalPrice = totalPrice,
             DiscountValue = discountValue > 0 ? discountValue : null,
             FinalPrice = order.Totalprice ?? totalPrice,
+            ActualRevenue = order.ActualRevenue,
             Status = order.Status,
             CustomerName = order.Customername,
             CustomerPhone = order.Customerphone,

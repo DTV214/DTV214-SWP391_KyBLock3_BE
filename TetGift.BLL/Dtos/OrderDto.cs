@@ -62,6 +62,7 @@ public class OrderResponseDto
     public decimal TotalPrice { get; set; }
     public decimal? DiscountValue { get; set; }
     public decimal FinalPrice { get; set; }
+    public decimal? ActualRevenue { get; set; }
     public string? Status { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerPhone { get; set; }
