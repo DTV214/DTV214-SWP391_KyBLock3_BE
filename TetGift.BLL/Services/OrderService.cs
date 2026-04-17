@@ -805,7 +805,7 @@ public class OrderService : IOrderService
         decimal actualRevenue = finalPaid - totalCost;
 
         // Persist totals onto Order
-        order.Totalprice = totalCost;
+        order.Totalprice = finalPaid;
         order.ActualRevenue = actualRevenue;
 
         // Status giữ nguyên CONFIRMED — Staff/Admin sẽ chuyển sang PROCESSING thủ công
