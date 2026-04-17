@@ -168,4 +168,21 @@ public class DashboardController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Lấy thống kê tiêu điểm (Insights) cho admin như Top Customer, Top Selling Product, Tỷ lệ hủy, v.v.
+    /// </summary>
+    [HttpGet("insights")]
+    public async Task<IActionResult> GetDashboardInsights([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var result = await _dashboardService.GetDashboardInsightsAsync(startDate, endDate);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

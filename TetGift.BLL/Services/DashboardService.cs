@@ -604,4 +604,187 @@ public class DashboardService : IDashboardService
         // Sắp xếp theo tổng chi tiêu giảm dần
         return stats.OrderByDescending(s => s.TotalSpent).ToList();
     }
+
+    public async Task<DashboardHighlightsDto> GetDashboardInsightsAsync(DateTime? startDate = null, DateTime? endDate = null)
+    {
+        var result = new DashboardHighlightsDto();
+        
+        var orderRepo = _uow.GetRepository<Order>();
+        var accountRepo = _uow.GetRepository<Account>();
+        var productRepo = _uow.GetRepository<Product>();
+        var cartRepo = _uow.GetRepository<Cart>();
+
+        // 1. Lọc đơn hàng theo thời gian
+        var ordersQuery = orderRepo.Entities
+            .Include(o => o.Account)
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.Product)
+            .Include(o => o.Payments)
+            .Include(o => o.Promotion)
+            .AsQueryable();
+
+        if (startDate.HasValue)
+        {
+            ordersQuery = ordersQuery.Where(o => o.Orderdatetime >= startDate.Value);
+        }
+        if (endDate.HasValue)
+        {
+            var end = endDate.Value.AddDays(1);
+            ordersQuery = ordersQuery.Where(o => o.Orderdatetime < end);
+        }
+
+        var ordersList = await ordersQuery.ToListAsync();
+
+        var paidStatuses = new[] { 
+            OrderStatus.DELIVERED, 
+            OrderStatus.CONFIRMED, 
+            OrderStatus.PROCESSING, 
+            OrderStatus.SHIPPED, 
+            OrderStatus.PAID_WAITING_STOCK 
+        };
+
+        var validOrders = ordersList.Where(o => o.Status != null && paidStatuses.Contains(o.Status.ToUpper())).ToList();
+        var cancelledOrders = ordersList.Where(o => (o.Status ?? "").ToUpper() == OrderStatus.CANCELLED).ToList();
+
+        // 2. Cancellation Stats
+        result.CancellationStats = new CancellationStatsDto
+        {
+            CancelledOrders = cancelledOrders.Count,
+            ValidOrders = validOrders.Count,
+            CancellationRate = (cancelledOrders.Count + validOrders.Count) > 0 
+                ? Math.Round((double)cancelledOrders.Count / (cancelledOrders.Count + validOrders.Count) * 100, 2) 
+                : 0
+        };
+
+        // 3. Average Order Value
+        result.AverageOrderValue = validOrders.Count > 0 
+            ? validOrders.Average(o => CalculateFinalPrice(o)) 
+            : 0;
+
+        // 4. Customer Highlights
+        // Tính toán trên toàn bộ danh sách khách hàng có trong các đơn hợp lệ hoặc hủy
+        var customerGroups = ordersList
+            .Where(o => o.Accountid.HasValue && o.Account != null)
+            .GroupBy(o => o.Accountid!.Value)
+            .Select(g => new
+            {
+                AccountId = g.Key,
+                Account = g.First().Account!,
+                TotalOrders = g.Count(o => o.Status != null && paidStatuses.Contains(o.Status.ToUpper())),
+                TotalSpent = g.Where(o => o.Status != null && paidStatuses.Contains(o.Status.ToUpper())).Sum(o => CalculateFinalPrice(o)),
+                TotalCancelled = g.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.CANCELLED)
+            }).ToList();
+
+        if (customerGroups.Any())
+        {
+            var topSpender = customerGroups.OrderByDescending(c => c.TotalSpent).FirstOrDefault();
+            if (topSpender != null && topSpender.TotalSpent > 0)
+            {
+                result.TopSpender = new HighlightCustomerDto
+                {
+                    AccountId = topSpender.AccountId,
+                    FullName = topSpender.Account.Fullname ?? topSpender.Account.Username,
+                    Email = topSpender.Account.Email ?? "",
+                    TotalValue = topSpender.TotalSpent,
+                    OrderCount = topSpender.TotalOrders
+                };
+            }
+
+            var mostFrequent = customerGroups.OrderByDescending(c => c.TotalOrders).FirstOrDefault();
+            if (mostFrequent != null && mostFrequent.TotalOrders > 0)
+            {
+                result.MostFrequentBuyer = new HighlightCustomerDto
+                {
+                    AccountId = mostFrequent.AccountId,
+                    FullName = mostFrequent.Account.Fullname ?? mostFrequent.Account.Username,
+                    Email = mostFrequent.Account.Email ?? "",
+                    TotalValue = mostFrequent.TotalSpent,
+                    OrderCount = mostFrequent.TotalOrders
+                };
+            }
+
+            var topCanceler = customerGroups.OrderByDescending(c => c.TotalCancelled).FirstOrDefault();
+            if (topCanceler != null && topCanceler.TotalCancelled > 0)
+            {
+                result.TopCanceler = new HighlightCustomerDto
+                {
+                    AccountId = topCanceler.AccountId,
+                    FullName = topCanceler.Account.Fullname ?? topCanceler.Account.Username,
+                    Email = topCanceler.Account.Email ?? "",
+                    TotalValue = topCanceler.TotalCancelled, // Đếm số đơn hủy
+                    OrderCount = topCanceler.TotalOrders
+                };
+            }
+        }
+
+        // 5. Product Highlights (Chỉ đếm các đơn hợp lệ)
+        var productGroups = validOrders
+            .SelectMany(o => o.OrderDetails)
+            .Where(od => od.Productid.HasValue && od.Product != null)
+            .GroupBy(od => od.Productid!.Value)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                Product = g.First().Product!,
+                TotalQuantity = g.Sum(od => od.Quantity ?? 0),
+                TotalRevenue = g.Sum(od => (od.Quantity ?? 0) * (od.Product!.Price ?? 0)) // Tạm tính doanh thu theo giá gốc
+            }).ToList();
+
+        if (productGroups.Any())
+        {
+            var topSelling = productGroups.OrderByDescending(p => p.TotalQuantity).First();
+            result.TopSellingProduct = new HighlightProductDto
+            {
+                ProductId = topSelling.ProductId,
+                ProductName = topSelling.Product.Productname ?? $"Product {topSelling.ProductId}",
+                ImageUrl = topSelling.Product.ImageUrl,
+                TotalQuantity = topSelling.TotalQuantity,
+                TotalRevenue = topSelling.TotalRevenue
+            };
+        }
+
+        // Tạm tính Sản phẩm bán ế (Dựa trên tất cả sản phẩm đang ACTIVE)
+        var activeProducts = await productRepo.Entities.Where(p => p.Status == "ACTIVE").ToListAsync();
+        
+        var worstSelling = activeProducts
+            .Select(p => new
+            {
+                Product = p,
+                TotalQuantity = productGroups.FirstOrDefault(pg => pg.ProductId == p.Productid)?.TotalQuantity ?? 0,
+                TotalRevenue = productGroups.FirstOrDefault(pg => pg.ProductId == p.Productid)?.TotalRevenue ?? 0
+            })
+            .OrderBy(p => p.TotalQuantity)
+            .FirstOrDefault();
+
+        if (worstSelling != null)
+        {
+            result.UnderperformingProduct = new HighlightProductDto
+            {
+                ProductId = worstSelling.Product.Productid,
+                ProductName = worstSelling.Product.Productname ?? "",
+                ImageUrl = worstSelling.Product.ImageUrl,
+                TotalQuantity = worstSelling.TotalQuantity,
+                TotalRevenue = worstSelling.TotalRevenue
+            };
+        }
+
+
+        // 6. Abandoned Cart Value
+
+        var cartsWithItems = await cartRepo.Entities
+            .Include(c => c.CartDetails)
+            .Where(c => c.CartDetails != null && c.CartDetails.Any())
+            .ToListAsync();
+        
+        var orderAccountIdsInPeriod = validOrders.Where(o => o.Accountid.HasValue).Select(o => o.Accountid!.Value).ToHashSet();
+        var abandonedCarts = cartsWithItems.Where(c => c.Accountid.HasValue && !orderAccountIdsInPeriod.Contains(c.Accountid.Value)).ToList();
+
+        result.AbandonedCartValue = new AbandonedCartValueDto
+        {
+            CartCount = abandonedCarts.Count,
+            TotalLostValue = abandonedCarts.Sum(c => c.Totalprice ?? 0)
+        };
+
+        return result;
+    }
 }
