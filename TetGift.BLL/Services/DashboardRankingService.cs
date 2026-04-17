@@ -159,9 +159,13 @@ namespace TetGift.BLL.Services
             var lineBases = details.Select(GetLineBaseAmount).ToList();
             var totalBaseAmount = lineBases.Sum();
 
-            // Totalprice đã trừ promotion/voucher rồi
+            // Totalprice đã là giá cuối cùng sau voucher/promotion
             var orderNetRevenue = order.Totalprice ?? totalBaseAmount;
             if (orderNetRevenue < 0) orderNetRevenue = 0;
+
+            // Số tiền giảm giá thực tế của cả đơn
+            var totalDiscount = totalBaseAmount - orderNetRevenue;
+            if (totalDiscount < 0) totalDiscount = 0;
 
             for (int i = 0; i < details.Count; i++)
             {
@@ -170,15 +174,22 @@ namespace TetGift.BLL.Services
                 var orderQty = detail.Quantity ?? 0;
                 var lineBaseAmount = lineBases[i];
 
+                decimal allocatedLineDiscount;
                 decimal allocatedLineRevenue;
+
                 if (totalBaseAmount > 0)
                 {
-                    allocatedLineRevenue = orderNetRevenue * (lineBaseAmount / totalBaseAmount);
+                    allocatedLineDiscount = totalDiscount * (lineBaseAmount / totalBaseAmount);
+                    allocatedLineRevenue = lineBaseAmount - allocatedLineDiscount;
                 }
                 else
                 {
+                    allocatedLineDiscount = details.Count > 0 ? totalDiscount / details.Count : 0;
                     allocatedLineRevenue = details.Count > 0 ? orderNetRevenue / details.Count : 0;
                 }
+
+                if (allocatedLineRevenue < 0)
+                    allocatedLineRevenue = 0;
 
                 // Nếu là giỏ preset/config -> bung child ra, không tính product cha
                 if (product.Configid.HasValue &&
