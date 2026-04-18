@@ -34,4 +34,17 @@ public class StatisticsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+    [HttpGet("trending")]
+    public async Task<IActionResult> GetTrendingProducts([FromQuery] string period = "week", [FromQuery] int top = 5)
+    {
+        try
+        {
+            var result = await _statisticService.GetTrendingProductsAsync(period, top);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }
