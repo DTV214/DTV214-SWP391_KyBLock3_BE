@@ -159,9 +159,11 @@ namespace TetGift.BLL.Services
             var lineBases = details.Select(GetLineBaseAmount).ToList();
             var totalBaseAmount = lineBases.Sum();
 
-            // Totalprice đã trừ promotion/voucher rồi
+            // Totalprice là tổng cuối cùng của đơn sau voucher/promotion
             var orderNetRevenue = order.Totalprice ?? totalBaseAmount;
             if (orderNetRevenue < 0) orderNetRevenue = 0;
+
+            decimal allocatedOrderRevenueSoFar = 0m;
 
             for (int i = 0; i < details.Count; i++)
             {
@@ -171,43 +173,106 @@ namespace TetGift.BLL.Services
                 var lineBaseAmount = lineBases[i];
 
                 decimal allocatedLineRevenue;
-                if (totalBaseAmount > 0)
+
+                // Reconcile dòng cuối để tổng line revenue luôn khớp đúng order.Totalprice
+                if (i == details.Count - 1)
+                {
+                    allocatedLineRevenue = orderNetRevenue - allocatedOrderRevenueSoFar;
+                }
+                else if (totalBaseAmount > 0)
                 {
                     allocatedLineRevenue = orderNetRevenue * (lineBaseAmount / totalBaseAmount);
                 }
                 else
                 {
-                    allocatedLineRevenue = details.Count > 0 ? orderNetRevenue / details.Count : 0;
+                    allocatedLineRevenue = details.Count > 0 ? orderNetRevenue / details.Count : 0m;
                 }
 
-                // Nếu là giỏ preset/config -> bung child ra, không tính product cha
-                if (product.Configid.HasValue &&
-                    product.ProductDetailProductparents != null &&
-                    product.ProductDetailProductparents.Any())
+                if (allocatedLineRevenue < 0)
+                    allocatedLineRevenue = 0;
+
+                allocatedOrderRevenueSoFar += allocatedLineRevenue;
+
+                // Product config = giỏ preset => không tính product cha, chỉ tính child
+                if (product.Configid.HasValue)
                 {
                     result.AddRange(ExpandConfiguredProduct(detail, product, allocatedLineRevenue));
+                    continue;
                 }
-                else
-                {
-                    var categoryId = product.Categoryid ?? 0;
-                    var categoryName = product.Category?.Categoryname ?? "UNCATEGORIZED";
-                    var cost = (product.ImportPrice ?? 0m) * orderQty;
 
-                    result.Add(new FlattenedSaleRow
-                    {
-                        CategoryId = categoryId,
-                        CategoryName = categoryName,
-                        ProductId = product.Productid,
-                        ProductName = product.Productname ?? $"Product {product.Productid}",
-                        Revenue = allocatedLineRevenue,
-                        Cost = cost,
-                        Profit = allocatedLineRevenue - cost,
-                        QuantitySold = orderQty
-                    });
-                }
+                var categoryId = product.Categoryid ?? 0;
+                var categoryName = product.Category?.Categoryname ?? "UNCATEGORIZED";
+                var cost = (product.ImportPrice ?? 0m) * orderQty;
+
+                result.Add(new FlattenedSaleRow
+                {
+                    CategoryId = categoryId,
+                    CategoryName = categoryName,
+                    ProductId = product.Productid,
+                    ProductName = product.Productname ?? $"Product {product.Productid}",
+                    Revenue = allocatedLineRevenue,
+                    Cost = cost,
+                    Profit = 0m, // set sau
+                    QuantitySold = orderQty
+                });
             }
 
+            NormalizeOrderProfit(order, result);
             return result;
+        }
+
+        private static void NormalizeOrderProfit(Order order, List<FlattenedSaleRow> rows)
+        {
+            if (rows.Count == 0)
+                return;
+
+            // Profit raw từ revenue - cost
+            foreach (var row in rows)
+            {
+                row.Profit = row.Revenue - row.Cost;
+            }
+
+            // Nếu không có ActualRevenue thì giữ raw profit
+            if (!order.ActualRevenue.HasValue)
+                return;
+
+            var targetProfit = order.ActualRevenue.Value;
+            var currentProfit = rows.Sum(x => x.Profit);
+            var diff = targetProfit - currentProfit;
+
+            // Không lệch thì thôi
+            if (diff == 0)
+                return;
+
+            var totalRevenue = rows.Sum(x => x.Revenue);
+
+            // Chia phần chênh lệch theo tỷ trọng revenue để tổng profit khớp đúng ActualRevenue
+            if (totalRevenue > 0)
+            {
+                decimal allocatedDiffSoFar = 0m;
+
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    decimal profitAdjustment;
+
+                    if (i == rows.Count - 1)
+                    {
+                        profitAdjustment = diff - allocatedDiffSoFar;
+                    }
+                    else
+                    {
+                        profitAdjustment = diff * (rows[i].Revenue / totalRevenue);
+                    }
+
+                    rows[i].Profit += profitAdjustment;
+                    allocatedDiffSoFar += profitAdjustment;
+                }
+            }
+            else
+            {
+                // Không có revenue thì dồn chênh lệch vào row cuối
+                rows[^1].Profit += diff;
+            }
         }
 
         private static List<FlattenedSaleRow> ExpandConfiguredProduct(OrderDetail detail, Product parentProduct, decimal allocatedLineRevenue)
@@ -215,10 +280,12 @@ namespace TetGift.BLL.Services
             var result = new List<FlattenedSaleRow>();
             var orderQty = detail.Quantity ?? 0;
 
-            var childDetails = parentProduct.ProductDetailProductparents
+            var childDetails = (parentProduct.ProductDetailProductparents ?? [])
                 .Where(x => x.Product != null && (x.Quantity ?? 0) > 0)
                 .ToList();
 
+            // Product có ConfigId nhưng không có child -> không tính product cha
+            // Vì business của bạn đã chốt: giỏ thì chỉ tính child product
             if (childDetails.Count == 0)
                 return result;
 
@@ -229,6 +296,8 @@ namespace TetGift.BLL.Services
             var totalChildBaseValue = childBaseValues.Sum();
             var totalChildUnitCount = childDetails.Sum(x => x.Quantity ?? 0);
 
+            decimal allocatedChildRevenueSoFar = 0m;
+
             for (int i = 0; i < childDetails.Count; i++)
             {
                 var childDetail = childDetails[i];
@@ -237,7 +306,13 @@ namespace TetGift.BLL.Services
                 var totalChildQtySold = childQtyInBasket * orderQty;
 
                 decimal allocatedChildRevenue;
-                if (totalChildBaseValue > 0)
+
+                // Reconcile child cuối để tổng child revenue luôn khớp đúng line revenue
+                if (i == childDetails.Count - 1)
+                {
+                    allocatedChildRevenue = allocatedLineRevenue - allocatedChildRevenueSoFar;
+                }
+                else if (totalChildBaseValue > 0)
                 {
                     allocatedChildRevenue = allocatedLineRevenue * (childBaseValues[i] / totalChildBaseValue);
                 }
@@ -247,8 +322,13 @@ namespace TetGift.BLL.Services
                 }
                 else
                 {
-                    allocatedChildRevenue = childDetails.Count > 0 ? allocatedLineRevenue / childDetails.Count : 0;
+                    allocatedChildRevenue = childDetails.Count > 0 ? allocatedLineRevenue / childDetails.Count : 0m;
                 }
+
+                if (allocatedChildRevenue < 0)
+                    allocatedChildRevenue = 0;
+
+                allocatedChildRevenueSoFar += allocatedChildRevenue;
 
                 var cost = (childProduct.ImportPrice ?? 0m) * totalChildQtySold;
                 var categoryId = childProduct.Categoryid ?? 0;
@@ -262,7 +342,7 @@ namespace TetGift.BLL.Services
                     ProductName = childProduct.Productname ?? $"Product {childProduct.Productid}",
                     Revenue = allocatedChildRevenue,
                     Cost = cost,
-                    Profit = allocatedChildRevenue - cost,
+                    Profit = 0m, // set sau
                     QuantitySold = totalChildQtySold
                 });
             }
