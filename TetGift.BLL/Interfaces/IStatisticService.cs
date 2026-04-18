@@ -11,7 +11,6 @@ namespace TetGift.BLL.Interfaces
     {
         Task<ProductStatisticResponseDto> GetProductStatisticAsync(int productId);
 
-        // API Mới: Lấy Top sản phẩm Trending (Mặc định lấy 7 ngày)
         Task<List<TrendingProductDto>> GetTrendingProductsAsync(string period = "week", int top = 5);
         // Nơi đây sau này bạn và team sẽ khai báo thêm các hàm:
         // Task<DashboardOverviewDto> GetDashboardOverviewAsync();

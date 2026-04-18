@@ -168,4 +168,142 @@ public class StatisticService : IStatisticService
 
         return response;
     }
+    public async Task<List<TrendingProductDto>> GetTrendingProductsAsync(string period = "week", int top = 5)
+    {
+        var orderRepo = _uow.GetRepository<Order>();
+
+        DateTime now = DateTime.Now;
+        DateTime currentStart, previousStart;
+        string dateFormat;
+        int pointsCount;
+        Func<DateTime, DateTime> stepFunc;
+
+        // 1. Máy bẻ ghi thời gian (Time-boxing)
+        switch (period.ToLower())
+        {
+            case "month":
+                // 30 ngày qua
+                currentStart = now.AddDays(-30).Date;
+                previousStart = currentStart.AddDays(-30);
+                dateFormat = "dd/MM";
+                pointsCount = 30;
+                stepFunc = d => d.AddDays(1);
+                break;
+            case "year":
+                // 12 tháng qua (Tính từ ngày mùng 1 của 11 tháng trước đến hiện tại)
+                currentStart = new DateTime(now.Year, now.Month, 1).AddMonths(-11);
+                previousStart = currentStart.AddMonths(-12);
+                dateFormat = "MM/yyyy"; // Group biểu đồ theo Tháng/Năm
+                pointsCount = 12;
+                stepFunc = d => d.AddMonths(1);
+                break;
+            case "week":
+            default:
+                // 7 ngày qua
+                currentStart = now.AddDays(-7).Date;
+                previousStart = currentStart.AddDays(-7);
+                dateFormat = "dd/MM";
+                pointsCount = 7;
+                stepFunc = d => d.AddDays(1);
+                break;
+        }
+
+        var validStatuses = new List<string> { OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED };
+
+        // 2. Chỉ query 1 lần duy nhất lấy toàn bộ đơn trong khoảng thời gian cần so sánh
+        var orders = await orderRepo.Entities
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+            .Where(o => validStatuses.Contains(o.Status) && o.Orderdatetime >= previousStart && o.Orderdatetime <= now)
+            .ToListAsync();
+
+        // Dictionary dùng để tracking số liệu từng sản phẩm
+        var tracker = new Dictionary<int, (Product Product, int CurrentQty, int PrevQty, List<(DateTime Date, int Qty)> Sales)>();
+
+        // 3. Phân loại đơn hàng vào Kỳ Hiện Tại hoặc Kỳ Trước
+        foreach (var order in orders)
+        {
+            bool isCurrent = order.Orderdatetime >= currentStart;
+
+            foreach (var detail in order.OrderDetails)
+            {
+                if (detail.Productid == null || detail.Product == null) continue;
+
+                int pId = detail.Productid.Value;
+                int qty = detail.Quantity ?? 0;
+
+                if (!tracker.ContainsKey(pId))
+                {
+                    tracker[pId] = (detail.Product, 0, 0, new List<(DateTime, int)>());
+                }
+
+                var data = tracker[pId];
+                if (isCurrent)
+                {
+                    data.CurrentQty += qty;
+                    data.Sales.Add((order.Orderdatetime.Value, qty));
+                }
+                else
+                {
+                    data.PrevQty += qty;
+                }
+                tracker[pId] = data; // Cập nhật lại vào dict
+            }
+        }
+
+        // 4. Lọc TOP sản phẩm (Xếp hạng theo số lượng bán ở kỳ hiện tại)
+        var topProducts = tracker.Values
+            .Where(x => x.CurrentQty > 0) // Chỉ lấy thằng nào có bán được
+            .OrderByDescending(x => x.CurrentQty)
+            .Take(top)
+            .ToList();
+
+        var response = new List<TrendingProductDto>();
+
+        // 5. Đóng gói JSON & Xử lý biểu đồ
+        foreach (var item in topProducts)
+        {
+            var dto = new TrendingProductDto
+            {
+                ProductId = item.Product.Productid,
+                ProductName = item.Product.Productname ?? "Sản phẩm",
+                ImageUrl = item.Product.ImageUrl,
+                TotalSoldInPeriod = item.CurrentQty
+            };
+
+            // Tính % tăng trưởng (Xử lý lỗi chia cho 0 nếu kỳ trước không bán được cái nào)
+            if (item.PrevQty == 0)
+            {
+                dto.GrowthRate = item.CurrentQty > 0 ? 100 : 0;
+            }
+            else
+            {
+                dto.GrowthRate = Math.Round((decimal)(item.CurrentQty - item.PrevQty) / item.PrevQty * 100, 1);
+            }
+
+            // Dựng khung sườn biểu đồ (Fill các ngày trống bằng số 0 để line chart không đứt khúc)
+            var chartDict = new Dictionary<string, int>();
+            DateTime stepDate = currentStart;
+            for (int i = 0; i < pointsCount; i++)
+            {
+                chartDict[stepDate.ToString(dateFormat)] = 0;
+                stepDate = stepFunc(stepDate);
+            }
+
+            // Đổ dữ liệu thật vào khung sườn
+            foreach (var sale in item.Sales)
+            {
+                string key = sale.Date.ToString(dateFormat);
+                if (chartDict.ContainsKey(key))
+                {
+                    chartDict[key] += sale.Qty;
+                }
+            }
+
+            dto.TrendData = chartDict.Select(kv => new TrendDataPointDto { Date = kv.Key, Quantity = kv.Value }).ToList();
+            response.Add(dto);
+        }
+
+        return response;
+    }
 }
