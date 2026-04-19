@@ -322,11 +322,48 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.Totalprice)
                 .HasPrecision(18, 2)
                 .HasColumnName("totalprice");
+
+            entity.Property(e => e.ActualRevenue)
+                .HasPrecision(18, 2)
+                .HasColumnName("actualrevenue");
+
             entity.Property(e => e.isQuotation)
                 .HasColumnName("isquotation");
+
             entity.Property(e => e.Shippeddate)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("shippeddate");
+
+            // ===== VAT =====
+            entity.Property(e => e.RequireVatInvoice)
+                .HasDefaultValue(false)
+                .HasColumnName("requirevatinvoice");
+
+            entity.Property(e => e.VatRate)
+                .HasPrecision(5, 4)
+                .HasDefaultValue(0m)
+                .HasColumnName("vatrate");
+
+            entity.Property(e => e.VatAmount)
+                .HasPrecision(18, 2)
+                .HasDefaultValue(0m)
+                .HasColumnName("vatamount");
+
+            entity.Property(e => e.VatCompanyName)
+                .HasMaxLength(255)
+                .HasColumnName("vatcompanyname");
+
+            entity.Property(e => e.VatCompanyTaxCode)
+                .HasMaxLength(50)
+                .HasColumnName("vatcompanytaxcode");
+
+            entity.Property(e => e.VatCompanyAddress)
+                .HasMaxLength(500)
+                .HasColumnName("vatcompanyaddress");
+
+            entity.Property(e => e.VatInvoiceEmail)
+                .HasMaxLength(255)
+                .HasColumnName("vatinvoiceemail");
 
             entity.HasOne(d => d.Account).WithMany(p => p.Orders)
                 .HasForeignKey(d => d.Accountid)

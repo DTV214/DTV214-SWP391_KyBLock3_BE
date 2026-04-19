@@ -7,7 +7,7 @@ public class CreatePaymentRequest
     [Required(ErrorMessage = "OrderId là bắt buộc")]
     public int OrderId { get; set; }
 
-    public string? PaymentMethod { get; set; } // VNPAY, WALLET (optional, default VNPAY)
+    public string? PaymentMethod { get; set; }
 }
 
 public class CreateWalletDepositPaymentRequest
@@ -21,7 +21,15 @@ public class PaymentResponseDto
 {
     public int PaymentId { get; set; }
     public int OrderId { get; set; }
+
+    // backward compatibility
     public decimal Amount { get; set; }
+
+    public decimal BaseAmount { get; set; }           // = Order.Totalprice
+    public decimal VatAmount { get; set; }
+    public decimal FinalPayableAmount { get; set; }   // = Payment.Amount
+    public bool RequireVatInvoice { get; set; }
+
     public string PaymentUrl { get; set; } = null!;
     public string Status { get; set; } = null!;
     public DateTime? CreatedDate { get; set; }
@@ -34,7 +42,15 @@ public class PaymentResultDto
     public int OrderId { get; set; }
     public string? TransactionNo { get; set; }
     public string Message { get; set; } = null!;
+
+    // backward compatibility
     public decimal Amount { get; set; }
+
+    public decimal BaseAmount { get; set; }
+    public decimal VatAmount { get; set; }
+    public decimal FinalPayableAmount { get; set; }
+    public bool RequireVatInvoice { get; set; }
+
     public string? BankCode { get; set; }
     public string? ResponseCode { get; set; }
 }
@@ -44,10 +60,18 @@ public class PaymentHistoryDto
     public int PaymentId { get; set; }
     public int? OrderId { get; set; }
     public int? WalletId { get; set; }
+
+    // backward compatibility
     public decimal Amount { get; set; }
+
+    public decimal BaseAmount { get; set; }
+    public decimal VatAmount { get; set; }
+    public decimal FinalPayableAmount { get; set; }
+    public bool RequireVatInvoice { get; set; }
+
     public string Status { get; set; } = null!;
-    public string? Type { get; set; } // ORDER_PAYMENT, WALLET_DEPOSIT
-    public string? PaymentMethod { get; set; } // VNPAY, WALLET
+    public string? Type { get; set; }
+    public string? PaymentMethod { get; set; }
     public bool IsPayOnline { get; set; }
     public string? TransactionNo { get; set; }
     public DateTime? CreatedDate { get; set; }

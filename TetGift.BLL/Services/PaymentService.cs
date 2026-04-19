@@ -15,9 +15,14 @@ public class PaymentService : IPaymentService
     private readonly IConfiguration _configuration;
     private readonly IEmailSender _emailSender;
     private readonly IEmailTemplateRenderer _templateRenderer;
-    private readonly IOrderService _orderService; // new
+    private readonly IOrderService _orderService;
 
-    public PaymentService(IUnitOfWork uow, IConfiguration configuration, IEmailSender emailSender, IEmailTemplateRenderer templateRenderer, IOrderService orderService)
+    public PaymentService(
+        IUnitOfWork uow,
+        IConfiguration configuration,
+        IEmailSender emailSender,
+        IEmailTemplateRenderer templateRenderer,
+        IOrderService orderService)
     {
         _uow = uow;
         _configuration = configuration;
@@ -43,26 +48,29 @@ public class PaymentService : IPaymentService
         if (order.Status != OrderStatus.PENDING)
             throw new Exception("Chỉ có thể thanh toán cho đơn hàng đang chờ xác nhận.");
 
-        decimal finalPrice = order.Totalprice ?? 0;
+        var baseAmount = GetBaseAmount(order);
+        var vatAmount = GetVatAmount(order);
+        var payableAmount = GetFinalPayableAmount(order);
 
         var paymentRepo = _uow.GetRepository<Payment>();
         var existingPayments = await paymentRepo.FindAsync(
             p => p.Orderid == orderId && p.Status == PaymentStatus.SUCCESS
         );
+
         if (existingPayments.Any())
             throw new Exception("Đơn hàng này đã được thanh toán thành công.");
 
-        // Tạo Payment record cho VNPay (Bỏ logic Wallet)
         var payment = new Payment
         {
             Orderid = orderId,
-            Amount = finalPrice,
+            Amount = payableAmount,
             Status = PaymentStatus.PENDING,
             Type = "ORDER_PAYMENT",
-            Paymentmethod = "VNPAY",
+            Paymentmethod = paymentMethod ?? "VNPAY",
             CreatedDate = DateTime.UtcNow,
             Ispayonline = true
         };
+
         await paymentRepo.AddAsync(payment);
         await _uow.SaveAsync();
 
@@ -75,9 +83,10 @@ public class PaymentService : IPaymentService
         vnpay.AddRequestData("vnp_Version", VnPayLibrary.VERSION);
         vnpay.AddRequestData("vnp_Command", "pay");
         vnpay.AddRequestData("vnp_TmnCode", vnpTmnCode);
+
         var vietnamTime = DateTime.Now.AddHours(7);
 
-        vnpay.AddRequestData("vnp_Amount", ((long)(finalPrice * 100)).ToString());
+        vnpay.AddRequestData("vnp_Amount", ((long)(payableAmount * 100)).ToString());
         vnpay.AddRequestData("vnp_CreateDate", vietnamTime.ToString("yyyyMMddHHmmss"));
         vnpay.AddRequestData("vnp_CurrCode", "VND");
         vnpay.AddRequestData("vnp_IpAddr", clientIp ?? "127.0.0.1");
@@ -94,10 +103,14 @@ public class PaymentService : IPaymentService
         {
             PaymentId = payment.Paymentid,
             OrderId = orderId,
-            Amount = finalPrice,
+            Amount = payableAmount, // backward compatibility
+            BaseAmount = baseAmount,
+            VatAmount = vatAmount,
+            FinalPayableAmount = payableAmount,
+            RequireVatInvoice = order.RequireVatInvoice,
             PaymentUrl = paymentUrl,
             CreatedDate = payment.CreatedDate,
-            Status = "PENDING"
+            Status = PaymentStatus.PENDING
         };
     }
 
@@ -118,16 +131,26 @@ public class PaymentService : IPaymentService
         var vnpTransactionNo = vnpay.GetResponseData("vnp_TransactionNo");
         var vnpResponseCode = vnpay.GetResponseData("vnp_ResponseCode");
         var vnpTransactionStatus = vnpay.GetResponseData("vnp_TransactionStatus");
-        var vnpSecureHash = queryParams.ContainsKey("vnp_SecureHash") ? queryParams["vnp_SecureHash"] : "";
+        var vnpSecureHash = queryParams.TryGetValue("vnp_SecureHash", out var hash) ? hash : "";
 
         if (!vnpay.ValidateSignature(vnpSecureHash, vnpHashSecret))
         {
-            return new PaymentResultDto { Success = false, Message = "Invalid signature", ResponseCode = "97" };
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "Invalid signature",
+                ResponseCode = "97"
+            };
         }
 
         if (!int.TryParse(vnpTxnRef, out var paymentId))
         {
-            return new PaymentResultDto { Success = false, Message = "Order not found", ResponseCode = "01" };
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "Order not found",
+                ResponseCode = "01"
+            };
         }
 
         var paymentRepo = _uow.GetRepository<Payment>();
@@ -138,13 +161,23 @@ public class PaymentService : IPaymentService
 
         if (payment == null)
         {
-            return new PaymentResultDto { Success = false, Message = "Payment not found", ResponseCode = "01" };
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "Payment not found",
+                ResponseCode = "01"
+            };
         }
 
-        var vnpAmount = long.Parse(vnpay.GetResponseData("vnp_Amount") ?? "0") / 100;
-        if (payment.Amount != vnpAmount)
+        var vnpAmount = ParseVnpAmount(vnpay.GetResponseData("vnp_Amount"));
+        if (!MoneyEquals(payment.Amount ?? 0m, vnpAmount))
         {
-            return new PaymentResultDto { Success = false, Message = "invalid amount", ResponseCode = "04" };
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "invalid amount",
+                ResponseCode = "04"
+            };
         }
 
         bool justConfirmedOrder = false;
@@ -152,6 +185,11 @@ public class PaymentService : IPaymentService
 
         if (payment.Status == PaymentStatus.SUCCESS)
         {
+            var existingOrder = payment.Order;
+            var existingBaseAmount = existingOrder != null ? GetBaseAmount(existingOrder) : 0m;
+            var existingVatAmount = existingOrder != null ? GetVatAmount(existingOrder) : 0m;
+            var existingPayableAmount = payment.Amount ?? 0m;
+
             return new PaymentResultDto
             {
                 Success = true,
@@ -159,6 +197,11 @@ public class PaymentService : IPaymentService
                 OrderId = payment.Orderid ?? 0,
                 TransactionNo = vnpTransactionNo,
                 Message = "Order already confirmed",
+                Amount = existingPayableAmount,
+                BaseAmount = existingBaseAmount,
+                VatAmount = existingVatAmount,
+                FinalPayableAmount = existingPayableAmount,
+                RequireVatInvoice = existingOrder?.RequireVatInvoice ?? false,
                 ResponseCode = "02"
             };
         }
@@ -179,6 +222,7 @@ public class PaymentService : IPaymentService
         {
             var orderRepo = _uow.GetRepository<Order>();
             var order = payment.Order;
+
             if (order.Status == OrderStatus.PENDING)
             {
                 order.Status = OrderStatus.CONFIRMED;
@@ -190,29 +234,30 @@ public class PaymentService : IPaymentService
 
         await _uow.SaveAsync();
 
-        // AFTER saving confirmation: try allocate stock and compute ActualRevenue
         if (justConfirmedOrder && confirmedOrder != null)
         {
             try
             {
-                // Try to allocate stock and compute/persist ActualRevenue.
-                // OrderService.TryAllocateStockAfterPaymentAsync already computes and persists ActualRevenue.
                 await _orderService.TryAllocateStockAfterPaymentAsync(confirmedOrder.Orderid);
             }
             catch
             {
-                // swallow/log — do not fail IPN response. Allocation may be retried manually.
+                // swallow/log
             }
 
             try
             {
                 await SendOrderPaymentSuccessEmailAsync(confirmedOrder);
             }
-            catch (Exception ex)
+            catch
             {
-                // Email failure should not break payment flow
+                // swallow/log
             }
         }
+
+        var baseAmount = payment.Order != null ? GetBaseAmount(payment.Order) : 0m;
+        var vatAmount = payment.Order != null ? GetVatAmount(payment.Order) : 0m;
+        var payableAmount = payment.Amount ?? 0m;
 
         return new PaymentResultDto
         {
@@ -220,9 +265,13 @@ public class PaymentService : IPaymentService
             PaymentId = payment.Paymentid,
             OrderId = payment.Orderid ?? 0,
             TransactionNo = vnpTransactionNo,
-            Message = "Confirm Success",
-            Amount = payment.Amount ?? 0,
-            ResponseCode = "00"
+            Message = payment.Status == PaymentStatus.SUCCESS ? "Confirm Success" : "Payment failed",
+            Amount = payableAmount,
+            BaseAmount = baseAmount,
+            VatAmount = vatAmount,
+            FinalPayableAmount = payableAmount,
+            RequireVatInvoice = payment.Order?.RequireVatInvoice ?? false,
+            ResponseCode = payment.Status == PaymentStatus.SUCCESS ? "00" : vnpResponseCode
         };
     }
 
@@ -243,18 +292,28 @@ public class PaymentService : IPaymentService
         var vnpTransactionNo = vnpay.GetResponseData("vnp_TransactionNo");
         var vnpResponseCode = vnpay.GetResponseData("vnp_ResponseCode");
         var vnpTransactionStatus = vnpay.GetResponseData("vnp_TransactionStatus");
-        var vnpSecureHash = queryParams.ContainsKey("vnp_SecureHash") ? queryParams["vnp_SecureHash"] : "";
-        var vnpAmount = long.Parse(vnpay.GetResponseData("vnp_Amount")) / 100;
+        var vnpSecureHash = queryParams.TryGetValue("vnp_SecureHash", out var hash) ? hash : "";
+        var vnpAmount = ParseVnpAmount(vnpay.GetResponseData("vnp_Amount"));
         var bankCode = vnpay.GetResponseData("vnp_BankCode");
 
         if (!vnpay.ValidateSignature(vnpSecureHash, vnpHashSecret))
         {
-            return new PaymentResultDto { Success = false, Message = "Có lỗi xảy ra trong quá trình xử lý", ResponseCode = "97" };
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "Có lỗi xảy ra trong quá trình xử lý",
+                ResponseCode = "97"
+            };
         }
 
         if (!int.TryParse(vnpTxnRef, out var paymentId))
         {
-            return new PaymentResultDto { Success = false, Message = "Không tìm thấy giao dịch", ResponseCode = "01" };
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "Không tìm thấy giao dịch",
+                ResponseCode = "01"
+            };
         }
 
         var paymentRepo = _uow.GetRepository<Payment>();
@@ -265,12 +324,22 @@ public class PaymentService : IPaymentService
 
         if (payment == null)
         {
-            return new PaymentResultDto { Success = false, Message = "Không tìm thấy giao dịch", ResponseCode = "01" };
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "Không tìm thấy giao dịch",
+                ResponseCode = "01"
+            };
         }
 
-        if (payment.Amount != vnpAmount)
+        if (!MoneyEquals(payment.Amount ?? 0m, vnpAmount))
         {
-            return new PaymentResultDto { Success = false, Message = "invalid amount", ResponseCode = "04" };
+            return new PaymentResultDto
+            {
+                Success = false,
+                Message = "invalid amount",
+                ResponseCode = "04"
+            };
         }
 
         var success = vnpResponseCode == "00" && vnpTransactionStatus == "00";
@@ -314,9 +383,9 @@ public class PaymentService : IPaymentService
                 {
                     await SendOrderPaymentSuccessEmailAsync(confirmedOrder);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    // Email failure should not break user flow
+                    // swallow/log
                 }
             }
         }
@@ -331,6 +400,10 @@ public class PaymentService : IPaymentService
             ? "Giao dịch được thực hiện thành công. Cảm ơn quý khách đã sử dụng dịch vụ"
             : $"Có lỗi xảy ra trong quá trình xử lý. Mã lỗi: {vnpResponseCode}";
 
+        var baseAmount = payment.Order != null ? GetBaseAmount(payment.Order) : 0m;
+        var vatAmount = payment.Order != null ? GetVatAmount(payment.Order) : 0m;
+        var payableAmount = payment.Amount ?? 0m;
+
         return new PaymentResultDto
         {
             Success = success,
@@ -338,7 +411,11 @@ public class PaymentService : IPaymentService
             OrderId = payment.Orderid ?? 0,
             TransactionNo = vnpTransactionNo,
             Message = message,
-            Amount = vnpAmount,
+            Amount = payableAmount,
+            BaseAmount = baseAmount,
+            VatAmount = vatAmount,
+            FinalPayableAmount = payableAmount,
+            RequireVatInvoice = payment.Order?.RequireVatInvoice ?? false,
             BankCode = bankCode,
             ResponseCode = vnpResponseCode
         };
@@ -347,13 +424,21 @@ public class PaymentService : IPaymentService
     public async Task<IEnumerable<PaymentHistoryDto>> GetPaymentsByOrderIdAsync(int orderId)
     {
         var paymentRepo = _uow.GetRepository<Payment>();
-        var payments = await paymentRepo.FindAsync(p => p.Orderid == orderId);
+        var payments = await paymentRepo.GetAllAsync(
+            p => p.Orderid == orderId,
+            include: q => q.Include(p => p.Order)
+        );
 
         return payments.Select(p => new PaymentHistoryDto
         {
             PaymentId = p.Paymentid,
             OrderId = p.Orderid ?? 0,
-            Amount = p.Amount ?? 0,
+            WalletId = p.Walletid,
+            Amount = p.Amount ?? 0m,
+            BaseAmount = p.Order?.Totalprice ?? 0m,
+            VatAmount = p.Order?.RequireVatInvoice == true ? p.Order.VatAmount : 0m,
+            FinalPayableAmount = p.Amount ?? 0m,
+            RequireVatInvoice = p.Order?.RequireVatInvoice ?? false,
             Status = p.Status ?? PaymentStatus.PENDING,
             Type = p.Type,
             PaymentMethod = p.Paymentmethod,
@@ -377,7 +462,12 @@ public class PaymentService : IPaymentService
         {
             PaymentId = p.Paymentid,
             OrderId = p.Orderid ?? 0,
-            Amount = p.Amount ?? 0,
+            WalletId = p.Walletid,
+            Amount = p.Amount ?? 0m,
+            BaseAmount = p.Order?.Totalprice ?? 0m,
+            VatAmount = p.Order?.RequireVatInvoice == true ? p.Order.VatAmount : 0m,
+            FinalPayableAmount = p.Amount ?? 0m,
+            RequireVatInvoice = p.Order?.RequireVatInvoice ?? false,
             Status = p.Status ?? PaymentStatus.PENDING,
             Type = p.Type,
             PaymentMethod = p.Paymentmethod,
@@ -404,10 +494,12 @@ public class PaymentService : IPaymentService
             ? $"http://14.225.207.221/account/orders/{order.Orderid}"
             : $"{orderBaseUrl.TrimEnd('/')}/{order.Orderid}";
 
+        var payableAmount = GetFinalPayableAmount(order);
+
         var htmlBody = _templateRenderer.RenderOrderPaymentSuccess(
             customerName,
             order.Orderid,
-            FormatVnd(order.Totalprice ?? 0),
+            FormatVnd(payableAmount),
             orderLink
         );
 
@@ -419,5 +511,37 @@ public class PaymentService : IPaymentService
             $"TetGift - Thanh toán đơn hàng #{order.Orderid} thành công",
             htmlBody
         );
+    }
+
+    private static decimal GetBaseAmount(Order order)
+    {
+        return order.Totalprice ?? 0m;
+    }
+
+    private static decimal GetVatAmount(Order order)
+    {
+        return order.RequireVatInvoice ? order.VatAmount : 0m;
+    }
+
+    private static decimal GetFinalPayableAmount(Order order)
+    {
+        return GetBaseAmount(order) + GetVatAmount(order);
+    }
+
+    private static decimal ParseVnpAmount(string? rawAmount)
+    {
+        if (string.IsNullOrWhiteSpace(rawAmount))
+            return 0m;
+
+        if (!decimal.TryParse(rawAmount, out var parsed))
+            return 0m;
+
+        return parsed / 100m;
+    }
+
+    private static bool MoneyEquals(decimal a, decimal b)
+    {
+        return Math.Round(a, 2, MidpointRounding.AwayFromZero) ==
+               Math.Round(b, 2, MidpointRounding.AwayFromZero);
     }
 }

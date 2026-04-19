@@ -33,49 +33,47 @@ public class OrderService : IOrderService
 
     public async Task<OrderResponseDto> CreateOrderFromCartAsync(int accountId, CreateOrderRequest request)
     {
-        // 1. Lấy Cart (sử dụng ICartService - kế thừa code cũ)
         var cart = await _cartService.GetCartByAccountIdAsync(accountId);
         if (cart.ItemCount == 0)
             throw new Exception("Giỏ hàng trống, không thể tạo đơn hàng.");
 
-        var discountValue = 0d;
-        var promoId = 0;
+        ValidateVatRequest(request);
+
+        decimal finalPriceAfterPromotion = cart.TotalPrice;
+        int promoId = 0;
 
         if (!string.IsNullOrWhiteSpace(request.PromotionCode))
         {
             var promoRepo = _uow.GetRepository<Promotion>();
-            var promoResult = (0d, false, "");
             var promo = await _promotionService.GetCodeAsync(request.PromotionCode);
 
-            promoResult = promo.ApplyPromotion((double)cart.TotalPrice);
-            if (promoResult.Item2 == false)
-            {
+            var promoResult = promo.ApplyPromotion((double)cart.TotalPrice);
+            if (!promoResult.Item2)
                 throw new Exception(promoResult.Item3);
-            }
 
             promoId = promo.Promotionid;
-            discountValue = promoResult.Item1;
+            finalPriceAfterPromotion = RoundMoney((decimal)promoResult.Item1);
 
-            // Nếu là limited thì chỉnh bảng
             if (promo.IsLimited ?? false)
             {
                 var isApplied = await _accountPromotionService.UsePromotionAsync(accountId, promoId);
                 if (!isApplied)
                     throw new Exception("Lỗi khi áp dụng mã giảm giá");
+
                 promo.UsedCount++;
                 await promoRepo.UpdateAsync(promo);
             }
         }
 
-        // 3. Validate Stock availability cho từng sản phẩm
+        // Validate stock
         var stockRepo = _uow.GetRepository<Stock>();
         var productRepo = _uow.GetRepository<Product>();
+
         foreach (var item in cart.Items)
         {
             var product = await productRepo.GetByIdAsync(item.ProductId)
                 ?? throw new Exception($"Sản phẩm '{item.ProductName}' không tồn tại.");
 
-            // Xử lí sản phẩm giỏ
             if (product.Configid != null && product.Configid != 0)
             {
                 var productDetails = product.ProductDetailProductparents;
@@ -83,7 +81,7 @@ public class OrderService : IOrderService
                 {
                     var stocks = await stockRepo.FindAsync(
                         s => s.Productid == productItem.Productid && s.Status == StockStatus.ACTIVE
-                        );
+                    );
 
                     var totalStock = stocks.Sum(s => s.Stockquantity ?? 0);
                     if (totalStock < productItem.Quantity)
@@ -92,8 +90,6 @@ public class OrderService : IOrderService
                     }
                 }
             }
-
-            // Xử lí sản phẩm thường
             else
             {
                 var stocks = await stockRepo.FindAsync(
@@ -108,19 +104,30 @@ public class OrderService : IOrderService
             }
         }
 
-        // 4. Tạo Order
+        var requireVat = request.RequireVatInvoice;
+        var vatRate = requireVat ? DefaultVatRate : 0m;
+        var vatAmount = requireVat ? RoundMoney(finalPriceAfterPromotion * vatRate) : 0m;
+
         var orderRepo = _uow.GetRepository<Order>();
         var order = new Order
         {
             Accountid = accountId,
-            Totalprice = discountValue == 0 ? cart.TotalPrice : (decimal)discountValue,
+            Totalprice = finalPriceAfterPromotion, // GIỮ NGUYÊN LOGIC CŨ
             Status = OrderStatus.PENDING,
             Customername = request.CustomerName,
             Customerphone = request.CustomerPhone,
             Customeremail = request.CustomerEmail,
             Customeraddress = request.CustomerAddress,
             Note = request.Note,
-            Orderdatetime = DateTime.Now
+            Orderdatetime = DateTime.Now,
+
+            RequireVatInvoice = requireVat,
+            VatRate = vatRate,
+            VatAmount = vatAmount,
+            VatCompanyName = requireVat ? request.VatCompanyName : null,
+            VatCompanyTaxCode = requireVat ? request.VatCompanyTaxCode : null,
+            VatCompanyAddress = requireVat ? request.VatCompanyAddress : null,
+            VatInvoiceEmail = requireVat ? request.VatInvoiceEmail : null
         };
 
         if (promoId != 0)
@@ -129,7 +136,6 @@ public class OrderService : IOrderService
         await orderRepo.AddAsync(order);
         await _uow.SaveAsync();
 
-        // 5. Tạo OrderDetails (Stock sẽ được trừ sau khi thanh toán thành công qua TryAllocateStockAfterPaymentAsync)
         var orderDetailRepo = _uow.GetRepository<OrderDetail>();
 
         foreach (var cartItem in cart.Items)
@@ -146,10 +152,8 @@ public class OrderService : IOrderService
 
         await _uow.SaveAsync();
 
-        // 6. Clear Cart sau khi tạo đơn thành công
         await _cartService.ClearCartAsync(accountId);
 
-        // 7. Load lại Order với đầy đủ thông tin
         var fullOrder = await orderRepo.FindAsync(
             o => o.Orderid == order.Orderid,
             include: q => q
@@ -1060,35 +1064,23 @@ public class OrderService : IOrderService
             }
         }
 
-        var discountValue = 0m;
-        var promotionCode = "";
-        if (order.Promotion != null)
-        {
-            if (order.Promotion.IsPercentage ?? false)
-            {
-                discountValue = (order.Totalprice ?? 0) * ((order.Promotion.Discountvalue ?? 0) / 100);
+        var finalPrice = order.Totalprice ?? totalPrice;
+        var discountValue = totalPrice - finalPrice;
+        if (discountValue < 0) discountValue = 0;
 
-                if (discountValue > order.Promotion.MaxDiscountPrice)
-                {
-                    discountValue = order.Promotion.MaxDiscountPrice ?? 0;
-                }
-            }
-            else
-            {
-                discountValue = order.Promotion.Discountvalue ?? 0;
-            }
-
-            promotionCode = order.Promotion.Code ?? "";
-        }
+        var vatAmount = order.RequireVatInvoice ? order.VatAmount : 0m;
+        var finalPayableAmount = finalPrice + vatAmount;
 
         return new OrderResponseDto
         {
             OrderId = order.Orderid,
             AccountId = order.Accountid ?? 0,
             OrderDateTime = order.Orderdatetime,
+
             TotalPrice = totalPrice,
             DiscountValue = discountValue > 0 ? discountValue : null,
-            FinalPrice = order.Totalprice ?? totalPrice,
+            FinalPrice = finalPrice,
+
             ActualRevenue = order.ActualRevenue,
             Status = order.Status,
             CustomerName = order.Customername,
@@ -1096,18 +1088,57 @@ public class OrderService : IOrderService
             CustomerEmail = order.Customeremail,
             CustomerAddress = order.Customeraddress,
             Note = order.Note,
-            PromotionCode = !string.IsNullOrEmpty(promotionCode) ? promotionCode : null,
+            PromotionCode = order.Promotion?.Code,
             ShippedDate = order.Shippeddate,
             isQuotation = order.isQuotation,
-            Feedback = order.Feedbacks != null && order.Feedbacks.Any() && order.Feedbacks.First().Isdeleted != true ? new FeedbackResponseDto
-            {
-                FeedbackId = order.Feedbacks.First().Feedbackid,
-                OrderId = order.Orderid,
-                Rating = order.Feedbacks.First().Rating ?? 0,
-                Comment = order.Feedbacks.First().Comment,
-                CustomerName = null
-            } : null,
+
+            RequireVatInvoice = order.RequireVatInvoice,
+            VatRate = order.VatRate,
+            VatAmount = vatAmount,
+            FinalPayableAmount = finalPayableAmount,
+            VatCompanyName = order.VatCompanyName,
+            VatCompanyTaxCode = order.VatCompanyTaxCode,
+            VatCompanyAddress = order.VatCompanyAddress,
+            VatInvoiceEmail = order.VatInvoiceEmail,
+
+            Feedback = order.Feedbacks != null && order.Feedbacks.Any() && order.Feedbacks.First().Isdeleted != true
+                ? new FeedbackResponseDto
+                {
+                    FeedbackId = order.Feedbacks.First().Feedbackid,
+                    OrderId = order.Orderid,
+                    Rating = order.Feedbacks.First().Rating ?? 0,
+                    Comment = order.Feedbacks.First().Comment,
+                    CustomerName = null
+                }
+                : null,
+
             Items = items
         };
+    }
+
+    //Helper VAT
+    private const decimal DefaultVatRate = 0.08m;
+
+    private static decimal RoundMoney(decimal value)
+    {
+        return Math.Round(value, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static void ValidateVatRequest(CreateOrderRequest request)
+    {
+        if (!request.RequireVatInvoice)
+            return;
+
+        if (string.IsNullOrWhiteSpace(request.VatCompanyName))
+            throw new Exception("Vui lòng nhập tên công ty để xuất hóa đơn VAT.");
+
+        if (string.IsNullOrWhiteSpace(request.VatCompanyTaxCode))
+            throw new Exception("Vui lòng nhập mã số thuế để xuất hóa đơn VAT.");
+
+        if (string.IsNullOrWhiteSpace(request.VatCompanyAddress))
+            throw new Exception("Vui lòng nhập địa chỉ công ty để xuất hóa đơn VAT.");
+
+        if (string.IsNullOrWhiteSpace(request.VatInvoiceEmail))
+            request.VatInvoiceEmail = request.CustomerEmail;
     }
 }

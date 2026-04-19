@@ -12,10 +12,15 @@ public class InvoiceService : IInvoiceService
 {
     private readonly IUnitOfWork _uow;
 
+    private const string SellerLegalName = "Tết Gift";
+    private const string SellerTaxCode = "0312345678";
+    private const string SellerAddress = "S603 Vinhomes GrandPark";
+    private const string SellerPhone = "1900 1234";
+    private const string SellerEmail = "support@tetgift.vn";
+
     public InvoiceService(IUnitOfWork uow)
     {
         _uow = uow;
-        // QuestPDF community license (free for open source / internal use)
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
@@ -23,14 +28,12 @@ public class InvoiceService : IInvoiceService
     {
         var orderRepo = _uow.GetRepository<Order>();
 
-        // Build query
         IQueryable<Order> query;
         if (accountId.HasValue)
         {
             query = orderRepo.Entities
                 .Where(o => o.Orderid == orderId && o.Accountid == accountId.Value)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
+                .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
                 .Include(o => o.Promotion)
                 .Include(o => o.Account);
         }
@@ -38,14 +41,12 @@ public class InvoiceService : IInvoiceService
         {
             query = orderRepo.Entities
                 .Where(o => o.Orderid == orderId)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
+                .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
                 .Include(o => o.Promotion)
                 .Include(o => o.Account);
         }
 
         var order = await query.FirstOrDefaultAsync();
-
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng.");
 
@@ -54,48 +55,36 @@ public class InvoiceService : IInvoiceService
 
     private byte[] GeneratePdf(Order order)
     {
-        // Colors
-        var primaryColor = "#690000";   // Đỏ Tết (Primary)
-        var goldColor = "#D4AF37";      // Vàng đồng
-        var bgColor = "#FBF5E8";        // Kem nhạt (Background)
-        var grayText = "#4B5563";       // Xám đậm trang trọng
+        var primaryColor = "#690000";
+        var goldColor = "#D4AF37";
+        var grayText = "#4B5563";
 
-        // Calculate totals
-        decimal subTotal = 0;
+        var subTotal = 0m;
         if (order.OrderDetails != null)
         {
             foreach (var d in order.OrderDetails)
-            {
-                subTotal += d.Amount ?? (d.Product?.Price ?? 0) * (d.Quantity ?? 0);
-            }
+                subTotal += d.Amount ?? ((d.Product?.Price ?? 0) * (d.Quantity ?? 0));
         }
 
-        decimal discount = 0;
-        if (order.Promotion != null)
-        {
-            if (order.Promotion.IsPercentage ?? false)
-                discount = subTotal * ((order.Promotion.Discountvalue ?? 0) / 100);
-            else
-                discount = order.Promotion.Discountvalue ?? 0;
+        var finalBaseAmount = order.Totalprice ?? subTotal;
+        var discount = subTotal - finalBaseAmount;
+        if (discount < 0) discount = 0;
 
-            if (order.Promotion.MaxDiscountPrice.HasValue && discount > order.Promotion.MaxDiscountPrice.Value)
-                discount = order.Promotion.MaxDiscountPrice.Value;
-        }
-        decimal finalPrice = order.Totalprice ?? (subTotal - discount);
+        var requireVat = order.RequireVatInvoice;
+        var vatRate = requireVat ? (order.VatRate <= 0 ? 0.08m : order.VatRate) : 0m;
+        var vatAmount = requireVat ? order.VatAmount : 0m;
+        var finalPayableAmount = finalBaseAmount + vatAmount;
 
         var document = Document.Create(container =>
         {
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.MarginLeft(40);
-                page.MarginRight(40);
-                page.MarginTop(40);
-                page.MarginBottom(40);
+                page.Margin(35);
                 page.DefaultTextStyle(x => x.FontSize(11).FontFamily("Helvetica"));
 
                 page.Header().Element(ComposeHeader);
-                page.Content().Element(content => ComposeContent(content, order, subTotal, discount, finalPrice));
+                page.Content().Element(ComposeContent);
                 page.Footer().Element(ComposeFooter);
             });
         });
@@ -104,34 +93,41 @@ public class InvoiceService : IInvoiceService
 
         void ComposeHeader(IContainer container)
         {
-            container.PaddingBottom(16).Column(col =>
+            container.PaddingBottom(12).Column(col =>
             {
                 col.Item().Row(row =>
                 {
-                    // Left: Shop info
-                    row.RelativeItem().Column(shopCol =>
+                    row.RelativeItem().Column(left =>
                     {
-                        shopCol.Item().Text("TetGift")
-                            .FontSize(24).Bold().FontColor(primaryColor);
-                        shopCol.Item().Text("Quà Tặng Tết Nguyên Đán Cao Cấp")
-                            .FontSize(12).FontColor(goldColor).Italic();
-                        shopCol.Item().PaddingTop(4).Text("Hotline: 1900 1234  |  Email: support@tetgift.vn")
-                            .FontSize(10).FontColor(grayText);
-                        shopCol.Item().Text("Website: www.tetgift.vn")
-                            .FontSize(10).FontColor(grayText);
+                        left.Item().Text(SellerLegalName).FontSize(22).Bold().FontColor(primaryColor);
+                        left.Item().Text(requireVat
+                                ? "Chứng từ nội bộ mô phỏng hóa đơn GTGT"
+                                : "Hóa đơn mua hàng")
+                            .FontSize(11).Italic().FontColor(goldColor);
+
+                        left.Item().PaddingTop(4).Text($"Địa chỉ: {SellerAddress}")
+                            .FontSize(9).FontColor(grayText);
+                        left.Item().Text($"MST: {SellerTaxCode}")
+                            .FontSize(9).FontColor(grayText);
+                        left.Item().Text($"Hotline: {SellerPhone} | Email: {SellerEmail}")
+                            .FontSize(9).FontColor(grayText);
                     });
 
-                    // Right: Invoice title
-                    row.ConstantItem(160).AlignRight().Column(invoiceCol =>
+                    row.ConstantItem(200).AlignRight().Column(right =>
                     {
-                        invoiceCol.Item().Text("HÓA ĐƠN MUA HÀNG")
-                            .FontSize(16).Bold().FontColor(primaryColor).AlignRight();
-                        invoiceCol.Item().Text($"#{order.Orderid:D6}")
-                            .FontSize(14).Bold().FontColor(goldColor).AlignRight();
-                        invoiceCol.Item().PaddingTop(4).Text($"Ngày: {(order.Orderdatetime ?? DateTime.Now):dd/MM/yyyy}")
-                            .FontSize(10).FontColor(grayText).AlignRight();
-                        invoiceCol.Item().Text($"Trạng thái: {TranslateStatus(order.Status)}")
-                            .FontSize(10).FontColor(grayText).AlignRight();
+                        right.Item().Text(requireVat
+                                ? "HÓA ĐƠN GIÁ TRỊ GIA TĂNG (NỘI BỘ)"
+                                : "HÓA ĐƠN MUA HÀNG")
+                            .FontSize(15).Bold().FontColor(primaryColor).AlignRight();
+
+                        right.Item().Text($"Số: #{order.Orderid:D6}")
+                            .FontSize(13).Bold().FontColor(goldColor).AlignRight();
+
+                        right.Item().PaddingTop(4).Text($"Ngày lập: {(order.Orderdatetime ?? DateTime.Now):dd/MM/yyyy HH:mm}")
+                            .FontSize(9).FontColor(grayText).AlignRight();
+
+                        right.Item().Text($"Trạng thái: {TranslateStatus(order.Status)}")
+                            .FontSize(9).FontColor(grayText).AlignRight();
                     });
                 });
 
@@ -139,12 +135,12 @@ public class InvoiceService : IInvoiceService
             });
         }
 
-        void ComposeContent(IContainer container, Order order, decimal subTotal, decimal discount, decimal finalPrice)
+        void ComposeContent(IContainer container)
         {
             container.Column(col =>
             {
-                // Customer info
-                col.Item().PaddingTop(12).Table(table =>
+                // Buyer info
+                col.Item().PaddingTop(10).Table(table =>
                 {
                     table.ColumnsDefinition(cols =>
                     {
@@ -153,55 +149,67 @@ public class InvoiceService : IInvoiceService
                     });
 
                     table.Cell().ColumnSpan(2).PaddingBottom(6)
-                        .Text("THÔNG TIN KHÁCH HÀNG").Bold().FontSize(12).FontColor(primaryColor);
+                        .Text(requireVat ? "THÔNG TIN BÊN MUA / XUẤT HÓA ĐƠN" : "THÔNG TIN KHÁCH HÀNG")
+                        .Bold().FontSize(12).FontColor(primaryColor);
 
                     table.Cell().Element(InfoCellStyle).Column(c =>
                     {
-                        c.Item().Text("Tên khách hàng:").Bold().FontSize(10);
-                        c.Item().Text(order.Customername ?? "N/A").FontSize(11);
+                        c.Item().Text(requireVat ? "Tên đơn vị / Công ty:" : "Tên khách hàng:").Bold().FontSize(10);
+                        c.Item().Text(requireVat
+                            ? (order.VatCompanyName ?? order.Customername ?? "N/A")
+                            : (order.Customername ?? "N/A")).FontSize(11);
                     });
+
                     table.Cell().Element(InfoCellStyle).Column(c =>
                     {
-                        c.Item().Text("Số điện thoại:").Bold().FontSize(10);
-                        c.Item().Text(order.Customerphone ?? "N/A").FontSize(11);
+                        c.Item().Text(requireVat ? "Mã số thuế:" : "Số điện thoại:").Bold().FontSize(10);
+                        c.Item().Text(requireVat
+                            ? (order.VatCompanyTaxCode ?? "N/A")
+                            : (order.Customerphone ?? "N/A")).FontSize(11);
                     });
+
                     table.Cell().Element(InfoCellStyle).Column(c =>
                     {
-                        c.Item().Text("Email:").Bold().FontSize(10);
-                        c.Item().Text(order.Customeremail ?? "N/A").FontSize(11);
+                        c.Item().Text(requireVat ? "Email nhận hóa đơn:" : "Email:").Bold().FontSize(10);
+                        c.Item().Text(requireVat
+                            ? (order.VatInvoiceEmail ?? order.Customeremail ?? "N/A")
+                            : (order.Customeremail ?? "N/A")).FontSize(11);
                     });
+
                     table.Cell().Element(InfoCellStyle).Column(c =>
                     {
-                        c.Item().Text("Địa chỉ giao hàng:").Bold().FontSize(10);
-                        c.Item().Text(order.Customeraddress ?? "N/A").FontSize(11);
+                        c.Item().Text(requireVat ? "Địa chỉ đơn vị:" : "Địa chỉ giao hàng:").Bold().FontSize(10);
+                        c.Item().Text(requireVat
+                            ? (order.VatCompanyAddress ?? order.Customeraddress ?? "N/A")
+                            : (order.Customeraddress ?? "N/A")).FontSize(11);
                     });
                 });
 
-                // Order items table
-                col.Item().PaddingTop(20).Text("CHI TIẾT ĐƠN HÀNG").Bold().FontSize(12).FontColor(primaryColor);
+                // Items
+                col.Item().PaddingTop(18).Text("CHI TIẾT HÀNG HÓA / DỊCH VỤ")
+                    .Bold().FontSize(12).FontColor(primaryColor);
+
                 col.Item().PaddingTop(8).Table(table =>
                 {
                     table.ColumnsDefinition(cols =>
                     {
-                        cols.ConstantColumn(30);    // STT
-                        cols.RelativeColumn(4);     // Tên SP
-                        cols.ConstantColumn(70);    // Đơn giá
-                        cols.ConstantColumn(50);    // SL
-                        cols.ConstantColumn(85);    // Thành tiền
+                        cols.ConstantColumn(30);
+                        cols.RelativeColumn(4);
+                        cols.ConstantColumn(70);
+                        cols.ConstantColumn(50);
+                        cols.ConstantColumn(90);
                     });
 
-                    // Header
                     table.Header(header =>
                     {
                         header.Cell().Element(HeaderCellStyle).Text("STT").Bold().FontSize(10).AlignCenter();
-                        header.Cell().Element(HeaderCellStyle).Text("Sản phẩm").Bold().FontSize(10);
+                        header.Cell().Element(HeaderCellStyle).Text("Tên hàng hóa").Bold().FontSize(10);
                         header.Cell().Element(HeaderCellStyle).Text("Đơn giá").Bold().FontSize(10).AlignRight();
                         header.Cell().Element(HeaderCellStyle).Text("SL").Bold().FontSize(10).AlignCenter();
                         header.Cell().Element(HeaderCellStyle).Text("Thành tiền").Bold().FontSize(10).AlignRight();
                     });
 
-                    // Rows
-                    int index = 1;
+                    var index = 1;
                     if (order.OrderDetails != null)
                     {
                         foreach (var item in order.OrderDetails)
@@ -223,14 +231,14 @@ public class InvoiceService : IInvoiceService
                 });
 
                 // Summary
-                col.Item().PaddingTop(16).AlignRight().Width(260).Column(sumCol =>
+                col.Item().PaddingTop(16).AlignRight().Width(290).Column(sumCol =>
                 {
                     sumCol.Item().Table(t =>
                     {
                         t.ColumnsDefinition(c =>
                         {
                             c.RelativeColumn();
-                            c.ConstantColumn(110);
+                            c.ConstantColumn(120);
                         });
 
                         t.Cell().Text("Tổng tiền hàng:").FontSize(11);
@@ -238,46 +246,79 @@ public class InvoiceService : IInvoiceService
 
                         if (discount > 0)
                         {
-                            t.Cell().Text($"Giảm giá ({order.Promotion?.Code}):").FontSize(11).FontColor(grayText);
-                            t.Cell().Text($"-{FormatCurrency(discount)}").FontSize(11).FontColor("#16A34A").AlignRight();
+                            t.Cell().Text("Giảm giá / chiết khấu:").FontSize(11);
+                            t.Cell().Text($"-{FormatCurrency(discount)}").FontSize(11).AlignRight().FontColor("#16A34A");
+                        }
+
+                        t.Cell().Text(requireVat ? "Giá tính thuế:" : "Thành tiền sau giảm giá:").FontSize(11);
+                        t.Cell().Text(FormatCurrency(finalBaseAmount)).FontSize(11).AlignRight();
+
+                        if (requireVat)
+                        {
+                            t.Cell().Text($"Thuế suất GTGT: {(vatRate * 100):N0}%").FontSize(11);
+                            t.Cell().Text($"{(vatRate * 100):N0}%").FontSize(11).AlignRight();
+
+                            t.Cell().Text("Tiền thuế GTGT:").FontSize(11);
+                            t.Cell().Text(FormatCurrency(vatAmount)).FontSize(11).AlignRight();
                         }
 
                         t.Cell().ColumnSpan(2).PaddingTop(4).LineHorizontal(1).LineColor(primaryColor);
 
-                        t.Cell().Text("TỔNG THANH TOÁN:").Bold().FontSize(13).FontColor(primaryColor);
-                        t.Cell().Text(FormatCurrency(finalPrice)).Bold().FontSize(13).FontColor(primaryColor).AlignRight();
+                        t.Cell().Text("TỔNG CỘNG THANH TOÁN:").Bold().FontSize(13).FontColor(primaryColor);
+                        t.Cell().Text(FormatCurrency(requireVat ? finalPayableAmount : finalBaseAmount))
+                            .Bold().FontSize(13).FontColor(primaryColor).AlignRight();
                     });
                 });
 
-                // Note
                 if (!string.IsNullOrWhiteSpace(order.Note))
                 {
-                    col.Item().PaddingTop(20).Column(noteCol =>
+                    col.Item().PaddingTop(18).Column(noteCol =>
                     {
                         noteCol.Item().Text("Ghi chú:").Bold().FontSize(10).FontColor(grayText);
                         noteCol.Item().Text(order.Note).FontSize(10).FontColor(grayText).Italic();
                     });
                 }
 
-                // Thank you message
-                col.Item().PaddingTop(30).AlignCenter().Column(thankCol =>
+                if (requireVat)
                 {
-                    thankCol.Item().Text("Cảm ơn quý khách đã tin tưởng và mua sắm tại TetGift!")
-                        .FontSize(12).Bold().FontColor(primaryColor).AlignCenter();
-                    thankCol.Item().PaddingTop(4).Text("Kính chúc quý khách Năm Mới An Khang, Thịnh Vượng!")
-                        .FontSize(10).Italic().FontColor(grayText).AlignCenter();
-                });
+                    col.Item().PaddingTop(22).Table(table =>
+                    {
+                        table.ColumnsDefinition(cols =>
+                        {
+                            cols.RelativeColumn();
+                            cols.RelativeColumn();
+                        });
 
-                // Locations
-                col.Item().PaddingTop(20).Column(locCol =>
+                        table.Cell().AlignCenter().Column(c =>
+                        {
+                            c.Item().Text("NGƯỜI MUA HÀNG").Bold().FontSize(11);
+                            c.Item().Text("(Ký, ghi rõ họ tên)").FontSize(9).Italic().FontColor(grayText);
+                            c.Item().Height(60);
+                            c.Item().Text(order.Customername ?? order.VatCompanyName ?? "").FontSize(10).SemiBold();
+                        });
+
+                        table.Cell().AlignCenter().Column(c =>
+                        {
+                            c.Item().Text("ĐẠI DIỆN BÊN BÁN").Bold().FontSize(11);
+                            c.Item().Text("(Ký, ghi rõ họ tên)").FontSize(9).Italic().FontColor(grayText);
+                            c.Item().Height(60);
+                            c.Item().Text("Tết Gift").FontSize(10).SemiBold();
+                        });
+                    });
+
+                    col.Item().PaddingTop(10).Text("Lưu ý: Đây là hóa đơn GTGT nội bộ phục vụ quy trình nghiệp vụ nội bộ, không thay thế hóa đơn điện tử do cơ quan thuế hoặc nhà cung cấp hóa đơn điện tử phát hành.")
+                        .FontSize(8).Italic().FontColor(grayText);
+                }
+                else
                 {
-                    locCol.Item().PaddingBottom(4).Text("HỆ THỐNG CỬA HÀNG:").FontSize(10).Bold().FontColor(primaryColor);
-                    locCol.Item().Text("CN1: TetGift - HCM (Quận 1) - 15 Lê Lợi, Bến Nghé, Quận 1, TP.HCM").FontSize(9).FontColor(grayText);
-                    locCol.Item().Text("CN2: TetGift - HCM (Thủ Đức) - Khu Công Nghệ Cao, TP. Thủ Đức, TP.HCM").FontSize(9).FontColor(grayText);
-                    locCol.Item().Text("CN3: TetGift - Hà Nội (Hoàn Kiếm) - 25 Tràng Tiền, Hoàn Kiếm, Hà Nội").FontSize(9).FontColor(grayText);
-                    locCol.Item().Text("CN4: TetGift - Đà Nẵng (Hải Châu) - 230 Trần Phú, Hải Châu, Đà Nẵng").FontSize(9).FontColor(grayText);
-                    locCol.Item().Text("CN5: TetGift - Bình Tân - 120 Lê Văn Quới, Bình Tân, Hồ Chí Minh").FontSize(9).FontColor(grayText);
-                });
+                    col.Item().PaddingTop(24).AlignCenter().Column(thankCol =>
+                    {
+                        thankCol.Item().Text("Cảm ơn quý khách đã tin tưởng và mua sắm tại TetGift!")
+                            .FontSize(12).Bold().FontColor(primaryColor).AlignCenter();
+                        thankCol.Item().PaddingTop(4).Text("Kính chúc quý khách Năm Mới An Khang, Thịnh Vượng!")
+                            .FontSize(10).Italic().FontColor(grayText).AlignCenter();
+                    });
+                }
             });
         }
 

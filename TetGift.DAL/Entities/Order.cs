@@ -31,6 +31,16 @@ public partial class Order
 
     public DateTime? Shippeddate { get; set; }
 
+    // ===== VAT =====
+    public bool RequireVatInvoice { get; set; } = false;
+    public decimal VatRate { get; set; } = 0m;
+    public decimal VatAmount { get; set; } = 0m;
+
+    public string? VatCompanyName { get; set; }
+    public string? VatCompanyTaxCode { get; set; }
+    public string? VatCompanyAddress { get; set; }
+    public string? VatInvoiceEmail { get; set; }
+
     public virtual Account? Account { get; set; }
 
     public virtual ICollection<Feedback> Feedbacks { get; set; } = new List<Feedback>();
