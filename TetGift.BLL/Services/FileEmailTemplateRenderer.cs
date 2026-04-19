@@ -74,7 +74,14 @@ namespace TetGift.BLL.Services
                        .Replace("{{QUOTATION_LINK}}", quotationLink);
         }
 
-        public string RenderOrderPaymentSuccess(string customerName, int orderId, string amount, string orderLink)
+        public string RenderOrderPaymentSuccess(
+            string customerName,
+            int orderId,
+            string amount,
+            string baseAmount,
+            string vatAmount,
+            string orderLink,
+            string orderItemsHtml)
         {
             var possiblePaths = new[]
             {
@@ -107,7 +114,10 @@ namespace TetGift.BLL.Services
             return html.Replace("{{CUSTOMER_NAME}}", customerName)
                        .Replace("{{ORDER_ID}}", orderId.ToString())
                        .Replace("{{AMOUNT}}", amount)
-                       .Replace("{{ORDER_LINK}}", orderLink);
+                       .Replace("{{BASE_AMOUNT}}", baseAmount)
+                       .Replace("{{VAT_AMOUNT}}", vatAmount)
+                       .Replace("{{ORDER_LINK}}", orderLink)
+                       .Replace("{{ORDER_ITEMS}}", orderItemsHtml);
         }
 
         public string RenderOrderStatusChanged(string customerName, int orderId, string orderStatus, string orderLink, string orderItemsHtml)

@@ -106,7 +106,7 @@ public class PaymentService : IPaymentService
         {
             PaymentId = payment.Paymentid,
             OrderId = orderId,
-            Amount = payableAmount, // backward compatibility
+            Amount = payableAmount,
             BaseAmount = baseAmount,
             VatAmount = vatAmount,
             FinalPayableAmount = payableAmount,
@@ -160,6 +160,8 @@ public class PaymentService : IPaymentService
         var payment = await paymentRepo.FindAsync(
             p => p.Paymentid == paymentId,
             include: q => q.Include(p => p.Order)
+                          .ThenInclude(o => o.OrderDetails)
+                              .ThenInclude(od => od.Product)
         );
 
         if (payment == null)
@@ -245,7 +247,6 @@ public class PaymentService : IPaymentService
             }
             catch
             {
-                // swallow/log
             }
 
             try
@@ -254,7 +255,6 @@ public class PaymentService : IPaymentService
             }
             catch
             {
-                // swallow/log
             }
         }
 
@@ -323,6 +323,8 @@ public class PaymentService : IPaymentService
         var payment = await paymentRepo.FindAsync(
             p => p.Paymentid == paymentId,
             include: q => q.Include(p => p.Order)
+                          .ThenInclude(o => o.OrderDetails)
+                              .ThenInclude(od => od.Product)
         );
 
         if (payment == null)
@@ -379,7 +381,6 @@ public class PaymentService : IPaymentService
                 }
                 catch
                 {
-                    // swallow/log
                 }
 
                 try
@@ -388,7 +389,6 @@ public class PaymentService : IPaymentService
                 }
                 catch
                 {
-                    // swallow/log
                 }
             }
         }
@@ -498,36 +498,112 @@ public class PaymentService : IPaymentService
             : $"{orderBaseUrl.TrimEnd('/')}/{order.Orderid}";
 
         var payableAmount = GetFinalPayableAmount(order);
+        var baseAmount = GetBaseAmount(order);
+        var vatAmount = GetVatAmount(order);
+        var orderItemsHtml = BuildOrderItemsEmailHtml(order);
 
-        var htmlBody = _templateRenderer.RenderOrderPaymentSuccess(
+        var normalHtmlBody = _templateRenderer.RenderOrderPaymentSuccess(
             customerName,
             order.Orderid,
             FormatVnd(payableAmount),
-            orderLink
+            FormatVnd(baseAmount),
+            FormatVnd(vatAmount),
+            orderLink,
+            orderItemsHtml
         );
 
-        if (string.IsNullOrWhiteSpace(htmlBody))
-            throw new Exception("Render email body bị rỗng.");
+        var normalPdfBytes = await _invoiceService.GenerateNormalInvoicePdfAsync(order.Orderid, order.Accountid);
+        var normalFileName = await _invoiceService.GetNormalInvoiceFileNameAsync(order.Orderid, order.Accountid);
 
-        var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(order.Orderid, order.Accountid);
-        var fileName = await _invoiceService.GetDownloadFileNameAsync(order.Orderid, order.Accountid);
-
-        var attachments = new List<EmailAttachmentDto>
-    {
-        new EmailAttachmentDto
+        var normalAttachments = new List<EmailAttachmentDto>
         {
-            FileName = fileName,
-            ContentBytes = pdfBytes,
-            ContentType = "application/pdf"
-        }
-    };
+            new EmailAttachmentDto
+            {
+                FileName = normalFileName,
+                ContentBytes = normalPdfBytes,
+                ContentType = "application/pdf"
+            }
+        };
 
         await _emailSender.SendAsync(
             order.Customeremail,
             $"TetGift - Thanh toán đơn hàng #{order.Orderid} thành công",
-            htmlBody,
-            attachments
+            normalHtmlBody,
+            normalAttachments
         );
+
+        if (order.RequireVatInvoice && !string.IsNullOrWhiteSpace(order.VatInvoiceEmail))
+        {
+            var vatHtmlBody = _templateRenderer.RenderOrderPaymentSuccess(
+                customerName,
+                order.Orderid,
+                FormatVnd(payableAmount),
+                FormatVnd(baseAmount),
+                FormatVnd(vatAmount),
+                orderLink,
+                orderItemsHtml
+            );
+
+            var vatPdfBytes = await _invoiceService.GenerateVatInvoicePdfAsync(order.Orderid, order.Accountid);
+            var vatFileName = await _invoiceService.GetVatInvoiceFileNameAsync(order.Orderid, order.Accountid);
+
+            var vatAttachments = new List<EmailAttachmentDto>
+            {
+                new EmailAttachmentDto
+                {
+                    FileName = vatFileName,
+                    ContentBytes = vatPdfBytes,
+                    ContentType = "application/pdf"
+                }
+            };
+
+            await _emailSender.SendAsync(
+                order.VatInvoiceEmail,
+                $"TetGift - Hóa đơn VAT đơn hàng #{order.Orderid}",
+                vatHtmlBody,
+                vatAttachments
+            );
+        }
+    }
+
+    private static string BuildOrderItemsEmailHtml(Order order)
+    {
+        if (order.OrderDetails == null || !order.OrderDetails.Any())
+        {
+            return @"<p style='margin:0; color:#777777; font-size:14px; line-height:1.6;'>Không có thông tin sản phẩm.</p>";
+        }
+
+        var rows = order.OrderDetails
+            .Where(x => x.Product != null)
+            .Select(detail =>
+            {
+                var productName = detail.Product?.Productname ?? "Sản phẩm";
+                var quantity = detail.Quantity ?? 0;
+                var amount = detail.Amount ?? 0;
+                var imageUrl = detail.Product?.ImageUrl ?? "";
+
+                var imageBlock = string.IsNullOrWhiteSpace(imageUrl)
+                    ? ""
+                    : $@"<div style='width:72px; min-width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid #eee; background:#fafafa;'>
+                            <img src='{System.Net.WebUtility.HtmlEncode(imageUrl)}' style='width:100%; height:100%; object-fit:cover; display:block;' />
+                        </div>";
+
+                return $@"
+                <div style='display:flex; gap:14px; padding:14px 0; border-bottom:1px solid #F1D9D9; align-items:flex-start;'>
+                    {imageBlock}
+                    <div style='flex:1;'>
+                        <div style='font-size:15px; font-weight:700; color:#690000; margin-bottom:6px;'>
+                            {System.Net.WebUtility.HtmlEncode(productName)}
+                        </div>
+                        <div style='font-size:14px; color:#666666; line-height:1.7;'>
+                            Số lượng: {quantity}<br/>
+                            Thành tiền: {amount:N0} VNĐ
+                        </div>
+                    </div>
+                </div>";
+            });
+
+        return string.Join("", rows);
     }
 
     private static decimal GetBaseAmount(Order order)

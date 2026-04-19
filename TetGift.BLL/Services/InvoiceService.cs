@@ -29,6 +29,52 @@ public class InvoiceService : IInvoiceService
 
     public async Task<byte[]> GenerateInvoicePdfAsync(int orderId, int? accountId)
     {
+        var order = await GetOrderAsync(orderId, accountId);
+        return await BuildPdfByModeAsync(order, order.RequireVatInvoice ? InvoiceMode.Vat : InvoiceMode.Normal);
+    }
+
+    public async Task<byte[]> GenerateNormalInvoicePdfAsync(int orderId, int? accountId)
+    {
+        var order = await GetOrderAsync(orderId, accountId);
+        return await BuildPdfByModeAsync(order, InvoiceMode.Normal);
+    }
+
+    public async Task<byte[]> GenerateVatInvoicePdfAsync(int orderId, int? accountId)
+    {
+        var order = await GetOrderAsync(orderId, accountId);
+
+        if (!order.RequireVatInvoice)
+            throw new Exception("Đơn hàng này không có hóa đơn VAT.");
+
+        return await BuildPdfByModeAsync(order, InvoiceMode.Vat);
+    }
+
+    public async Task<string> GetDownloadFileNameAsync(int orderId, int? accountId)
+    {
+        var order = await GetOrderLightAsync(orderId, accountId);
+        return order.RequireVatInvoice
+            ? $"HoaDonVAT_{order.Orderid:D6}.pdf"
+            : $"HoaDon_{order.Orderid:D6}.pdf";
+    }
+
+    public async Task<string> GetNormalInvoiceFileNameAsync(int orderId, int? accountId)
+    {
+        var order = await GetOrderLightAsync(orderId, accountId);
+        return $"HoaDon_{order.Orderid:D6}.pdf";
+    }
+
+    public async Task<string> GetVatInvoiceFileNameAsync(int orderId, int? accountId)
+    {
+        var order = await GetOrderLightAsync(orderId, accountId);
+
+        if (!order.RequireVatInvoice)
+            throw new Exception("Đơn hàng này không có hóa đơn VAT.");
+
+        return $"HoaDonVAT_{order.Orderid:D6}.pdf";
+    }
+
+    private async Task<Order> GetOrderAsync(int orderId, int? accountId)
+    {
         var orderRepo = _uow.GetRepository<Order>();
 
         IQueryable<Order> query;
@@ -59,11 +105,10 @@ public class InvoiceService : IInvoiceService
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng.");
 
-        var html = await BuildInvoiceHtmlAsync(order);
-        return await RenderPdfFromHtmlAsync(html);
+        return order;
     }
 
-    public async Task<string> GetDownloadFileNameAsync(int orderId, int? accountId)
+    private async Task<(int Orderid, bool RequireVatInvoice)> GetOrderLightAsync(int orderId, int? accountId)
     {
         var orderRepo = _uow.GetRepository<Order>();
 
@@ -75,25 +120,27 @@ public class InvoiceService : IInvoiceService
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng.");
 
-        return order.RequireVatInvoice
-            ? $"HoaDonVAT_{order.Orderid:D6}.pdf"
-            : $"HoaDon_{order.Orderid:D6}.pdf";
+        return (order.Orderid, order.RequireVatInvoice);
     }
 
-    private async Task<string> BuildInvoiceHtmlAsync(Order order)
+    private async Task<byte[]> BuildPdfByModeAsync(Order order, InvoiceMode mode)
+    {
+        var html = await BuildInvoiceHtmlAsync(order, mode);
+        return await RenderPdfFromHtmlAsync(html);
+    }
+
+    private async Task<string> BuildInvoiceHtmlAsync(Order order, InvoiceMode mode)
     {
         var subTotal = CalculateSubTotal(order);
         var finalBaseAmount = order.Totalprice ?? subTotal;
         var discount = Math.Max(0, subTotal - finalBaseAmount);
 
-        var requireVat = order.RequireVatInvoice;
-        var vatRate = requireVat ? (order.VatRate <= 0 ? 0.08m : order.VatRate) : 0m;
-        var vatAmount = requireVat ? order.VatAmount : 0m;
+        var isVat = mode == InvoiceMode.Vat;
+        var vatRate = isVat ? (order.VatRate <= 0 ? 0.08m : order.VatRate) : 0m;
+        var vatAmount = isVat ? order.VatAmount : 0m;
         var finalPayableAmount = finalBaseAmount + vatAmount;
 
-        var templateFile = requireVat
-            ? "vat-invoice.html"
-            : "normal-invoice.html";
+        var templateFile = isVat ? "vat-invoice.html" : "normal-invoice.html";
 
         var templatePath = Path.Combine(
             _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
@@ -135,11 +182,11 @@ public class InvoiceService : IInvoiceService
             ["{{SubTotal}}"] = Html(FormatCurrency(subTotal)),
             ["{{FinalBaseAmount}}"] = Html(FormatCurrency(finalBaseAmount)),
             ["{{VatAmount}}"] = Html(FormatCurrency(vatAmount)),
-            ["{{FinalPayableAmount}}"] = Html(FormatCurrency(requireVat ? finalPayableAmount : finalBaseAmount)),
+            ["{{FinalPayableAmount}}"] = Html(FormatCurrency(isVat ? finalPayableAmount : finalBaseAmount)),
             ["{{VatRatePercent}}"] = Html($"{vatRate * 100:0}%"),
-            ["{{FinalPayableAmountInWords}}"] = Html(NumberToVietnameseCurrency(requireVat ? finalPayableAmount : finalBaseAmount)),
+            ["{{FinalPayableAmountInWords}}"] = Html(NumberToVietnameseCurrency(isVat ? finalPayableAmount : finalBaseAmount)),
 
-            ["{{ItemRows}}"] = BuildItemRows(order, requireVat),
+            ["{{ItemRows}}"] = BuildItemRows(order, isVat),
             ["{{DiscountRow}}"] = discount > 0
                 ? $@"<tr>
                         <td>Chiết khấu / giảm giá</td>
@@ -357,7 +404,6 @@ public class InvoiceService : IInvoiceService
             {
                 result.Add(digits[ten]);
                 result.Add("mươi");
-
                 if (unit == 1) result.Add("mốt");
                 else if (unit == 5) result.Add("lăm");
                 else if (unit > 0) result.Add(digits[unit]);
@@ -365,19 +411,23 @@ public class InvoiceService : IInvoiceService
             else if (ten == 1)
             {
                 result.Add("mười");
-
                 if (unit == 5) result.Add("lăm");
                 else if (unit > 0) result.Add(digits[unit]);
             }
             else if (ten == 0 && unit > 0)
             {
                 if (hundred > 0) result.Add("lẻ");
-
                 if (unit == 5 && hundred > 0) result.Add("năm");
                 else result.Add(digits[unit]);
             }
 
             return string.Join(" ", result).Trim();
         }
+    }
+
+    private enum InvoiceMode
+    {
+        Normal = 1,
+        Vat = 2
     }
 }
