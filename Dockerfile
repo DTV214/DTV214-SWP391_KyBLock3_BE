@@ -60,21 +60,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=build /app/publish ./
 
-# Quan trọng: set path trước khi install browser
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-
-RUN mkdir -p /ms-playwright
-
-# Nếu project publish có playwright.sh
-RUN chmod +x ./playwright.sh && \
-    ./playwright.sh install chromium
-
-RUN adduser --disabled-password --gecos "" appuser && \
-    chown -R appuser:appuser /app /ms-playwright && \
-    chmod -R 755 /app /ms-playwright
-
 ENV ASPNETCORE_URLS=http://+:5000
 ENV ASPNETCORE_ENVIRONMENT=Production
+
+RUN mkdir -p /ms-playwright && \
+    adduser --disabled-password --gecos "" appuser && \
+    chown -R appuser:appuser /app /ms-playwright && \
+    chmod -R 755 /app /ms-playwright
 
 EXPOSE 5000
 

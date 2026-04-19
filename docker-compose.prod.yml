@@ -21,6 +21,8 @@ services:
       Otp__DeletePendingAfterMinutes: 30
       Gemini__ApiKey: ${GEMINI_API_KEY}
       Gemini__Model: gemini-2.5-flash
+    volumes:
+      - playwright-data:/ms-playwright
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -31,3 +33,6 @@ services:
 networks:
   default:
     name: swp391-network
+
+volumes:
+  playwright-data:

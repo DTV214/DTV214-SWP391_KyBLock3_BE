@@ -17,6 +17,8 @@ using TetGift.DAL.Repositories;
 using TetGift.DAL.UnitOfWork;
 using TetGift.Filters;
 using TetGift.Middlewares;
+using Microsoft.Playwright;
+using System.IO;
 
 namespace TetGift
 {
@@ -278,6 +280,13 @@ namespace TetGift
             app.UseAuthorization();
             app.UseStaticFiles();
             app.MapControllers();
+
+            var browserPath = Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH") ?? "/ms-playwright";
+
+            if (!Directory.Exists(browserPath) || Directory.GetDirectories(browserPath).Length == 0)
+            {
+                Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
+            }
 
             app.Run();
         }
