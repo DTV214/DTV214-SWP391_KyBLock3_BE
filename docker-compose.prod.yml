@@ -8,7 +8,7 @@ services:
       - "5002:5000"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      PLAYWRIGHT_BROWSERS_PATH: /root/.cache/ms-playwright
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
       ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING}
       Jwt__Key: ${JWT_KEY}
       Jwt__Issuer: TetGift
