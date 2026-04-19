@@ -2,6 +2,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
 
 namespace TetGift.BLL.Services
@@ -17,7 +18,11 @@ namespace TetGift.BLL.Services
             _cfg = cfg;
         }
 
-        public async Task SendAsync(string toEmail, string subject, string htmlBody)
+        public async Task SendAsync(
+            string toEmail,
+            string subject,
+            string htmlBody,
+            List<EmailAttachmentDto>? attachments = null)
         {
             var apiKey = _cfg["Resend:ApiKey"];
             var from = _cfg["Resend:From"];
@@ -27,7 +32,6 @@ namespace TetGift.BLL.Services
             if (string.IsNullOrWhiteSpace(from))
                 throw new InvalidOperationException("Missing config: Resend:From");
 
-            // base address + auth header (set once per client)
             if (_http.BaseAddress == null)
                 _http.BaseAddress = new Uri("https://api.resend.com/");
 
@@ -38,7 +42,13 @@ namespace TetGift.BLL.Services
                 from,
                 to = new[] { toEmail },
                 subject,
-                html = htmlBody
+                html = htmlBody,
+                attachments = attachments?.Select(a => new
+                {
+                    filename = a.FileName,
+                    content = Convert.ToBase64String(a.ContentBytes),
+                    type = a.ContentType
+                }).ToArray()
             };
 
             var json = JsonSerializer.Serialize(payload);

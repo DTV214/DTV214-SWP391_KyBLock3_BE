@@ -1,0 +1,359 @@
+﻿<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Hóa đơn mua hàng</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 18mm 14mm 18mm 14mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #111827;
+            font-size: 13px;
+            line-height: 1.45;
+            margin: 0;
+            background: #ffffff;
+        }
+
+        .sheet {
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .topbar {
+            border-bottom: 2px solid #111827;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .seller-block h1 {
+            margin: 0;
+            font-size: 28px;
+            letter-spacing: 0.3px;
+            color: #111827;
+            text-transform: uppercase;
+        }
+
+        .seller-block .sub {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #4b5563;
+        }
+
+        .seller-meta {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #374151;
+        }
+
+        .doc-block {
+            text-align: right;
+            min-width: 240px;
+        }
+
+            .doc-block .doc-title {
+                font-size: 24px;
+                font-weight: 700;
+                text-transform: uppercase;
+                color: #111827;
+                margin: 0;
+            }
+
+            .doc-block .doc-no {
+                margin-top: 6px;
+                font-size: 15px;
+                font-weight: 700;
+            }
+
+            .doc-block .doc-date {
+                margin-top: 8px;
+                font-size: 12px;
+                color: #4b5563;
+            }
+
+        .section-title {
+            margin: 16px 0 8px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #111827;
+            border-left: 4px solid #111827;
+            padding-left: 8px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .info-card {
+            border: 1px solid #d1d5db;
+            padding: 10px 12px;
+            min-height: 68px;
+            background: #fafafa;
+        }
+
+            .info-card .label {
+                font-size: 11px;
+                color: #6b7280;
+                margin-bottom: 4px;
+                text-transform: uppercase;
+            }
+
+            .info-card .value {
+                font-size: 13px;
+                color: #111827;
+                font-weight: 600;
+                word-break: break-word;
+            }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .items {
+            margin-top: 8px;
+            border: 1px solid #d1d5db;
+        }
+
+            .items th {
+                background: #111827;
+                color: white;
+                font-size: 12px;
+                padding: 10px 8px;
+                border: 1px solid #111827;
+                text-transform: uppercase;
+            }
+
+            .items td {
+                border: 1px solid #d1d5db;
+                padding: 9px 8px;
+                vertical-align: top;
+                font-size: 12px;
+            }
+
+            .items .center {
+                text-align: center;
+            }
+
+            .items .right {
+                text-align: right;
+            }
+
+        .product-name {
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .product-sub {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #6b7280;
+            white-space: pre-line;
+        }
+
+        .summary-wrap {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 14px;
+        }
+
+        .summary {
+            width: 360px;
+            border: 1px solid #d1d5db;
+        }
+
+            .summary td {
+                padding: 9px 12px;
+                border-bottom: 1px solid #e5e7eb;
+                font-size: 12px;
+            }
+
+                .summary td:last-child {
+                    text-align: right;
+                    font-weight: 600;
+                }
+
+            .summary .total-row td {
+                font-size: 15px;
+                font-weight: 700;
+                background: #111827;
+                color: white;
+                border-bottom: none;
+            }
+
+        .note-box {
+            margin-top: 14px;
+            border: 1px dashed #9ca3af;
+            padding: 10px 12px;
+            background: #fcfcfc;
+        }
+
+            .note-box .label {
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                color: #6b7280;
+                margin-bottom: 4px;
+            }
+
+        .signatures {
+            margin-top: 34px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        .sign-box {
+            text-align: center;
+        }
+
+        .sign-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .sign-sub {
+            margin-top: 3px;
+            font-size: 11px;
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        .sign-space {
+            height: 70px;
+        }
+
+        .sign-name {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .footer {
+            margin-top: 24px;
+            padding-top: 10px;
+            border-top: 1px solid #d1d5db;
+            font-size: 11px;
+            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sheet">
+        <div class="topbar">
+            <div class="seller-block">
+                <h1>{{SellerLegalName}}</h1>
+                <div class="sub">Hóa đơn mua hàng</div>
+                <div class="seller-meta">
+                    <div><strong>Địa chỉ:</strong> {{SellerAddress}}</div>
+                    <div><strong>MST:</strong> {{SellerTaxCode}}</div>
+                    <div><strong>Điện thoại:</strong> {{SellerPhone}} &nbsp; | &nbsp; <strong>Email:</strong> {{SellerEmail}}</div>
+                </div>
+            </div>
+
+            <div class="doc-block">
+                <div class="doc-title">Hóa đơn mua hàng</div>
+                <div class="doc-no">Số: {{DocumentNumber}}</div>
+                <div class="doc-date">Ngày lập: {{CreatedDate}}</div>
+                <div class="doc-date">Trạng thái: {{OrderStatus}}</div>
+            </div>
+        </div>
+
+        <div class="section-title">Thông tin khách hàng</div>
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="label">Tên khách hàng</div>
+                <div class="value">{{BuyerName}}</div>
+            </div>
+            <div class="info-card">
+                <div class="label">Số điện thoại</div>
+                <div class="value">{{BuyerPhone}}</div>
+            </div>
+            <div class="info-card">
+                <div class="label">Email</div>
+                <div class="value">{{BuyerEmail}}</div>
+            </div>
+            <div class="info-card">
+                <div class="label">Địa chỉ giao hàng</div>
+                <div class="value">{{BuyerAddress}}</div>
+            </div>
+        </div>
+
+        <div class="section-title">Chi tiết hàng hóa</div>
+        <table class="items">
+            <thead>
+                <tr>
+                    <th style="width: 42px;">STT</th>
+                    <th>Tên hàng hóa</th>
+                    <th style="width: 110px;">Đơn giá</th>
+                    <th style="width: 60px;">SL</th>
+                    <th style="width: 130px;">Thành tiền</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ItemRows}}
+            </tbody>
+        </table>
+
+        <div class="summary-wrap">
+            <table class="summary">
+                <tbody>
+                    <tr>
+                        <td>Tổng tiền hàng</td>
+                        <td>{{SubTotal}}</td>
+                    </tr>
+                    {{DiscountRow}}
+                    <tr>
+                        <td>Thành tiền sau giảm giá</td>
+                        <td>{{FinalBaseAmount}}</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td>Tổng thanh toán</td>
+                        <td>{{FinalPayableAmount}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        {{NoteSection}}
+
+        <div class="signatures">
+            <div class="sign-box">
+                <div class="sign-title">Người mua hàng</div>
+                <div class="sign-sub">(Ký, ghi rõ họ tên)</div>
+                <div class="sign-space"></div>
+                <div class="sign-name">{{BuyerName}}</div>
+            </div>
+
+            <div class="sign-box">
+                <div class="sign-title">Đại diện bên bán</div>
+                <div class="sign-sub">(Ký, ghi rõ họ tên)</div>
+                <div class="sign-space"></div>
+                <div class="sign-name">Tết Gift</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div>Chứng từ bán hàng của Tết Gift</div>
+            <div>{{SellerPhone}} · {{SellerEmail}}</div>
+        </div>
+    </div>
+</body>
+</html>

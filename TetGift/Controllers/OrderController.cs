@@ -209,14 +209,15 @@ public class OrderController : ControllerBase
             var role = GetCurrentUserRole();
             int? accountId = null;
 
-            // Customer chỉ được tải invoice của mình; Admin/Staff được tải mọi invoice
             if (role != UserRole.ADMIN && role != UserRole.STAFF)
             {
                 accountId = GetCurrentAccountId();
             }
 
             var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(orderId, accountId);
-            return File(pdfBytes, "application/pdf", $"HoaDon_{orderId:D6}.pdf");
+            var fileName = await _invoiceService.GetDownloadFileNameAsync(orderId, accountId);
+
+            return File(pdfBytes, "application/pdf", fileName);
         }
         catch (Exception ex)
         {

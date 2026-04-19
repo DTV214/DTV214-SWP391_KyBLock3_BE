@@ -16,19 +16,22 @@ public class PaymentService : IPaymentService
     private readonly IEmailSender _emailSender;
     private readonly IEmailTemplateRenderer _templateRenderer;
     private readonly IOrderService _orderService;
+    private readonly IInvoiceService _invoiceService;
 
     public PaymentService(
         IUnitOfWork uow,
         IConfiguration configuration,
         IEmailSender emailSender,
         IEmailTemplateRenderer templateRenderer,
-        IOrderService orderService)
+        IOrderService orderService,
+        IInvoiceService invoiceService)
     {
         _uow = uow;
         _configuration = configuration;
         _emailSender = emailSender;
         _templateRenderer = templateRenderer;
         _orderService = orderService;
+        _invoiceService = invoiceService;
     }
 
     public async Task<PaymentResponseDto> CreatePaymentAsync(int orderId, int accountId, string? clientIp = null, string? paymentMethod = null)
@@ -506,10 +509,24 @@ public class PaymentService : IPaymentService
         if (string.IsNullOrWhiteSpace(htmlBody))
             throw new Exception("Render email body bị rỗng.");
 
+        var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(order.Orderid, order.Accountid);
+        var fileName = await _invoiceService.GetDownloadFileNameAsync(order.Orderid, order.Accountid);
+
+        var attachments = new List<EmailAttachmentDto>
+    {
+        new EmailAttachmentDto
+        {
+            FileName = fileName,
+            ContentBytes = pdfBytes,
+            ContentType = "application/pdf"
+        }
+    };
+
         await _emailSender.SendAsync(
             order.Customeremail,
             $"TetGift - Thanh toán đơn hàng #{order.Orderid} thành công",
-            htmlBody
+            htmlBody,
+            attachments
         );
     }
 

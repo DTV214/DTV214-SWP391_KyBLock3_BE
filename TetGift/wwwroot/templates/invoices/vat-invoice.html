@@ -1,0 +1,399 @@
+﻿<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Hóa đơn GTGT</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 14mm 12mm 14mm 12mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Times New Roman", Times, serif;
+            color: #111827;
+            font-size: 13px;
+            line-height: 1.4;
+            margin: 0;
+            background: #fff;
+        }
+
+        .sheet {
+            width: 100%;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .watermark {
+            position: fixed;
+            top: 38%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-24deg);
+            font-size: 72px;
+            font-weight: 700;
+            color: rgba(220, 38, 38, 0.06);
+            white-space: nowrap;
+            z-index: 0;
+            pointer-events: none;
+            letter-spacing: 6px;
+        }
+
+        .content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .top-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            border-bottom: 1.5px solid #111827;
+            padding-bottom: 8px;
+        }
+
+        .seller-left {
+            font-size: 12px;
+        }
+
+            .seller-left .company {
+                font-size: 18px;
+                font-weight: 700;
+                text-transform: uppercase;
+                margin-bottom: 6px;
+            }
+
+        .doc-right {
+            text-align: center;
+        }
+
+            .doc-right .doc-main {
+                font-size: 24px;
+                font-weight: 700;
+                text-transform: uppercase;
+                line-height: 1.15;
+            }
+
+            .doc-right .doc-sub {
+                margin-top: 2px;
+                font-size: 12px;
+                font-style: italic;
+            }
+
+            .doc-right .serial {
+                margin-top: 6px;
+                font-size: 13px;
+            }
+
+                .doc-right .serial strong {
+                    font-size: 16px;
+                }
+
+        .meta-line {
+            margin-top: 8px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .section {
+            margin-top: 10px;
+            border: 1px solid #111827;
+            padding: 8px 10px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 5px;
+            align-items: flex-start;
+        }
+
+            .row .label {
+                min-width: 140px;
+                font-weight: 700;
+            }
+
+            .row .value {
+                flex: 1;
+                border-bottom: 1px dotted #6b7280;
+                min-height: 18px;
+                padding-bottom: 2px;
+                word-break: break-word;
+            }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .items {
+            margin-top: 10px;
+        }
+
+            .items th, .items td {
+                border: 1px solid #111827;
+                padding: 6px 6px;
+                font-size: 12px;
+                vertical-align: top;
+            }
+
+            .items th {
+                text-align: center;
+                font-weight: 700;
+                background: #f3f4f6;
+            }
+
+            .items .center {
+                text-align: center;
+            }
+
+            .items .right {
+                text-align: right;
+            }
+
+        .product-name {
+            font-weight: 700;
+        }
+
+        .product-sub {
+            margin-top: 3px;
+            font-size: 11px;
+            color: #4b5563;
+            white-space: pre-line;
+        }
+
+        .totals {
+            margin-top: 10px;
+            width: 100%;
+            border: 1px solid #111827;
+        }
+
+            .totals td {
+                padding: 7px 10px;
+                border-bottom: 1px solid #d1d5db;
+                font-size: 12px;
+            }
+
+                .totals td:first-child {
+                    width: 70%;
+                }
+
+                .totals td:last-child {
+                    text-align: right;
+                    font-weight: 700;
+                }
+
+            .totals .grand td {
+                font-size: 15px;
+                font-weight: 700;
+                border-bottom: none;
+                background: #f9fafb;
+            }
+
+        .money-text {
+            margin-top: 10px;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        .note-box {
+            margin-top: 12px;
+            border: 1px dashed #9ca3af;
+            padding: 10px 12px;
+            background: #fcfcfc;
+        }
+
+            .note-box .label {
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                color: #6b7280;
+                margin-bottom: 4px;
+            }
+
+        .signatures {
+            margin-top: 26px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            text-align: center;
+        }
+
+            .signatures .title {
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+            }
+
+            .signatures .sub {
+                margin-top: 2px;
+                font-size: 11px;
+                font-style: italic;
+                color: #4b5563;
+            }
+
+        .sign-space {
+            height: 72px;
+        }
+
+        .sign-name {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .footer-note {
+            margin-top: 14px;
+            border-top: 1px dashed #9ca3af;
+            padding-top: 8px;
+            font-size: 11px;
+            color: #4b5563;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="sheet">
+        <div class="watermark">VAT Invoice</div>
+
+        <div class="content">
+            <div class="top-header">
+                <div class="seller-left">
+                    <div class="company">{{SellerLegalName}}</div>
+                    <div><strong>Mã số thuế:</strong> {{SellerTaxCode}}</div>
+                    <div><strong>Địa chỉ:</strong> {{SellerAddress}}</div>
+                    <div><strong>Điện thoại:</strong> {{SellerPhone}}</div>
+                    <div><strong>Email:</strong> {{SellerEmail}}</div>
+                </div>
+
+                <div class="doc-right">
+                    <div class="doc-main">Hóa đơn giá trị gia tăng</div>
+                    <div class="doc-sub">(VAT)</div>
+                    <div class="serial">Số: <strong>{{DocumentNumber}}</strong></div>
+                    <div class="serial">Ký hiệu: <strong>VAT-INT</strong></div>
+                </div>
+            </div>
+
+            <div class="meta-line">
+                Ngày {{CreatedDay}} tháng {{CreatedMonth}} năm {{CreatedYear}}
+            </div>
+
+            <div class="section">
+                <div class="section-title">Thông tin bên bán</div>
+                <div class="row">
+                    <div class="label">Đơn vị bán hàng:</div>
+                    <div class="value">{{SellerLegalName}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Mã số thuế:</div>
+                    <div class="value">{{SellerTaxCode}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Địa chỉ:</div>
+                    <div class="value">{{SellerAddress}}</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Thông tin bên mua</div>
+                <div class="row">
+                    <div class="label">Tên đơn vị:</div>
+                    <div class="value">{{VatBuyerCompanyName}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Mã số thuế:</div>
+                    <div class="value">{{VatBuyerTaxCode}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Địa chỉ:</div>
+                    <div class="value">{{VatBuyerAddress}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Người liên hệ:</div>
+                    <div class="value">{{BuyerName}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Email nhận hóa đơn:</div>
+                    <div class="value">{{VatBuyerEmail}}</div>
+                </div>
+            </div>
+
+            <table class="items">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">STT</th>
+                        <th>Tên hàng hóa, dịch vụ</th>
+                        <th style="width: 90px;">ĐVT</th>
+                        <th style="width: 60px;">SL</th>
+                        <th style="width: 110px;">Đơn giá</th>
+                        <th style="width: 130px;">Thành tiền</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ItemRows}}
+                </tbody>
+            </table>
+
+            <table class="totals">
+                <tbody>
+                    <tr>
+                        <td>Cộng tiền hàng</td>
+                        <td>{{SubTotal}}</td>
+                    </tr>
+                    {{DiscountRow}}
+                    <tr>
+                        <td>Giá tính thuế</td>
+                        <td>{{FinalBaseAmount}}</td>
+                    </tr>
+                    <tr>
+                        <td>Thuế suất GTGT</td>
+                        <td>{{VatRatePercent}}</td>
+                    </tr>
+                    <tr>
+                        <td>Tiền thuế GTGT</td>
+                        <td>{{VatAmount}}</td>
+                    </tr>
+                    <tr class="grand">
+                        <td>Tổng cộng tiền thanh toán</td>
+                        <td>{{FinalPayableAmount}}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="money-text">
+                Số tiền viết bằng chữ: {{FinalPayableAmountInWords}}
+            </div>
+
+            {{NoteSection}}
+
+            <div class="signatures">
+                <div>
+                    <div class="title">Người mua hàng</div>
+                    <div class="sub">(Ký, ghi rõ họ tên)</div>
+                    <div class="sign-space"></div>
+                    <div class="sign-name">{{BuyerName}}</div>
+                </div>
+                <div>
+                    <div class="title">Đại diện đơn vị bán hàng</div>
+                    <div class="sub">(Ký, ghi rõ họ tên)</div>
+                    <div class="sign-space"></div>
+                    <div class="sign-name">Tết Gift</div>
+                </div>
+            </div>
+
+            <div class="footer-note">
+                Hóa đơn GTGT phục vụ nghiệp vụ học tập và làm đồ án SWP391, không thay thế hóa đơn điện tử chính thức.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
