@@ -12,6 +12,8 @@ namespace TetGift.BLL.Interfaces
         Task<ProductStatisticResponseDto> GetProductStatisticAsync(int productId);
 
         Task<List<TrendingProductDto>> GetTrendingProductsAsync(string period = "week", int top = 5);
+
+        Task<SeasonalTrendResponseDto> GetSeasonalTrendAsync(int month, int year);
         // Nơi đây sau này bạn và team sẽ khai báo thêm các hàm:
         // Task<DashboardOverviewDto> GetDashboardOverviewAsync();
         // Task<CustomerStatisticDto> GetCustomerStatisticAsync();

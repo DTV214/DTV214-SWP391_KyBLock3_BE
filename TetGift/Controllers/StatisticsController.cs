@@ -47,4 +47,18 @@ public class StatisticsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    [HttpGet("seasonal-trend")]
+    public async Task<IActionResult> GetSeasonalTrend([FromQuery] int month, [FromQuery] int year)
+    {
+        try
+        {
+            var result = await _statisticService.GetSeasonalTrendAsync(month, year);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

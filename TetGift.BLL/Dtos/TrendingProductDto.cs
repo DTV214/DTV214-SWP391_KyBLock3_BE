@@ -24,3 +24,27 @@ public class TrendDataPointDto
     // Số lượng bán được trong ngày đó (Trục Y)
     public int Quantity { get; set; }
 }
+
+public class SeasonalTrendResponseDto
+{
+    public int RequestedMonth { get; set; }
+    public int ReferenceYear { get; set; }
+    public List<CategoryStatDto> TopCategories { get; set; } = new();
+    public List<ProductTrendDto> TopProducts { get; set; } = new();
+}
+
+public class CategoryStatDto
+{
+    public int CategoryId { get; set; }
+    public string CategoryName { get; set; } = string.Empty;
+    public int TotalSold { get; set; }
+    public decimal Percentage { get; set; } // Tỷ lệ % để vẽ biểu đồ tròn
+}
+
+public class ProductTrendDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
+    public int TotalSold { get; set; }
+}

@@ -306,4 +306,121 @@ public class StatisticService : IStatisticService
 
         return response;
     }
+    public async Task<SeasonalTrendResponseDto> GetSeasonalTrendAsync(int month, int year)
+    {
+        var orderRepo = _uow.GetRepository<Order>();
+
+        // 1. Xử lý logic "Nhìn về quá khứ": 
+        // Nếu Admin chọn tháng/năm ở tương lai hoặc hiện tại, hệ thống tự lùi về 1 năm để lấy data mẫu
+        DateTime now = DateTime.Now;
+        int queryYear = year;
+        if (year > now.Year || (year == now.Year && month >= now.Month))
+        {
+            queryYear = year - 1;
+        }
+
+        DateTime startDate = new DateTime(queryYear, month, 1);
+        DateTime endDate = startDate.AddMonths(1).AddDays(-1);
+
+        var validStatuses = new List<string> {
+        OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED
+    };
+
+        // 2. Query lấy toàn bộ đơn hàng trong tháng đó (Kèm phân rã Giỏ quà)
+        var orders = await orderRepo.Entities
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p.Category)
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p.ProductDetailProductparents)
+                        .ThenInclude(pd => pd.Product)
+                            .ThenInclude(p => p.Category)
+            .Where(o => validStatuses.Contains(o.Status) &&
+                        o.Orderdatetime >= startDate &&
+                        o.Orderdatetime <= endDate)
+            .ToListAsync();
+
+        // Dictionary để đếm số lượng
+        var productCounts = new Dictionary<int, (Product Product, int Count)>();
+        var categoryCounts = new Dictionary<int, (string Name, int Count)>();
+        int totalItemsSoldInMonth = 0;
+
+        // 3. Thuật toán phân rã (Unbundling)
+        foreach (var order in orders)
+        {
+            foreach (var od in order.OrderDetails)
+            {
+                if (od.Product == null) continue;
+                int orderQty = od.Quantity ?? 0;
+
+                // Nếu là Giỏ Quà -> Phải đếm các món bên trong
+                if (od.Product.Configid != null)
+                {
+                    foreach (var child in od.Product.ProductDetailProductparents)
+                    {
+                        if (child.Product == null) continue;
+                        int actualQty = (child.Quantity ?? 1) * orderQty;
+                        UpdateCounts(child.Product, actualQty, productCounts, categoryCounts);
+                        totalItemsSoldInMonth += actualQty;
+                    }
+                }
+                else // Nếu là sản phẩm lẻ -> Đếm trực tiếp
+                {
+                    UpdateCounts(od.Product, orderQty, productCounts, categoryCounts);
+                    totalItemsSoldInMonth += orderQty;
+                }
+            }
+        }
+
+        // 4. Đóng gói kết quả
+        var response = new SeasonalTrendResponseDto
+        {
+            RequestedMonth = month,
+            ReferenceYear = queryYear,
+            TopProducts = productCounts.Values
+                .OrderByDescending(x => x.Count)
+                .Take(10)
+                .Select(x => new ProductTrendDto
+                {
+                    ProductId = x.Product.Productid,
+                    ProductName = x.Product.Productname ?? "N/A",
+                    ImageUrl = x.Product.ImageUrl,
+                    TotalSold = x.Count
+                }).ToList(),
+            TopCategories = categoryCounts.Values
+                .OrderByDescending(x => x.Count)
+                .Take(5)
+                .Select(x => new CategoryStatDto
+                {
+                    CategoryName = x.Name,
+                    TotalSold = x.Count,
+                    Percentage = totalItemsSoldInMonth > 0 ? Math.Round((decimal)x.Count / totalItemsSoldInMonth * 100, 1) : 0
+                }).ToList()
+        };
+
+        return response;
+    }
+
+    // Hàm helper để tránh lặp code khi đếm
+    private void UpdateCounts(Product p, int qty,
+        Dictionary<int, (Product Product, int Count)> pDict,
+        Dictionary<int, (string Name, int Count)> cDict)
+    {
+        // Đếm sản phẩm
+        if (pDict.ContainsKey(p.Productid))
+            pDict[p.Productid] = (p, pDict[p.Productid].Count + qty);
+        else
+            pDict[p.Productid] = (p, qty);
+
+        // Đếm danh mục
+        if (p.Categoryid.HasValue)
+        {
+            string catName = p.Category?.Categoryname ?? "Khác";
+            if (cDict.ContainsKey(p.Categoryid.Value))
+                cDict[p.Categoryid.Value] = (catName, cDict[p.Categoryid.Value].Count + qty);
+            else
+                cDict[p.Categoryid.Value] = (catName, qty);
+        }
+    }
 }
