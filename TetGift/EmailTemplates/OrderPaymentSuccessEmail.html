@@ -46,22 +46,36 @@
                 </div>
             </div>
 
-            <div style="margin-bottom: 10px; font-size: 15px; color: #555555;">
-                Tổng tiền hàng:
-                <b style="color: #690000;">{{BASE_AMOUNT}}</b>
+            <div style="max-width: 420px; margin: 0 auto; background: #fff; border: 1px solid #eee; border-radius: 14px; padding: 16px 18px; text-align: left;">
+                <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; font-size:14px; color:#555555;">
+                    <span>Tổng tiền hàng</span>
+                    <b style="color:#690000;">{{SUBTOTAL_AMOUNT}}</b>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; font-size:14px; color:#555555;">
+                    <span>Giảm khuyến mãi</span>
+                    <b style="color:#16A34A;">-{{DISCOUNT_AMOUNT}}</b>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; font-size:14px; color:#555555;">
+                    <span>Thành tiền sau giảm</span>
+                    <b style="color:#690000;">{{BASE_AMOUNT}}</b>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:12px; font-size:14px; color:#555555;">
+                    <span>VAT</span>
+                    <b style="color:#690000;">{{VAT_AMOUNT}}</b>
+                </div>
+
+                <div style="height:1px; background:#eee; margin:10px 0 12px;"></div>
+
+                <div style="display:flex; justify-content:space-between; gap:12px; font-size:16px; color:#555555;">
+                    <span><b>Tổng thanh toán</b></span>
+                    <b style="color:#690000;">{{AMOUNT}}</b>
+                </div>
             </div>
 
-            <div style="margin-bottom: 10px; font-size: 15px; color: #555555;">
-                VAT:
-                <b style="color: #690000;">{{VAT_AMOUNT}}</b>
-            </div>
-
-            <div style="margin-bottom: 18px; font-size: 16px; color: #555555;">
-                Số tiền thanh toán:
-                <b style="color: #690000;">{{AMOUNT}}</b>
-            </div>
-
-            <div>
+            <div style="margin-top: 20px;">
                 <a href="{{ORDER_LINK}}"
                    style="display: inline-block; background-color: #690000; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 10px; font-size: 15px; font-weight: 700; letter-spacing: 0.5px;">
                     XEM ĐƠN HÀNG
@@ -74,17 +88,6 @@
             <div>
                 {{ORDER_ITEMS}}
             </div>
-        </div>
-
-        <div style="background-color: #fff; border: 1px solid #eee; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px;">
-            <p style="margin: 0 0 10px; color: #690000; font-size: 14px; font-weight: 700;">
-                Liên kết truy cập
-            </p>
-            <p style="margin: 0; font-size: 14px; line-height: 1.6; word-break: break-all;">
-                <a href="{{ORDER_LINK}}" style="color: #690000; text-decoration: underline;">
-                    {{ORDER_LINK}}
-                </a>
-            </p>
         </div>
 
         <p style="margin: 0 0 18px; color: #666666; font-size: 14px; line-height: 1.7; text-align: center;">

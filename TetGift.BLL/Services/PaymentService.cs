@@ -500,12 +500,16 @@ public class PaymentService : IPaymentService
         var payableAmount = GetFinalPayableAmount(order);
         var baseAmount = GetBaseAmount(order);
         var vatAmount = GetVatAmount(order);
+        var subtotalAmount = GetSubTotalAmount(order);
+        var discountAmount = Math.Max(0, subtotalAmount - baseAmount);
         var orderItemsHtml = BuildOrderItemsEmailHtml(order);
 
         var normalHtmlBody = _templateRenderer.RenderOrderPaymentSuccess(
             customerName,
             order.Orderid,
             FormatVnd(payableAmount),
+            FormatVnd(subtotalAmount),
+            FormatVnd(discountAmount),
             FormatVnd(baseAmount),
             FormatVnd(vatAmount),
             orderLink,
@@ -516,14 +520,14 @@ public class PaymentService : IPaymentService
         var normalFileName = await _invoiceService.GetNormalInvoiceFileNameAsync(order.Orderid, order.Accountid);
 
         var normalAttachments = new List<EmailAttachmentDto>
+    {
+        new EmailAttachmentDto
         {
-            new EmailAttachmentDto
-            {
-                FileName = normalFileName,
-                ContentBytes = normalPdfBytes,
-                ContentType = "application/pdf"
-            }
-        };
+            FileName = normalFileName,
+            ContentBytes = normalPdfBytes,
+            ContentType = "application/pdf"
+        }
+    };
 
         await _emailSender.SendAsync(
             order.Customeremail,
@@ -538,6 +542,8 @@ public class PaymentService : IPaymentService
                 customerName,
                 order.Orderid,
                 FormatVnd(payableAmount),
+                FormatVnd(subtotalAmount),
+                FormatVnd(discountAmount),
                 FormatVnd(baseAmount),
                 FormatVnd(vatAmount),
                 orderLink,
@@ -548,14 +554,14 @@ public class PaymentService : IPaymentService
             var vatFileName = await _invoiceService.GetVatInvoiceFileNameAsync(order.Orderid, order.Accountid);
 
             var vatAttachments = new List<EmailAttachmentDto>
+        {
+            new EmailAttachmentDto
             {
-                new EmailAttachmentDto
-                {
-                    FileName = vatFileName,
-                    ContentBytes = vatPdfBytes,
-                    ContentType = "application/pdf"
-                }
-            };
+                FileName = vatFileName,
+                ContentBytes = vatPdfBytes,
+                ContentType = "application/pdf"
+            }
+        };
 
             await _emailSender.SendAsync(
                 order.VatInvoiceEmail,
@@ -564,6 +570,21 @@ public class PaymentService : IPaymentService
                 vatAttachments
             );
         }
+    }
+
+    private static decimal GetSubTotalAmount(Order order)
+    {
+        decimal subtotal = 0m;
+
+        if (order.OrderDetails != null)
+        {
+            foreach (var item in order.OrderDetails)
+            {
+                subtotal += item.Amount ?? ((item.Product?.Price ?? 0m) * (item.Quantity ?? 0));
+            }
+        }
+
+        return subtotal;
     }
 
     private static string BuildOrderItemsEmailHtml(Order order)

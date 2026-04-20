@@ -78,6 +78,8 @@ namespace TetGift.BLL.Services
             string customerName,
             int orderId,
             string amount,
+            string subtotalAmount,
+            string discountAmount,
             string baseAmount,
             string vatAmount,
             string orderLink,
@@ -114,6 +116,8 @@ namespace TetGift.BLL.Services
             return html.Replace("{{CUSTOMER_NAME}}", customerName)
                        .Replace("{{ORDER_ID}}", orderId.ToString())
                        .Replace("{{AMOUNT}}", amount)
+                       .Replace("{{SUBTOTAL_AMOUNT}}", subtotalAmount)
+                       .Replace("{{DISCOUNT_AMOUNT}}", discountAmount)
                        .Replace("{{BASE_AMOUNT}}", baseAmount)
                        .Replace("{{VAT_AMOUNT}}", vatAmount)
                        .Replace("{{ORDER_LINK}}", orderLink)
