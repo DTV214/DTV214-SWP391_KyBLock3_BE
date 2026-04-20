@@ -25,10 +25,13 @@ public class TrendDataPointDto
     public int Quantity { get; set; }
 }
 
-public class SeasonalTrendResponseDto
+public class EventTrendResponseDto
 {
     public int RequestedMonth { get; set; }
-    public int ReferenceYear { get; set; }
+
+    // Năm thực tế mà Backend đã lấy dữ liệu (để FE hiển thị nhắc nhở Admin)
+    public int DataYear { get; set; }
+
     public List<CategoryStatDto> TopCategories { get; set; } = new();
     public List<ProductTrendDto> TopProducts { get; set; } = new();
 }
@@ -38,7 +41,7 @@ public class CategoryStatDto
     public int CategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty;
     public int TotalSold { get; set; }
-    public decimal Percentage { get; set; } // Tỷ lệ % để vẽ biểu đồ tròn
+    public decimal Percentage { get; set; }
 }
 
 public class ProductTrendDto

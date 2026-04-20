@@ -306,27 +306,36 @@ public class StatisticService : IStatisticService
 
         return response;
     }
-    public async Task<SeasonalTrendResponseDto> GetSeasonalTrendAsync(int month, int year)
+    public async Task<EventTrendResponseDto> GetEventMonthTrendAsync(int month)
     {
         var orderRepo = _uow.GetRepository<Order>();
 
-        // 1. Xử lý logic "Nhìn về quá khứ": 
-        // Nếu Admin chọn tháng/năm ở tương lai hoặc hiện tại, hệ thống tự lùi về 1 năm để lấy data mẫu
         DateTime now = DateTime.Now;
-        int queryYear = year;
-        if (year > now.Year || (year == now.Year && month >= now.Month))
+        int queryYear = now.Year; // Mặc định lấy năm hiện tại
+
+        // 1. THUẬT TOÁN TỰ ĐỘNG DÒ NĂM
+        // Nếu Admin chọn một tháng ở TƯƠNG LAI (VD: bây giờ tháng 4, chọn tháng 10) 
+        // -> Lùi về năm ngoái để xem trend của sự kiện đó
+        if (month > now.Month)
         {
-            queryYear = year - 1;
+            queryYear = now.Year - 1;
         }
+        // Nếu chọn tháng quá khứ hoặc hiện tại -> Giữ nguyên năm nay
 
         DateTime startDate = new DateTime(queryYear, month, 1);
         DateTime endDate = startDate.AddMonths(1).AddDays(-1);
 
-        var validStatuses = new List<string> {
-        OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED
-    };
+        // Nếu là tháng hiện tại, ta giới hạn đến ngày hôm nay thôi (tuỳ chọn)
+        if (queryYear == now.Year && month == now.Month)
+        {
+            endDate = now;
+        }
 
-        // 2. Query lấy toàn bộ đơn hàng trong tháng đó (Kèm phân rã Giỏ quà)
+        var validStatuses = new List<string> {
+            OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED
+        };
+
+        // 2. QUERY SIÊU TỐI ƯU KÈM THEO GIỎ QUÀ
         var orders = await orderRepo.Entities
             .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Product)
@@ -341,12 +350,11 @@ public class StatisticService : IStatisticService
                         o.Orderdatetime <= endDate)
             .ToListAsync();
 
-        // Dictionary để đếm số lượng
         var productCounts = new Dictionary<int, (Product Product, int Count)>();
         var categoryCounts = new Dictionary<int, (string Name, int Count)>();
         int totalItemsSoldInMonth = 0;
 
-        // 3. Thuật toán phân rã (Unbundling)
+        // 3. THUẬT TOÁN BÓC TÁCH COMBO
         foreach (var order in orders)
         {
             foreach (var od in order.OrderDetails)
@@ -354,33 +362,62 @@ public class StatisticService : IStatisticService
                 if (od.Product == null) continue;
                 int orderQty = od.Quantity ?? 0;
 
-                // Nếu là Giỏ Quà -> Phải đếm các món bên trong
+                // Nếu là Combo / Giỏ Quà -> Mổ bụng đếm món con
                 if (od.Product.Configid != null)
                 {
                     foreach (var child in od.Product.ProductDetailProductparents)
                     {
                         if (child.Product == null) continue;
                         int actualQty = (child.Quantity ?? 1) * orderQty;
-                        UpdateCounts(child.Product, actualQty, productCounts, categoryCounts);
+
+                        // Cập nhật Product
+                        if (productCounts.ContainsKey(child.Product.Productid))
+                            productCounts[child.Product.Productid] = (child.Product, productCounts[child.Product.Productid].Count + actualQty);
+                        else
+                            productCounts[child.Product.Productid] = (child.Product, actualQty);
+
+                        // Cập nhật Category
+                        if (child.Product.Categoryid.HasValue)
+                        {
+                            string catName = child.Product.Category?.Categoryname ?? "Khác";
+                            if (categoryCounts.ContainsKey(child.Product.Categoryid.Value))
+                                categoryCounts[child.Product.Categoryid.Value] = (catName, categoryCounts[child.Product.Categoryid.Value].Count + actualQty);
+                            else
+                                categoryCounts[child.Product.Categoryid.Value] = (catName, actualQty);
+                        }
+
                         totalItemsSoldInMonth += actualQty;
                     }
                 }
-                else // Nếu là sản phẩm lẻ -> Đếm trực tiếp
+                else // Nếu là Hàng lẻ -> Đếm thẳng
                 {
-                    UpdateCounts(od.Product, orderQty, productCounts, categoryCounts);
+                    if (productCounts.ContainsKey(od.Product.Productid))
+                        productCounts[od.Product.Productid] = (od.Product, productCounts[od.Product.Productid].Count + orderQty);
+                    else
+                        productCounts[od.Product.Productid] = (od.Product, orderQty);
+
+                    if (od.Product.Categoryid.HasValue)
+                    {
+                        string catName = od.Product.Category?.Categoryname ?? "Khác";
+                        if (categoryCounts.ContainsKey(od.Product.Categoryid.Value))
+                            categoryCounts[od.Product.Categoryid.Value] = (catName, categoryCounts[od.Product.Categoryid.Value].Count + orderQty);
+                        else
+                            categoryCounts[od.Product.Categoryid.Value] = (catName, orderQty);
+                    }
+
                     totalItemsSoldInMonth += orderQty;
                 }
             }
         }
 
-        // 4. Đóng gói kết quả
-        var response = new SeasonalTrendResponseDto
+        // 4. ĐÓNG GÓI JSON TRẢ VỀ FE
+        var response = new EventTrendResponseDto
         {
             RequestedMonth = month,
-            ReferenceYear = queryYear,
+            DataYear = queryYear,
             TopProducts = productCounts.Values
                 .OrderByDescending(x => x.Count)
-                .Take(10)
+                .Take(10) // Lấy Top 10 sản phẩm
                 .Select(x => new ProductTrendDto
                 {
                     ProductId = x.Product.Productid,
@@ -390,7 +427,7 @@ public class StatisticService : IStatisticService
                 }).ToList(),
             TopCategories = categoryCounts.Values
                 .OrderByDescending(x => x.Count)
-                .Take(5)
+                .Take(5) // Lấy Top 5 Danh mục
                 .Select(x => new CategoryStatDto
                 {
                     CategoryName = x.Name,
@@ -401,7 +438,6 @@ public class StatisticService : IStatisticService
 
         return response;
     }
-
     // Hàm helper để tránh lặp code khi đếm
     private void UpdateCounts(Product p, int qty,
         Dictionary<int, (Product Product, int Count)> pDict,

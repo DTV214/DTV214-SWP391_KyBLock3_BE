@@ -47,13 +47,16 @@ public class StatisticsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
-
-    [HttpGet("seasonal-trend")]
-    public async Task<IActionResult> GetSeasonalTrend([FromQuery] int month, [FromQuery] int year)
+    [HttpGet("event-trend")]
+    // [Authorize(Roles = "ADMIN,STAFF")] 
+    public async Task<IActionResult> GetEventMonthTrend([FromQuery] int month)
     {
         try
         {
-            var result = await _statisticService.GetSeasonalTrendAsync(month, year);
+            if (month < 1 || month > 12)
+                return BadRequest(new { message = "Tháng không hợp lệ (Phải từ 1 đến 12)." });
+
+            var result = await _statisticService.GetEventMonthTrendAsync(month);
             return Ok(result);
         }
         catch (Exception ex)
