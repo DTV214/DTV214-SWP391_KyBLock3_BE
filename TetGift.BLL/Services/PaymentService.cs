@@ -605,23 +605,23 @@ public class PaymentService : IPaymentService
 
                 var imageBlock = string.IsNullOrWhiteSpace(imageUrl)
                     ? ""
-                    : $@"<div style='width:72px; min-width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid #eee; background:#fafafa;'>
-                            <img src='{System.Net.WebUtility.HtmlEncode(imageUrl)}' style='width:100%; height:100%; object-fit:cover; display:block;' />
-                        </div>";
+                    : $@"<div style='width:84px; min-width:84px; height:84px; border-radius:10px; overflow:hidden; border:1px solid #eee; background:#fafafa; margin-right:10px;'>
+                        <img src='{System.Net.WebUtility.HtmlEncode(imageUrl)}' style='width:100%; height:100%; object-fit:cover; display:block;' />
+                    </div>";
 
                 return $@"
-                <div style='display:flex; gap:14px; padding:14px 0; border-bottom:1px solid #F1D9D9; align-items:flex-start;'>
-                    {imageBlock}
-                    <div style='flex:1;'>
-                        <div style='font-size:15px; font-weight:700; color:#690000; margin-bottom:6px;'>
-                            {System.Net.WebUtility.HtmlEncode(productName)}
-                        </div>
-                        <div style='font-size:14px; color:#666666; line-height:1.7;'>
-                            Số lượng: {quantity}<br/>
-                            Thành tiền: {amount:N0} VNĐ
-                        </div>
+            <div style='display:flex; gap:18px; padding:14px 0; border-bottom:1px solid #F1D9D9; align-items:flex-start;'>
+                {imageBlock}
+                <div style='flex:1; padding-top:2px;'>
+                    <div style='font-size:15px; font-weight:700; color:#690000; margin-bottom:6px;'>
+                        {System.Net.WebUtility.HtmlEncode(productName)}
                     </div>
-                </div>";
+                    <div style='font-size:14px; color:#666666; line-height:1.7;'>
+                        Số lượng: {quantity}<br/>
+                        Thành tiền: {amount:N0} VNĐ
+                    </div>
+                </div>
+            </div>";
             });
 
         return string.Join("", rows);
