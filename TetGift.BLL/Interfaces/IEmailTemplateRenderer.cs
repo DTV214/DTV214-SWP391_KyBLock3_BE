@@ -8,6 +8,8 @@
             string customerName,
             int orderId,
             string amount,
+            string subtotalAmount,
+            string discountAmount,
             string baseAmount,
             string vatAmount,
             string orderLink,

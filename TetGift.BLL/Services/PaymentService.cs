@@ -500,12 +500,16 @@ public class PaymentService : IPaymentService
         var payableAmount = GetFinalPayableAmount(order);
         var baseAmount = GetBaseAmount(order);
         var vatAmount = GetVatAmount(order);
+        var subtotalAmount = GetSubTotalAmount(order);
+        var discountAmount = Math.Max(0, subtotalAmount - baseAmount);
         var orderItemsHtml = BuildOrderItemsEmailHtml(order);
 
         var normalHtmlBody = _templateRenderer.RenderOrderPaymentSuccess(
             customerName,
             order.Orderid,
             FormatVnd(payableAmount),
+            FormatVnd(subtotalAmount),
+            FormatVnd(discountAmount),
             FormatVnd(baseAmount),
             FormatVnd(vatAmount),
             orderLink,
@@ -516,14 +520,14 @@ public class PaymentService : IPaymentService
         var normalFileName = await _invoiceService.GetNormalInvoiceFileNameAsync(order.Orderid, order.Accountid);
 
         var normalAttachments = new List<EmailAttachmentDto>
+    {
+        new EmailAttachmentDto
         {
-            new EmailAttachmentDto
-            {
-                FileName = normalFileName,
-                ContentBytes = normalPdfBytes,
-                ContentType = "application/pdf"
-            }
-        };
+            FileName = normalFileName,
+            ContentBytes = normalPdfBytes,
+            ContentType = "application/pdf"
+        }
+    };
 
         await _emailSender.SendAsync(
             order.Customeremail,
@@ -538,6 +542,8 @@ public class PaymentService : IPaymentService
                 customerName,
                 order.Orderid,
                 FormatVnd(payableAmount),
+                FormatVnd(subtotalAmount),
+                FormatVnd(discountAmount),
                 FormatVnd(baseAmount),
                 FormatVnd(vatAmount),
                 orderLink,
@@ -548,14 +554,14 @@ public class PaymentService : IPaymentService
             var vatFileName = await _invoiceService.GetVatInvoiceFileNameAsync(order.Orderid, order.Accountid);
 
             var vatAttachments = new List<EmailAttachmentDto>
+        {
+            new EmailAttachmentDto
             {
-                new EmailAttachmentDto
-                {
-                    FileName = vatFileName,
-                    ContentBytes = vatPdfBytes,
-                    ContentType = "application/pdf"
-                }
-            };
+                FileName = vatFileName,
+                ContentBytes = vatPdfBytes,
+                ContentType = "application/pdf"
+            }
+        };
 
             await _emailSender.SendAsync(
                 order.VatInvoiceEmail,
@@ -564,6 +570,21 @@ public class PaymentService : IPaymentService
                 vatAttachments
             );
         }
+    }
+
+    private static decimal GetSubTotalAmount(Order order)
+    {
+        decimal subtotal = 0m;
+
+        if (order.OrderDetails != null)
+        {
+            foreach (var item in order.OrderDetails)
+            {
+                subtotal += item.Amount ?? ((item.Product?.Price ?? 0m) * (item.Quantity ?? 0));
+            }
+        }
+
+        return subtotal;
     }
 
     private static string BuildOrderItemsEmailHtml(Order order)
@@ -584,23 +605,23 @@ public class PaymentService : IPaymentService
 
                 var imageBlock = string.IsNullOrWhiteSpace(imageUrl)
                     ? ""
-                    : $@"<div style='width:72px; min-width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid #eee; background:#fafafa;'>
-                            <img src='{System.Net.WebUtility.HtmlEncode(imageUrl)}' style='width:100%; height:100%; object-fit:cover; display:block;' />
-                        </div>";
+                    : $@"<div style='width:84px; min-width:84px; height:84px; border-radius:10px; overflow:hidden; border:1px solid #eee; background:#fafafa; margin-right:10px;'>
+                        <img src='{System.Net.WebUtility.HtmlEncode(imageUrl)}' style='width:100%; height:100%; object-fit:cover; display:block;' />
+                    </div>";
 
                 return $@"
-                <div style='display:flex; gap:14px; padding:14px 0; border-bottom:1px solid #F1D9D9; align-items:flex-start;'>
-                    {imageBlock}
-                    <div style='flex:1;'>
-                        <div style='font-size:15px; font-weight:700; color:#690000; margin-bottom:6px;'>
-                            {System.Net.WebUtility.HtmlEncode(productName)}
-                        </div>
-                        <div style='font-size:14px; color:#666666; line-height:1.7;'>
-                            Số lượng: {quantity}<br/>
-                            Thành tiền: {amount:N0} VNĐ
-                        </div>
+            <div style='display:flex; gap:18px; padding:14px 0; border-bottom:1px solid #F1D9D9; align-items:flex-start;'>
+                {imageBlock}
+                <div style='flex:1; padding-top:2px;'>
+                    <div style='font-size:15px; font-weight:700; color:#690000; margin-bottom:6px;'>
+                        {System.Net.WebUtility.HtmlEncode(productName)}
                     </div>
-                </div>";
+                    <div style='font-size:14px; color:#666666; line-height:1.7;'>
+                        Số lượng: {quantity}<br/>
+                        Thành tiền: {amount:N0} VNĐ
+                    </div>
+                </div>
+            </div>";
             });
 
         return string.Join("", rows);
