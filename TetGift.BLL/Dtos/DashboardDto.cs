@@ -80,6 +80,12 @@ public class DashboardSummaryDto
     public AbandonedCartDto AbandonedCarts { get; set; } = new();
     public OrderStatusStatsDto Orders { get; set; } = new();
     public AccountChartDto NewAccounts { get; set; } = new();
+
+    // Thống kê tài khoản & Tỉ lệ chuyển đổi
+    public int TotalCustomerAccounts { get; set; }
+    public int AccountsWithOrders { get; set; }
+    public decimal ConversionRate { get; set; }
+    public List<HighlightProductDto> TopProducts { get; set; } = new();
 }
 
 public class CustomerOrderStatisticsDto

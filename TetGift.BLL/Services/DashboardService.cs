@@ -329,7 +329,10 @@ public class DashboardService : IDashboardService
 
         // Get order status statistics
         var orderRepo = _uow.GetRepository<Order>();
-        var ordersQuery = orderRepo.Entities.AsQueryable();
+        var ordersQuery = orderRepo.Entities
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+            .AsQueryable();
 
         if (request != null)
         {
@@ -354,6 +357,44 @@ public class DashboardService : IDashboardService
             orderStatusStats[status]++;
         }
 
+        // --- Thống kê tỉ lệ chuyển đổi (Conversion Rate) ---
+        var accountRepo = _uow.GetRepository<Account>();
+        var customerAccounts = await accountRepo.Entities
+            .Where(a => a.Role == "CUSTOMER")
+            .Include(a => a.Orders)
+            .ToListAsync();
+
+        var paidStatuses = new[] { 
+            "DELIVERED", "CONFIRMED", "PROCESSING", "SHIPPED", "PAID_WAITING_STOCK" 
+        };
+
+        var totalCustomerAccounts = customerAccounts.Count;
+        var accountsWithOrders = customerAccounts.Count(a => a.Orders.Any(o => o.Status != null && paidStatuses.Contains(o.Status.ToUpper())));
+        var conversionRate = totalCustomerAccounts > 0 
+            ? Math.Round((decimal)accountsWithOrders / totalCustomerAccounts * 100, 2) 
+            : 0;
+
+        // --- Thống kê Top 10 sản phẩm bán chạy ---
+        var topProducts = allOrders
+            .Where(o => o.Status != null && paidStatuses.Contains(o.Status.ToUpper()))
+            .SelectMany(o => o.OrderDetails)
+            .Where(od => od.Productid.HasValue && od.Product != null)
+            .GroupBy(od => od.Productid!.Value)
+            .Select(g => new HighlightProductDto
+            {
+                ProductId = g.Key,
+                ProductName = g.First().Product!.Productname ?? $"Product {g.Key}",
+                ImageUrl = g.First().Product!.ImageUrl,
+                TotalQuantity = g.Sum(od => od.Quantity ?? 0),
+                TotalRevenue = g.Sum(od => (od.Quantity ?? 0) * (od.Product!.Price ?? 0)),
+                Price = g.First().Product!.Price ?? 0,
+                ImportPrice = g.First().Product!.ImportPrice ?? 0,
+                TotalProfit = g.Sum(od => (od.Quantity ?? 0) * ((od.Product!.Price ?? 0) - (od.Product!.ImportPrice ?? 0)))
+            })
+            .OrderByDescending(p => p.TotalQuantity)
+            .Take(10)
+            .ToList();
+
         return new DashboardSummaryDto
         {
             Revenue = revenue,
@@ -364,7 +405,11 @@ public class DashboardService : IDashboardService
                 Total = allOrders.Count,
                 ByStatus = orderStatusStats
             },
-            NewAccounts = newAccounts
+            NewAccounts = newAccounts,
+            TotalCustomerAccounts = totalCustomerAccounts,
+            AccountsWithOrders = accountsWithOrders,
+            ConversionRate = conversionRate,
+            TopProducts = topProducts
         };
     }
 
@@ -761,6 +806,31 @@ public class DashboardService : IDashboardService
             CartCount = abandonedCarts.Count,
             TotalLostValue = abandonedCarts.Sum(c => c.Totalprice ?? 0)
         };
+
+        // 7. Inactive Customers (>= 7 days)
+        var sevenDaysAgo = DateTime.UtcNow.AddHours(7).AddDays(-7);
+        var allCustomerAccounts = await accountRepo.Entities
+            .Where(a => a.Role == "CUSTOMER")
+            .Include(a => a.Orders)
+            .ToListAsync();
+
+        result.InactiveCustomers = allCustomerAccounts
+            .Where(a => a.Orders.Any() && a.Orders.Max(o => o.Orderdatetime) < sevenDaysAgo)
+            .Select(a => {
+                var lastOrder = a.Orders.Max(o => o.Orderdatetime);
+                return new InactiveCustomerDto
+                {
+                    AccountId = a.Accountid,
+                    FullName = a.Fullname ?? a.Username,
+                    Email = a.Email ?? "",
+                    Phone = a.Phone,
+                    LastOrderDate = lastOrder,
+                    DaysSinceLastOrder = lastOrder.HasValue ? (int)(DateTime.UtcNow.AddHours(7) - lastOrder.Value).TotalDays : 0
+                };
+            })
+            .OrderByDescending(c => c.DaysSinceLastOrder)
+            .Take(20)
+            .ToList();
 
         return result;
     }
