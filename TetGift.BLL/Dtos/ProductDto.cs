@@ -202,4 +202,11 @@ namespace TetGift.BLL.Dtos
         public decimal Subtotal { get; set; }
     }
 
+    public class ProductAssociationDto
+    {
+        public int ProductId { get; set; }
+        public string? ProductName { get; set; }
+        public int CoPurchaseCount { get; set; }           // number of orders that contain both target and this product
+        public double SupportPercentage { get; set; }      // CoPurchaseCount / totalOrdersWithTarget * 100
+    }
 }

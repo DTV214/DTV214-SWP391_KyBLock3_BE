@@ -11,6 +11,7 @@ public class RevenueChartDataDto
 {
     public string Date { get; set; } = string.Empty; // Format: "2026-01-01" or "2026-01" or "2026"
     public decimal Revenue { get; set; }
+    public decimal RevenueBeforeDiscount { get; set; }
     public int OrderCount { get; set; }
 }
 
@@ -19,6 +20,7 @@ public class RevenueChartDto
     public string Period { get; set; } = string.Empty;
     public List<RevenueChartDataDto> Data { get; set; } = new();
     public decimal TotalRevenue { get; set; }
+    public decimal TotalRevenueBeforeDiscount { get; set; } = 0;
     public int TotalOrders { get; set; }
 }
 

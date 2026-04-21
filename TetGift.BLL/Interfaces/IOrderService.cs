@@ -20,4 +20,7 @@ public interface IOrderService
     Task TryAllocateStockAfterPaymentAsync(int orderId);
     Task AllocateStockForWaitingOrderAsync(int orderId);
     Task ForceAllocateStockAsync(int orderId, int actorAccountId, string actorRole);
+
+    // Product association analysis: products frequently bought together with given product
+    Task<List<ProductAssociationDto>> GetProductAssociationsAsync(int productId, int top = 10, int minSupport = 1);
 }

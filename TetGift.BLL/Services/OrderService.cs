@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using TetGift.BLL.Common.Constraint;
@@ -201,6 +206,71 @@ public class OrderService : IOrderService
         #endregion
 
         return new PagedResponse<OrderResponseDto>(pagedOrders, totalItems, pageNumber, pageSize);
+    }
+
+    // New: product association analysis (bought together)
+    public async Task<List<ProductAssociationDto>> GetProductAssociationsAsync(int productId, int top = 10, int minSupport = 1)
+    {
+        if (productId <= 0) throw new ArgumentException("productId is required.", nameof(productId));
+        if (top <= 0) top = 10;
+        if (minSupport < 1) minSupport = 1;
+
+        var orderRepo = _uow.GetRepository<Order>();
+
+        // Consider only paid/confirmed orders (same approach used elsewhere)
+        var paidStatuses = new[] { OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.PAID_WAITING_STOCK };
+
+        var ordersWithTarget = await orderRepo.Entities
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+            .Include(o => o.Payments)
+            .Where(o =>
+                o.OrderDetails.Any(od => od.Productid == productId)
+                &&
+                (o.Payments.Any(p => p.Status == PaymentStatus.SUCCESS) ||
+                 (o.Status != null && paidStatuses.Contains(o.Status)))
+            )
+            .ToListAsync();
+
+        if (ordersWithTarget == null || ordersWithTarget.Count == 0)
+            return new List<ProductAssociationDto>();
+
+        var coCounts = new Dictionary<int, (string? name, int orderCount)>();
+
+        foreach (var order in ordersWithTarget)
+        {
+            var coProductIds = order.OrderDetails
+                .Where(od => od.Productid.HasValue && od.Productid.Value != productId)
+                .Select(od => od.Productid!.Value)
+                .Distinct();
+
+            foreach (var pid in coProductIds)
+            {
+                var prodName = order.OrderDetails.FirstOrDefault(od => od.Productid == pid)?.Product?.Productname ?? $"Product {pid}";
+                if (coCounts.TryGetValue(pid, out var entry))
+                    coCounts[pid] = (entry.name ?? prodName, entry.orderCount + 1);
+                else
+                    coCounts[pid] = (prodName, 1);
+            }
+        }
+
+        var totalOrdersWithTarget = ordersWithTarget.Count;
+
+        var results = coCounts
+            .Where(kv => kv.Value.orderCount >= minSupport)
+            .Select(kv => new ProductAssociationDto
+            {
+                ProductId = kv.Key,
+                ProductName = kv.Value.name,
+                CoPurchaseCount = kv.Value.orderCount,
+                SupportPercentage = Math.Round((double)kv.Value.orderCount / totalOrdersWithTarget * 100.0, 2)
+            })
+            .OrderByDescending(x => x.CoPurchaseCount)
+            .ThenByDescending(x => x.SupportPercentage)
+            .Take(top)
+            .ToList();
+
+        return results;
     }
 
     public async Task<OrderResponseDto> UpdateOrderShippingInfoAsync(int orderId, int accountId, string userRole, UpdateOrderShippingRequest request)
@@ -1142,3 +1212,4 @@ public class OrderService : IOrderService
             request.VatInvoiceEmail = request.CustomerEmail;
     }
 }
+

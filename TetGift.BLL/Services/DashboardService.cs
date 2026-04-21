@@ -21,17 +21,15 @@ public class DashboardService : IDashboardService
         var orderRepo = _uow.GetRepository<Order>();
         var paymentRepo = _uow.GetRepository<Payment>();
 
-        // Lấy tất cả orders trong khoảng thời gian với Payment và Promotion
         var ordersQuery = orderRepo.Entities
             .Include(o => o.Promotion)
             .Include(o => o.Payments)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
             .AsQueryable();
 
         // Filter theo thời gian
         if (request.StartDate.HasValue)
-        {
             ordersQuery = ordersQuery.Where(o => o.Orderdatetime >= request.StartDate.Value);
-        }
         if (request.EndDate.HasValue)
         {
             var endDate = request.EndDate.Value.AddDays(1); // Include end date
@@ -45,80 +43,58 @@ public class DashboardService : IDashboardService
                        (o.Status != null && new[] { OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.DELIVERED }.Contains(o.Status)))
             .ToListAsync();
 
-        // Tính revenue theo period
         var revenueData = new List<RevenueChartDataDto>();
-        var period = request.Period.ToLower();
+        var period = (request.Period ?? "day").ToLower();
 
-        if (period == "day")
+        IEnumerable<IGrouping<object?, Order>> groups = period switch
         {
-            var grouped = paidOrders
-                .GroupBy(o => o.Orderdatetime?.Date)
-                .Where(g => g.Key.HasValue)
-                .OrderBy(g => g.Key)
-                .ToList();
+            "month" => paidOrders.GroupBy(o => o.Orderdatetime.HasValue
+                        ? (object?)new DateTime(o.Orderdatetime.Value.Year, o.Orderdatetime.Value.Month, 1)
+                        : null),
+            "year" => paidOrders.GroupBy(o => o.Orderdatetime?.Year as object),
+            _ => paidOrders.GroupBy(o => o.Orderdatetime?.Date as object)
+        };
 
-            foreach (var group in grouped)
-            {
-                var date = group.Key!.Value;
-                var orders = group.ToList();
-                var revenue = orders.Sum(o => CalculateFinalPrice(o));
-                var orderCount = orders.Count;
-
-                revenueData.Add(new RevenueChartDataDto
-                {
-                    Date = date.ToString("yyyy-MM-dd"),
-                    Revenue = revenue,
-                    OrderCount = orderCount
-                });
-            }
-        }
-        else if (period == "month")
+        foreach (var g in groups.Where(g => g.Key != null).OrderBy(g => g.Key))
         {
-            var grouped = paidOrders
-                .GroupBy(o => o.Orderdatetime.HasValue 
-                    ? new DateTime(o.Orderdatetime.Value.Year, o.Orderdatetime.Value.Month, 1)
-                    : (DateTime?)null)
-                .Where(g => g.Key.HasValue)
-                .OrderBy(g => g.Key)
-                .ToList();
+            decimal groupRevenueAfter = 0m;
+            decimal groupRevenueBefore = 0m;
+            var orders = g.ToList();
 
-            foreach (var group in grouped)
+            foreach (var order in orders)
             {
-                var date = group.Key!.Value;
-                var orders = group.ToList();
-                var revenue = orders.Sum(o => CalculateFinalPrice(o));
-                var orderCount = orders.Count;
-
-                revenueData.Add(new RevenueChartDataDto
+                // compute sum of detail amounts (fallback to price * qty)
+                decimal sumDetails = 0m;
+                if (order.OrderDetails != null)
                 {
-                    Date = date.ToString("yyyy-MM"),
-                    Revenue = revenue,
-                    OrderCount = orderCount
-                });
-            }
-        }
-        else if (period == "year")
-        {
-            var grouped = paidOrders
-                .GroupBy(o => o.Orderdatetime?.Year)
-                .Where(g => g.Key.HasValue)
-                .OrderBy(g => g.Key)
-                .ToList();
+                    foreach (var od in order.OrderDetails)
+                    {
+                        sumDetails += od.Amount ?? ((od.Product?.Price ?? 0m) * (od.Quantity ?? 0));
+                    }
+                }
 
-            foreach (var group in grouped)
+                // revenue before discount = sum of details
+                groupRevenueBefore += sumDetails;
+
+                // revenue after discount: prefer stored Totalprice (final stored amount), otherwise fallback to sumDetails
+                decimal finalPaid = order.Totalprice ?? sumDetails;
+                groupRevenueAfter += finalPaid;
+            }
+
+            string label = period switch
             {
-                var year = group.Key!.Value;
-                var orders = group.ToList();
-                var revenue = orders.Sum(o => CalculateFinalPrice(o));
-                var orderCount = orders.Count;
+                "month" => ((DateTime)g.Key!).ToString("yyyy-MM"),
+                "year" => g.Key!.ToString() ?? string.Empty,
+                _ => ((DateTime)g.Key!).ToString("yyyy-MM-dd")
+            };
 
-                revenueData.Add(new RevenueChartDataDto
-                {
-                    Date = year.ToString(),
-                    Revenue = revenue,
-                    OrderCount = orderCount
-                });
-            }
+            revenueData.Add(new RevenueChartDataDto
+            {
+                Date = label,
+                Revenue = groupRevenueAfter,
+                RevenueBeforeDiscount = groupRevenueBefore,
+                OrderCount = orders.Count
+            });
         }
 
         return new RevenueChartDto
@@ -126,6 +102,7 @@ public class DashboardService : IDashboardService
             Period = period,
             Data = revenueData,
             TotalRevenue = revenueData.Sum(d => d.Revenue),
+            TotalRevenueBeforeDiscount = revenueData.Sum(d => d.RevenueBeforeDiscount),
             TotalOrders = revenueData.Sum(d => d.OrderCount)
         };
     }

@@ -11,10 +11,12 @@ namespace TetGift.Controllers;
 public class FeedbackController : ControllerBase
 {
     private readonly IFeedbackService _feedbackService;
+    private readonly IOrderService _orderService;
 
-    public FeedbackController(IFeedbackService feedbackService)
+    public FeedbackController(IFeedbackService feedbackService, IOrderService orderService)
     {
         _feedbackService = feedbackService;
+        _orderService = orderService;
     }
 
     private int GetCurrentAccountId()
@@ -87,6 +89,26 @@ public class FeedbackController : ControllerBase
         {
             var feedbacks = await _feedbackService.GetFeedbacksForProductAsync(productId);
             return Ok(feedbacks);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // ========== ADMIN: Product association analysis ==========
+    // GET /api/admin/associations/product-associations?productId=123&top=10&minSupport=2
+    [HttpGet("admin/associations/product-associations")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> GetProductAssociations([FromQuery] int productId, [FromQuery] int top = 10, [FromQuery] int minSupport = 1)
+    {
+        if (productId <= 0)
+            return BadRequest(new { message = "productId is required." });
+
+        try
+        {
+            var result = await _orderService.GetProductAssociationsAsync(productId, top, minSupport);
+            return Ok(result);
         }
         catch (Exception ex)
         {
