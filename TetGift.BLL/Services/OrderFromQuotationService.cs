@@ -9,6 +9,7 @@ namespace TetGift.BLL.Services
     public class OrderFromQuotationService : IOrderFromQuotationService
     {
         private readonly IUnitOfWork _uow;
+        private const decimal DefaultVatRate = 0.08m;
 
         public OrderFromQuotationService(IUnitOfWork uow)
         {
@@ -32,7 +33,8 @@ namespace TetGift.BLL.Services
             if (q == null) throw new Exception("Quotation not found.");
             if ((q.Accountid ?? 0) != accountId) throw new Exception("Forbidden.");
 
-            // chống double convert
+            ValidateVatInfoIfRequired(q);
+
             if (q.Orderid != null && q.Orderid > 0) return q.Orderid.Value;
 
             var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
@@ -41,7 +43,6 @@ namespace TetGift.BLL.Services
             _uow.BeginTransaction();
             try
             {
-                // 1) ensure QuotationItem.Price = line total gốc (snapshot)
                 foreach (var it in items)
                 {
                     var pid = it.Productid ?? 0;
@@ -63,7 +64,6 @@ namespace TetGift.BLL.Services
                 }
                 await _uow.SaveAsync();
 
-                // 2) load all fees (batch)
                 var itemIds = items.Select(i => i.Quotationitemid).ToList();
                 var fees = itemIds.Count == 0
                     ? new List<QuotationFee>()
@@ -74,7 +74,6 @@ namespace TetGift.BLL.Services
                     .GroupBy(f => f.Quotationitemid!.Value)
                     .ToDictionary(g => g.Key, g => g.ToList());
 
-                // 3) create Order (PENDING: chờ payment)
                 var order = new Order
                 {
                     Accountid = accountId,
@@ -88,13 +87,20 @@ namespace TetGift.BLL.Services
                     Note = q.Note,
 
                     Totalprice = 0m,
-                    isQuotation = 1
+                    isQuotation = 1,
+
+                    RequireVatInvoice = q.RequireVatInvoice,
+                    VatRate = q.RequireVatInvoice ? DefaultVatRate : 0m,
+                    VatAmount = 0m,
+                    VatCompanyName = q.RequireVatInvoice ? q.VatCompanyName : null,
+                    VatCompanyTaxCode = q.RequireVatInvoice ? q.VatCompanyTaxCode : null,
+                    VatCompanyAddress = q.RequireVatInvoice ? q.VatCompanyAddress : null,
+                    VatInvoiceEmail = q.RequireVatInvoice ? q.VatInvoiceEmail : null
                 };
 
                 await oRepo.AddAsync(order);
                 await _uow.SaveAsync();
 
-                // 4) create OrderDetails + compute total = sum(original) - sum(sub) + sum(add)
                 decimal total = 0m;
 
                 foreach (var it in items)
@@ -131,9 +137,12 @@ namespace TetGift.BLL.Services
                 if (total <= 0) throw new Exception("Order total invalid.");
 
                 order.Totalprice = Math.Round(total, 2);
+                order.VatAmount = order.RequireVatInvoice
+                    ? Math.Round((order.Totalprice ?? 0m) * order.VatRate, 2)
+                    : 0m;
+
                 oRepo.Update(order);
 
-                // 5) link quotation -> order
                 q.Orderid = order.Orderid;
                 q.Status = QuotationStatus.CONVERTED_TO_ORDER;
                 qRepo.Update(q);
@@ -150,5 +159,21 @@ namespace TetGift.BLL.Services
             }
         }
 
+        private static void ValidateVatInfoIfRequired(Quotation q)
+        {
+            if (!q.RequireVatInvoice) return;
+
+            if (string.IsNullOrWhiteSpace(q.VatCompanyName))
+                throw new Exception("Quotation yêu cầu hóa đơn VAT nhưng thiếu tên công ty.");
+
+            if (string.IsNullOrWhiteSpace(q.VatCompanyTaxCode))
+                throw new Exception("Quotation yêu cầu hóa đơn VAT nhưng thiếu mã số thuế.");
+
+            if (string.IsNullOrWhiteSpace(q.VatCompanyAddress))
+                throw new Exception("Quotation yêu cầu hóa đơn VAT nhưng thiếu địa chỉ công ty.");
+
+            if (string.IsNullOrWhiteSpace(q.VatInvoiceEmail))
+                throw new Exception("Quotation yêu cầu hóa đơn VAT nhưng thiếu email nhận hóa đơn VAT.");
+        }
     }
 }

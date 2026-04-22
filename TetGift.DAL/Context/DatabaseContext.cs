@@ -638,6 +638,26 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.Adminreviewerid)
                 .HasColumnName("adminreviewerid");
 
+            // ===== VAT request info =====
+            entity.Property(e => e.RequireVatInvoice)
+                .HasDefaultValue(false)
+                .HasColumnName("requirevatinvoice");
+
+            entity.Property(e => e.VatCompanyName)
+                .HasMaxLength(255)
+                .HasColumnName("vatcompanyname");
+
+            entity.Property(e => e.VatCompanyTaxCode)
+                .HasMaxLength(50)
+                .HasColumnName("vatcompanytaxcode");
+
+            entity.Property(e => e.VatCompanyAddress)
+                .HasMaxLength(500)
+                .HasColumnName("vatcompanyaddress");
+
+            entity.Property(e => e.VatInvoiceEmail)
+                .HasMaxLength(255)
+                .HasColumnName("vatinvoiceemail");
 
             entity.HasOne(d => d.Account).WithMany(p => p.Quotations)
                 .HasForeignKey(d => d.Accountid)

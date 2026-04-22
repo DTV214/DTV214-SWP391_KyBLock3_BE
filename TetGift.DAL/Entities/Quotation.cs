@@ -41,6 +41,13 @@ public partial class Quotation
     public int? Staffreviewerid { get; set; }
     public int? Adminreviewerid { get; set; }
 
+    // ===== VAT request info =====
+    public bool RequireVatInvoice { get; set; } = false;
+    public string? VatCompanyName { get; set; }
+    public string? VatCompanyTaxCode { get; set; }
+    public string? VatCompanyAddress { get; set; }
+    public string? VatInvoiceEmail { get; set; }
+
     public virtual Account? Account { get; set; }
 
     public virtual Order? Order { get; set; }

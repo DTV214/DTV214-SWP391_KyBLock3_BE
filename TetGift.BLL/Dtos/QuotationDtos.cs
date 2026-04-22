@@ -6,7 +6,7 @@
         public int Quantity { get; set; }
     }
 
-    //Flow 1: luồng bình thường
+    // Flow 1: manual quotation
     public class QuotationCreateManualRequest
     {
         public int AccountId { get; set; }
@@ -16,6 +16,13 @@
         public string? Phone { get; set; }
         public string? DesiredPriceNote { get; set; }
         public string? Note { get; set; }
+
+        public bool RequireVatInvoice { get; set; } = false;
+        public string? VatCompanyName { get; set; }
+        public string? VatCompanyTaxCode { get; set; }
+        public string? VatCompanyAddress { get; set; }
+        public string? VatInvoiceEmail { get; set; }
+
         public List<QuotationItemUpsertDto> Items { get; set; } = new();
     }
 
@@ -28,6 +35,13 @@
         public string? Phone { get; set; }
         public string? DesiredPriceNote { get; set; }
         public string? Note { get; set; }
+
+        public bool? RequireVatInvoice { get; set; }
+        public string? VatCompanyName { get; set; }
+        public string? VatCompanyTaxCode { get; set; }
+        public string? VatCompanyAddress { get; set; }
+        public string? VatInvoiceEmail { get; set; }
+
         public List<QuotationItemUpsertDto>? Items { get; set; }
     }
 
@@ -36,7 +50,6 @@
         public int AccountId { get; set; }
     }
 
-    // Staff propose price (and optionally fees later)
     public class StaffProposePriceRequest
     {
         public int StaffAccountId { get; set; }
@@ -53,40 +66,39 @@
     public class CustomerDecisionRequest
     {
         public int AccountId { get; set; }
-        public string? Message { get; set; } // reason / desired change
+        public string? Message { get; set; }
     }
 
     public class StaffDiscountLineDto
     {
         public int QuotationItemId { get; set; }
-        public decimal DiscountPercent { get; set; } // 0..100
+        public decimal DiscountPercent { get; set; }
     }
 
     public class StaffCreateFeeRequest
     {
-        public int StaffAccountId { get; set; } // override từ JWT
+        public int StaffAccountId { get; set; }
         public int QuotationItemId { get; set; }
-        public short IsSubtracted { get; set; } // 0 trừ, 1 cộng
-        public decimal Price { get; set; }      // delta
+        public short IsSubtracted { get; set; }
+        public decimal Price { get; set; }
         public string? Description { get; set; }
     }
 
     public class StaffUpdateFeeRequest
     {
-        public int StaffAccountId { get; set; } // controller override từ JWT
-        public int QuotationFeeId { get; set; } // controller override từ route
-        public short IsSubtracted { get; set; } // 0 = trừ, 1 = cộng
-        public decimal Price { get; set; }      // delta tiền
+        public int StaffAccountId { get; set; }
+        public int QuotationFeeId { get; set; }
+        public short IsSubtracted { get; set; }
+        public decimal Price { get; set; }
         public string? Description { get; set; }
     }
 
-
     public class StaffFeeInputDto
     {
-        public int? QuotationFeeId { get; set; }// null => create mới
-        public short IsSubtracted { get; set; }// 0 = trừ, 1 = cộng
+        public int? QuotationFeeId { get; set; }
+        public short IsSubtracted { get; set; }
         public decimal Price { get; set; }
-        public string? Description { get; set; } // "Giảm 10%", "Phí ship", ...
+        public string? Description { get; set; }
         public bool IsDeleted { get; set; }
     }
 
@@ -98,7 +110,6 @@
 
     public class StaffReviewFeesRequest
     {
-        // sẽ override từ JWT trong controller
         public int StaffAccountId { get; set; }
         public List<StaffReviewFeesLineDto> Lines { get; set; } = new();
         public string? Message { get; set; }
@@ -108,8 +119,8 @@
     {
         public int QuotationFeeId { get; set; }
         public int QuotationItemId { get; set; }
-        public short IsSubtracted { get; set; } // 0=trừ, 1=cộng
-        public decimal Price { get; set; }      // delta tiền
+        public short IsSubtracted { get; set; }
+        public decimal Price { get; set; }
         public string? Description { get; set; }
     }
 
@@ -120,7 +131,7 @@
         public string? Message { get; set; }
     }
 
-    //Flow 2: tự reccommend
+    // Flow 2: recommend quotation
     public class RecommendCategoryInputDto
     {
         public int CategoryId { get; set; }
@@ -131,18 +142,30 @@
     public class QuotationRecommendRequest
     {
         public int AccountId { get; set; }
+
+        public string? Company { get; set; }
+        public string? Address { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+
         public decimal Budget { get; set; }
         public string? Note { get; set; }
+
+        public bool RequireVatInvoice { get; set; } = false;
+        public string? VatCompanyName { get; set; }
+        public string? VatCompanyTaxCode { get; set; }
+        public string? VatCompanyAddress { get; set; }
+        public string? VatInvoiceEmail { get; set; }
+
         public List<RecommendCategoryInputDto> Categories { get; set; } = new();
     }
 
     public class QuotationRecommendConfirmRequest
     {
         public int AccountId { get; set; }
-        public bool AutoCreateOrder { get; set; } = true; // nếu đồng ý thì tạo order API riêng
+        public bool AutoCreateOrder { get; set; } = true;
     }
 
-    // response
     public class QuotationSimpleDto
     {
         public int QuotationId { get; set; }
@@ -151,6 +174,11 @@
         public decimal? DesiredBudget { get; set; }
         public decimal? TotalPrice { get; set; }
         public int? Revision { get; set; }
+
+        public bool RequireVatInvoice { get; set; }
+        public decimal VatRatePreview { get; set; }
+        public decimal VatAmountPreview { get; set; }
+        public decimal FinalPayablePreview { get; set; }
     }
 
     public class RecommendPreviewItemDto

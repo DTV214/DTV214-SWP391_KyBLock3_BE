@@ -14,8 +14,13 @@ namespace TetGift.BLL.Services
         private readonly IOrderFromQuotationService _orderSvc;
         private readonly IEmailSender _emailSender;
         private readonly IEmailTemplateRenderer _emailTemplateRenderer;
+        private const decimal DefaultVatRate = 0.08m;
 
-        public QuotationService(IUnitOfWork uow, IOrderFromQuotationService orderSvc, IEmailSender emailSender, IEmailTemplateRenderer emailTemplateRenderer)
+        public QuotationService(
+            IUnitOfWork uow,
+            IOrderFromQuotationService orderSvc,
+            IEmailSender emailSender,
+            IEmailTemplateRenderer emailTemplateRenderer)
         {
             _uow = uow;
             _orderSvc = orderSvc;
@@ -23,9 +28,6 @@ namespace TetGift.BLL.Services
             _emailTemplateRenderer = emailTemplateRenderer;
         }
 
-        // =========================
-        // Helpers
-        // =========================
         private static void Ensure(bool condition, string message)
         {
             if (!condition) throw new Exception(message);
@@ -45,7 +47,14 @@ namespace TetGift.BLL.Services
             await Task.CompletedTask;
         }
 
-        private async Task AddMessageAsync(int quotationId, string fromRole, int? fromAccountId, string actionType, string? message, object? meta = null, string? toRole = null)
+        private async Task AddMessageAsync(
+            int quotationId,
+            string fromRole,
+            int? fromAccountId,
+            string actionType,
+            string? message,
+            object? meta = null,
+            string? toRole = null)
         {
             var msgRepo = _uow.GetRepository<QuotationMessage>();
 
@@ -69,16 +78,13 @@ namespace TetGift.BLL.Services
             var itemRepo = _uow.GetRepository<QuotationItem>();
             var productRepo = _uow.GetRepository<Product>();
 
-            // load current items
             var current = (await itemRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
 
-            // map desired (merge duplicate productId)
             var desiredMap = items
                 .Where(i => i.ProductId > 0 && i.Quantity > 0)
                 .GroupBy(i => i.ProductId)
                 .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
 
-            // delete items not in desired
             foreach (var cur in current)
             {
                 var pid = cur.Productid ?? 0;
@@ -88,13 +94,11 @@ namespace TetGift.BLL.Services
                 }
             }
 
-            // load products in batch for price snapshot
             var desiredProductIds = desiredMap.Keys.ToList();
             var products = desiredProductIds.Count == 0
                 ? new List<Product>()
                 : (await productRepo.FindAsync(p => desiredProductIds.Contains(p.Productid))).ToList();
 
-            // update existing or add new
             foreach (var kv in desiredMap)
             {
                 var pid = kv.Key;
@@ -116,20 +120,115 @@ namespace TetGift.BLL.Services
                         Quotationid = quotationId,
                         Productid = pid,
                         Quantity = qty,
-                        Price = lineTotal // IMPORTANT: store original line total
+                        Price = lineTotal
                     });
                 }
                 else
                 {
                     existed.Quantity = qty;
-                    existed.Price = lineTotal; // IMPORTANT: keep snapshot line total updated
+                    existed.Price = lineTotal;
                     itemRepo.Update(existed);
                 }
             }
         }
 
+        private static void ClearVatInfo(Quotation q)
+        {
+            q.RequireVatInvoice = false;
+            q.VatCompanyName = null;
+            q.VatCompanyTaxCode = null;
+            q.VatCompanyAddress = null;
+            q.VatInvoiceEmail = null;
+        }
 
+        private static void ApplyVatForCreate(
+            Quotation q,
+            bool requireVatInvoice,
+            string? vatCompanyName,
+            string? vatCompanyTaxCode,
+            string? vatCompanyAddress,
+            string? vatInvoiceEmail)
+        {
+            if (!requireVatInvoice)
+            {
+                ClearVatInfo(q);
+                return;
+            }
+
+            q.RequireVatInvoice = true;
+            q.VatCompanyName = vatCompanyName;
+            q.VatCompanyTaxCode = vatCompanyTaxCode;
+            q.VatCompanyAddress = vatCompanyAddress;
+            q.VatInvoiceEmail = vatInvoiceEmail;
+        }
+
+        private static void ApplyVatForUpdate(
+            Quotation q,
+            bool? requireVatInvoice,
+            string? vatCompanyName,
+            string? vatCompanyTaxCode,
+            string? vatCompanyAddress,
+            string? vatInvoiceEmail)
+        {
+            if (requireVatInvoice.HasValue)
+            {
+                q.RequireVatInvoice = requireVatInvoice.Value;
+            }
+
+            if (!q.RequireVatInvoice)
+            {
+                ClearVatInfo(q);
+                return;
+            }
+
+            if (vatCompanyName != null) q.VatCompanyName = vatCompanyName;
+            if (vatCompanyTaxCode != null) q.VatCompanyTaxCode = vatCompanyTaxCode;
+            if (vatCompanyAddress != null) q.VatCompanyAddress = vatCompanyAddress;
+            if (vatInvoiceEmail != null) q.VatInvoiceEmail = vatInvoiceEmail;
+        }
+
+        private static void ValidateVatInfoForOrder(Quotation q)
+        {
+            if (!q.RequireVatInvoice) return;
+
+            Ensure(!string.IsNullOrWhiteSpace(q.VatCompanyName), "Quotation yêu cầu hóa đơn VAT nhưng thiếu tên công ty.");
+            Ensure(!string.IsNullOrWhiteSpace(q.VatCompanyTaxCode), "Quotation yêu cầu hóa đơn VAT nhưng thiếu mã số thuế.");
+            Ensure(!string.IsNullOrWhiteSpace(q.VatCompanyAddress), "Quotation yêu cầu hóa đơn VAT nhưng thiếu địa chỉ công ty.");
+            Ensure(!string.IsNullOrWhiteSpace(q.VatInvoiceEmail), "Quotation yêu cầu hóa đơn VAT nhưng thiếu email nhận hóa đơn VAT.");
+        }
+
+        private async Task<decimal> GetOriginalTotalAsync(int quotationId)
+        {
+            var itemRepo = _uow.GetRepository<QuotationItem>();
+            var items = (await itemRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
+            return Math.Round(items.Sum(x => x.Price ?? 0m), 2);
+        }
+
+        private static QuotationSimpleDto BuildSimpleDto(Quotation q, decimal? baseTotalOverride = null)
+        {
+            var baseTotal = Math.Round(baseTotalOverride ?? q.Totalprice ?? 0m, 2);
+            var vatRate = q.RequireVatInvoice ? DefaultVatRate : 0m;
+            var vatAmount = q.RequireVatInvoice ? Math.Round(baseTotal * vatRate, 2) : 0m;
+
+            return new QuotationSimpleDto
+            {
+                QuotationId = q.Quotationid,
+                Status = q.Status,
+                QuotationType = q.Quotationtype,
+                DesiredBudget = q.Desiredbudget,
+                TotalPrice = baseTotal,
+                Revision = q.Revision,
+                RequireVatInvoice = q.RequireVatInvoice,
+                VatRatePreview = vatRate,
+                VatAmountPreview = vatAmount,
+                FinalPayablePreview = baseTotal + vatAmount
+            };
+        }
+
+        // =========================
         // CUSTOMER - FLOW 1
+        // =========================
+
         public async Task<QuotationSimpleDto> CreateManualAsync(QuotationCreateManualRequest req)
         {
             Ensure(req.AccountId > 0, "AccountId is required.");
@@ -152,6 +251,15 @@ namespace TetGift.BLL.Services
                 Revision = 1
             };
 
+            ApplyVatForCreate(
+                q,
+                req.RequireVatInvoice,
+                req.VatCompanyName,
+                req.VatCompanyTaxCode,
+                req.VatCompanyAddress,
+                req.VatInvoiceEmail
+            );
+
             await qRepo.AddAsync(q);
             await _uow.SaveAsync();
 
@@ -161,20 +269,18 @@ namespace TetGift.BLL.Services
                 await _uow.SaveAsync();
             }
 
-            await AddMessageAsync(q.Quotationid, QuotationRole.CUSTOMER, req.AccountId, QuotationAction.NOTE,
-                "Created manual quotation draft.");
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.CUSTOMER,
+                req.AccountId,
+                QuotationAction.NOTE,
+                "Created manual quotation draft.",
+                meta: new { requireVatInvoice = q.RequireVatInvoice });
 
             await _uow.SaveAsync();
 
-            return new QuotationSimpleDto
-            {
-                QuotationId = q.Quotationid,
-                Status = q.Status,
-                QuotationType = q.Quotationtype,
-                DesiredBudget = q.Desiredbudget,
-                TotalPrice = q.Totalprice,
-                Revision = q.Revision
-            };
+            var previewTotal = await GetOriginalTotalAsync(q.Quotationid);
+            return BuildSimpleDto(q, previewTotal);
         }
 
         public async Task<QuotationSimpleDto> UpdateDraftAsync(int quotationId, QuotationUpdateDraftRequest req)
@@ -194,6 +300,15 @@ namespace TetGift.BLL.Services
             q.Note = req.Note ?? q.Note;
             q.Desiredpricenote = req.DesiredPriceNote ?? q.Desiredpricenote;
 
+            ApplyVatForUpdate(
+                q,
+                req.RequireVatInvoice,
+                req.VatCompanyName,
+                req.VatCompanyTaxCode,
+                req.VatCompanyAddress,
+                req.VatInvoiceEmail
+            );
+
             var qRepo = _uow.GetRepository<Quotation>();
             qRepo.Update(q);
 
@@ -202,20 +317,18 @@ namespace TetGift.BLL.Services
                 await UpsertItemsAsync(q.Quotationid, req.Items);
             }
 
-            await AddMessageAsync(q.Quotationid, QuotationRole.CUSTOMER, req.AccountId, QuotationAction.NOTE,
-                "Customer updated draft/submitted quotation.");
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.CUSTOMER,
+                req.AccountId,
+                QuotationAction.NOTE,
+                "Customer updated draft/submitted quotation.",
+                meta: new { requireVatInvoice = q.RequireVatInvoice });
 
             await _uow.SaveAsync();
 
-            return new QuotationSimpleDto
-            {
-                QuotationId = q.Quotationid,
-                Status = q.Status,
-                QuotationType = q.Quotationtype,
-                DesiredBudget = q.Desiredbudget,
-                TotalPrice = q.Totalprice,
-                Revision = q.Revision
-            };
+            var previewTotal = await GetOriginalTotalAsync(q.Quotationid);
+            return BuildSimpleDto(q, previewTotal);
         }
 
         public async Task SubmitAsync(int quotationId, QuotationSubmitRequest req)
@@ -228,7 +341,6 @@ namespace TetGift.BLL.Services
             Ensure(q.Status == QuotationStatus.DRAFT || q.Status == QuotationStatus.SUBMITTED,
                 "Quotation cannot be submitted now.");
 
-            // must have items for manual
             if (string.Equals(q.Quotationtype, QuotationType.MANUAL, StringComparison.OrdinalIgnoreCase))
             {
                 var itemRepo = _uow.GetRepository<QuotationItem>();
@@ -241,13 +353,17 @@ namespace TetGift.BLL.Services
 
             _uow.GetRepository<Quotation>().Update(q);
 
-            await AddMessageAsync(q.Quotationid, QuotationRole.CUSTOMER, req.AccountId, QuotationAction.SUBMIT,
-                "Customer submitted quotation request.");
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.CUSTOMER,
+                req.AccountId,
+                QuotationAction.SUBMIT,
+                "Customer submitted quotation request.",
+                meta: new { requireVatInvoice = q.RequireVatInvoice });
 
             await _uow.SaveAsync();
         }
 
-        //user accept => create order
         public async Task CustomerAcceptAsync(int quotationId, CustomerDecisionRequest req)
         {
             Ensure(req.AccountId > 0, "AccountId is required.");
@@ -256,30 +372,39 @@ namespace TetGift.BLL.Services
             await EnsureQuotationBelongsToAccountAsync(q, req.AccountId);
 
             Ensure(q.Status == QuotationStatus.WAITING_CUSTOMER, "Quotation is not awaiting customer decision.");
+            ValidateVatInfoForOrder(q);
 
             q.Status = QuotationStatus.CUSTOMER_ACCEPTED;
             q.Customerrespondedat = DateTime.Now;
 
             _uow.GetRepository<Quotation>().Update(q);
-            await AddMessageAsync(q.Quotationid, QuotationRole.CUSTOMER, req.AccountId, QuotationAction.CUSTOMER_ACCEPT,
-                req.Message ?? "Customer accepted quotation.");
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.CUSTOMER,
+                req.AccountId,
+                QuotationAction.CUSTOMER_ACCEPT,
+                req.Message ?? "Customer accepted quotation.",
+                meta: new { requireVatInvoice = q.RequireVatInvoice });
 
             await _uow.SaveAsync();
 
-            // Create order via separate service
             var orderId = await _orderSvc.CreateOrderFromQuotationAsync(q.Quotationid, req.AccountId);
 
             q.Orderid = orderId;
             q.Status = QuotationStatus.CONVERTED_TO_ORDER;
 
             _uow.GetRepository<Quotation>().Update(q);
-            await AddMessageAsync(q.Quotationid, QuotationRole.SYSTEM, null, QuotationAction.CONVERT_ORDER,
-                $"Converted to order {orderId}.", meta: new { orderId });
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.SYSTEM,
+                null,
+                QuotationAction.CONVERT_ORDER,
+                $"Converted to order {orderId}.",
+                meta: new { orderId, requireVatInvoice = q.RequireVatInvoice });
 
             await _uow.SaveAsync();
         }
 
-        //user reject => back to staff
         public async Task CustomerRejectAsync(int quotationId, CustomerDecisionRequest req)
         {
             Ensure(req.AccountId > 0, "AccountId is required.");
@@ -295,28 +420,40 @@ namespace TetGift.BLL.Services
 
             _uow.GetRepository<Quotation>().Update(q);
 
-            await AddMessageAsync(q.Quotationid, QuotationRole.CUSTOMER, req.AccountId, QuotationAction.CUSTOMER_REJECT,
-                req.Message ?? "Customer rejected quotation.", meta: new { revision = q.Revision }, toRole: QuotationRole.STAFF);
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.CUSTOMER,
+                req.AccountId,
+                QuotationAction.CUSTOMER_REJECT,
+                req.Message ?? "Customer rejected quotation.",
+                meta: new { revision = q.Revision },
+                toRole: QuotationRole.STAFF);
 
             await _uow.SaveAsync();
 
-            // Optional: auto move back to staff reviewing so staff can rework
             q.Status = QuotationStatus.STAFF_REVIEWING;
             _uow.GetRepository<Quotation>().Update(q);
 
-            await AddMessageAsync(q.Quotationid, QuotationRole.SYSTEM, null, QuotationAction.NOTE,
-                "Moved back to STAFF_REVIEWING after customer rejected.", toRole: QuotationRole.STAFF);
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.SYSTEM,
+                null,
+                QuotationAction.NOTE,
+                "Moved back to STAFF_REVIEWING after customer rejected.",
+                toRole: QuotationRole.STAFF);
 
             await _uow.SaveAsync();
         }
 
+        // =========================
         // STAFF
+        // =========================
+
         public async Task StartReviewAsync(int quotationId, int staffAccountId)
         {
             Ensure(staffAccountId > 0, "StaffAccountId is required.");
 
             var q = await GetQuotationOrThrowAsync(quotationId);
-
             Ensure(q.Status == QuotationStatus.SUBMITTED, "Quotation is not in SUBMITTED.");
 
             q.Status = QuotationStatus.STAFF_REVIEWING;
@@ -330,141 +467,6 @@ namespace TetGift.BLL.Services
 
             await _uow.SaveAsync();
         }
-
-        //public async Task ProposePriceAsync(int quotationId, StaffProposePriceRequest req)
-        //{
-        //    Ensure(req.StaffAccountId > 0, "StaffAccountId is required.");
-        //    Ensure(req.TotalPrice >= 0, "TotalPrice invalid.");
-
-        //    var q = await GetQuotationOrThrowAsync(quotationId);
-
-        //    Ensure(q.Status == QuotationStatus.STAFF_REVIEWING, "Quotation is not in STAFF_REVIEWING.");
-
-        //    q.Totalprice = req.TotalPrice;
-        //    _uow.GetRepository<Quotation>().Update(q);
-
-        //    await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, req.StaffAccountId, QuotationAction.STAFF_PROPOSE,
-        //        req.Message ?? $"Staff proposed price: {req.TotalPrice}.");
-
-        //    await _uow.SaveAsync();
-        //}
-
-        //public async Task StaffReviewFeesAsync(int quotationId, StaffReviewFeesRequest req)
-        //{
-        //    if (quotationId <= 0) throw new Exception("quotationId is required.");
-        //    if (req.StaffAccountId <= 0) throw new Exception("StaffAccountId is required.");
-        //    if (req.Lines == null || req.Lines.Count == 0) throw new Exception("Lines is required.");
-
-        //    var qRepo = _uow.GetRepository<Quotation>();
-        //    var qiRepo = _uow.GetRepository<QuotationItem>();
-        //    var qfRepo = _uow.GetRepository<QuotationFee>();
-        //    var pRepo = _uow.GetRepository<Product>();
-
-        //    var q = (await qRepo.FindAsync(x => x.Quotationid == quotationId)).FirstOrDefault();
-        //    if (q == null) throw new Exception("Quotation not found.");
-
-        //    var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
-        //    if (items.Count == 0) throw new Exception("Quotation has no items.");
-
-        //    var itemDict = items.ToDictionary(x => x.Quotationitemid, x => x);
-
-        //    // load existing fees (batch)
-        //    var itemIds = items.Select(i => i.Quotationitemid).ToList();
-        //    var existingFees = itemIds.Count == 0
-        //        ? new List<QuotationFee>()
-        //        : (await qfRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
-
-        //    var feeMap = existingFees.ToDictionary(f => f.Quotationfeeid, f => f);
-
-        //    // products for fallback price
-        //    var productIds = items.Where(x => x.Productid != null).Select(x => x.Productid!.Value).Distinct().ToList();
-        //    var products = productIds.Count == 0
-        //        ? new List<Product>()
-        //        : (await pRepo.FindAsync(p => productIds.Contains(p.Productid))).ToList();
-
-        //    foreach (var line in req.Lines)
-        //    {
-        //        if (!itemDict.TryGetValue(line.QuotationItemId, out var item))
-        //            throw new Exception($"QuotationItem not found: {line.QuotationItemId}");
-
-        //        var pid = item.Productid ?? 0;
-        //        var qty = item.Quantity ?? 0;
-        //        if (pid <= 0 || qty <= 0)
-        //            throw new Exception($"QuotationItem {item.Quotationitemid} missing product/quantity.");
-
-        //        // Ensure original line total stored in item.Price
-        //        if (item.Price == null || item.Price <= 0)
-        //        {
-        //            var prod = products.FirstOrDefault(p => p.Productid == pid);
-        //            if (prod == null) throw new Exception($"Product not found: {pid}");
-        //            var unit = prod.Price ?? 0m;
-        //            if (unit <= 0) throw new Exception($"Invalid product price: {pid}");
-        //            item.Price = Math.Round(unit * qty, 2);
-        //            qiRepo.Update(item);
-        //        }
-
-        //        foreach (var f in line.Fees)
-        //        {
-        //            // delete
-        //            if (f.IsDeleted)
-        //            {
-        //                if (f.QuotationFeeId == null) continue;
-
-        //                if (!feeMap.TryGetValue(f.QuotationFeeId.Value, out var del))
-        //                    throw new Exception($"Fee not found: {f.QuotationFeeId.Value}");
-
-        //                // safety: ensure fee belongs to this item
-        //                if (del.Quotationitemid != item.Quotationitemid)
-        //                    throw new Exception("Fee does not belong to this quotation item.");
-
-        //                qfRepo.Delete(del);
-        //                continue;
-        //            }
-
-        //            // validate
-        //            if (f.Price <= 0) throw new Exception("Fee price must be > 0.");
-        //            if (f.IsSubtracted != 0 && f.IsSubtracted != 1) throw new Exception("IsSubtracted must be 0 or 1.");
-
-        //            if (f.QuotationFeeId != null)
-        //            {
-        //                // update
-        //                if (!feeMap.TryGetValue(f.QuotationFeeId.Value, out var ex))
-        //                    throw new Exception($"Fee not found: {f.QuotationFeeId.Value}");
-
-        //                if (ex.Quotationitemid != item.Quotationitemid)
-        //                    throw new Exception("Fee does not belong to this quotation item.");
-
-        //                ex.Issubtracted = f.IsSubtracted;
-        //                ex.Price = Math.Round(f.Price, 2);
-        //                ex.Description = f.Description;
-        //                qfRepo.Update(ex);
-        //            }
-        //            else
-        //            {
-        //                // create
-        //                await qfRepo.AddAsync(new QuotationFee
-        //                {
-        //                    Quotationitemid = item.Quotationitemid,
-        //                    Issubtracted = f.IsSubtracted,
-        //                    Price = Math.Round(f.Price, 2),
-        //                    Description = f.Description
-        //                });
-        //            }
-        //        }
-        //    }
-
-        //    // Partial upsert only: do NOT require all items to have fee here
-        //    q.Staffreviewerid = req.StaffAccountId;
-        //    q.Staffreviewedat = DateTime.Now;
-        //    qRepo.Update(q);
-
-        //    await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, req.StaffAccountId,
-        //        QuotationAction.STAFF_PROPOSE,
-        //        req.Message ?? "Staff updated fees (partial).",
-        //        meta: new { updatedLines = req.Lines.Count });
-
-        //    await _uow.SaveAsync();
-        //}
 
         public async Task CreateQuotationFeeAsync(int quotationId, StaffCreateFeeRequest req)
         {
@@ -483,12 +485,10 @@ namespace TetGift.BLL.Services
             if (q == null) throw new Exception("Quotation not found.");
             Ensure(q.Status == QuotationStatus.STAFF_REVIEWING, "Quotation is not in STAFF_REVIEWING.");
 
-            // ensure item belongs to this quotation
             var item = (await qiRepo.FindAsync(x => x.Quotationitemid == req.QuotationItemId && x.Quotationid == quotationId))
                 .FirstOrDefault();
             if (item == null) throw new Exception("QuotationItem not found in this quotation.");
 
-            // ensure snapshot original line total exists
             var pid = item.Productid ?? 0;
             var qty = item.Quantity ?? 0;
             if (pid <= 0 || qty <= 0) throw new Exception("QuotationItem missing product/quantity.");
@@ -543,23 +543,9 @@ namespace TetGift.BLL.Services
             if (fee == null) throw new Exception("QuotationFee not found.");
             if (fee.Quotationitemid == null) throw new Exception("Fee missing quotationItemId.");
 
-            // ensure fee belongs to this quotation
             var item = (await qiRepo.FindAsync(i => i.Quotationitemid == fee.Quotationitemid.Value && i.Quotationid == quotationId))
                 .FirstOrDefault();
             if (item == null) throw new Exception("Fee does not belong to this quotation.");
-
-            //if (req.IsDeleted)
-            //{
-            //    qfRepo.Delete(fee);
-
-            //    await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, req.StaffAccountId,
-            //        QuotationAction.NOTE,
-            //        "Staff deleted a fee (partial).",
-            //        meta: new { quotationFeeId = req.QuotationFeeId });
-
-            //    await _uow.SaveAsync();
-            //    return;
-            //}
 
             Ensure(req.Price > 0, "Fee price must be > 0.");
             Ensure(req.IsSubtracted == 0 || req.IsSubtracted == 1, "IsSubtracted must be 0 or 1.");
@@ -594,14 +580,12 @@ namespace TetGift.BLL.Services
             var q = (await qRepo.FindAsync(x => x.Quotationid == quotationId)).FirstOrDefault();
             if (q == null) throw new Exception("Quotation not found.");
 
-            // chỉ cho staff thao tác khi đang review (tuỳ bạn mở rộng stage)
             if (q.Status != QuotationStatus.STAFF_REVIEWING)
                 throw new Exception("Quotation is not in STAFF_REVIEWING.");
 
             var fee = (await qfRepo.FindAsync(x => x.Quotationfeeid == quotationFeeId)).FirstOrDefault();
             if (fee == null) throw new Exception("Fee not found.");
 
-            // ensure fee belongs to this quotation
             var itemId = fee.Quotationitemid ?? 0;
             if (itemId <= 0) throw new Exception("Fee missing quotation item.");
 
@@ -611,7 +595,6 @@ namespace TetGift.BLL.Services
 
             qfRepo.Delete(fee);
 
-            //ghi log message
             await AddMessageAsync(q.Quotationid, QuotationRole.STAFF, staffAccountId, QuotationAction.NOTE,
                 $"Staff deleted fee {quotationFeeId}.", meta: new { quotationFeeId, quotationItemId = itemId });
 
@@ -626,7 +609,6 @@ namespace TetGift.BLL.Services
             var qiRepo = _uow.GetRepository<QuotationItem>();
             var qfRepo = _uow.GetRepository<QuotationFee>();
 
-            // ensure item belongs to quotation
             var item = (await qiRepo.FindAsync(x => x.Quotationitemid == quotationItemId)).FirstOrDefault();
             if (item == null) throw new Exception("QuotationItem not found.");
             if (item.Quotationid != quotationId) throw new Exception("QuotationItem does not belong to this quotation.");
@@ -715,7 +697,6 @@ namespace TetGift.BLL.Services
                 quotationTotalAfterDiscount += afterDiscount;
             }
 
-            // Update tổng quotation
             q.Totalprice = Math.Round(quotationTotalAfterDiscount, 2);
             q.Staffreviewerid = req.StaffAccountId;
             q.Staffreviewedat = DateTime.Now;
@@ -739,11 +720,9 @@ namespace TetGift.BLL.Services
             var feeRepo = _uow.GetRepository<QuotationFee>();
             var qiRepo = _uow.GetRepository<QuotationItem>();
 
-            // items
             var items = (await qiRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
             Ensure(items.Count > 0, "Quotation must have items.");
 
-            // ensure mỗi item đã có giá gốc
             foreach (var it in items)
             {
                 Ensure(it.Price != null && it.Price > 0, $"QuotationItem {it.Quotationitemid} missing original price (Price).");
@@ -751,12 +730,10 @@ namespace TetGift.BLL.Services
 
             var itemIds = items.Select(i => i.Quotationitemid).ToList();
 
-            // load all fees in 1 query
             var fees = itemIds.Count == 0
                 ? new List<QuotationFee>()
                 : (await feeRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
 
-            //mỗi item phải có ít nhất 1 fee giảm
             var discountCountByItem = fees
                 .Where(f => f.Quotationitemid != null && (f.Issubtracted ?? 0) == 0)
                 .GroupBy(f => f.Quotationitemid!.Value)
@@ -788,7 +765,8 @@ namespace TetGift.BLL.Services
                     totalOriginal = Math.Round(totalOriginal, 2),
                     totalSubtract = Math.Round(totalSubtract, 2),
                     totalAdd = Math.Round(totalAdd, 2),
-                    totalAfter = Math.Round(totalAfter, 2)
+                    totalAfter = Math.Round(totalAfter, 2),
+                    requireVatInvoice = q.RequireVatInvoice
                 },
                 toRole: QuotationRole.ADMIN
             );
@@ -796,8 +774,10 @@ namespace TetGift.BLL.Services
             await _uow.SaveAsync();
         }
 
-
+        // =========================
         // ADMIN
+        // =========================
+
         public async Task AdminApproveAsync(int quotationId, AdminDecisionRequest req)
         {
             Ensure(req.AdminAccountId > 0, "AdminAccountId is required.");
@@ -814,7 +794,6 @@ namespace TetGift.BLL.Services
             await AddMessageAsync(q.Quotationid, QuotationRole.ADMIN, req.AdminAccountId, QuotationAction.ADMIN_APPROVE,
                 req.Message ?? "Admin approved. Waiting customer confirmation.", toRole: QuotationRole.CUSTOMER);
 
-            // TODO: send email to customer if you want (reuse your email sender)
             await _uow.SaveAsync();
 
             var link = $"http://14.225.207.221/quotation/status/{q.Quotationid}";
@@ -847,7 +826,6 @@ namespace TetGift.BLL.Services
 
             await _uow.SaveAsync();
 
-            // Optional: auto move back to STAFF_REVIEWING
             q.Status = QuotationStatus.STAFF_REVIEWING;
             _uow.GetRepository<Quotation>().Update(q);
 
@@ -857,71 +835,97 @@ namespace TetGift.BLL.Services
             await _uow.SaveAsync();
         }
 
+        // =========================
         // LIST
+        // =========================
+
         public async Task<List<QuotationListItemDto>> GetCustomerQuotationsAsync(int accountId, string? status = null)
         {
             if (accountId <= 0) throw new Exception("AccountId is required.");
 
             var repo = _uow.GetRepository<Quotation>();
-            var data = (await repo.FindAsync(q =>
-                    q.Accountid == accountId
-                    && (status == null || q.Status == status)
-                ))
+            var rows = (await repo.FindAsync(q => q.Accountid == accountId && (status == null || q.Status == status)))
                 .OrderByDescending(x => x.Requestdate)
-                .Select(x => new QuotationListItemDto
+                .ToList();
+
+            return rows.Select(x =>
+            {
+                var baseTotal = Math.Round(x.Totalprice ?? 0m, 2);
+                var vatRate = x.RequireVatInvoice ? DefaultVatRate : 0m;
+                var vatAmount = x.RequireVatInvoice ? Math.Round(baseTotal * vatRate, 2) : 0m;
+
+                return new QuotationListItemDto
                 {
                     QuotationId = x.Quotationid,
                     Status = x.Status,
                     RequestDate = x.Requestdate,
                     Company = x.Company,
                     TotalPrice = x.Totalprice,
-                    Revision = x.Revision
-                })
-                .ToList();
-
-            return data;
+                    Revision = x.Revision,
+                    RequireVatInvoice = x.RequireVatInvoice,
+                    VatRatePreview = vatRate,
+                    VatAmountPreview = vatAmount,
+                    FinalPayablePreview = baseTotal + vatAmount
+                };
+            }).ToList();
         }
 
         public async Task<List<QuotationListItemDto>> GetStaffQuotationsAsync(string? status = null)
         {
             var repo = _uow.GetRepository<Quotation>();
-            var data = (await repo.FindAsync(q =>
-                    (status == null || q.Status == status)
-                ))
+            var rows = (await repo.FindAsync(q => status == null || q.Status == status))
                 .OrderByDescending(x => x.Requestdate)
-                .Select(x => new QuotationListItemDto
+                .ToList();
+
+            return rows.Select(x =>
+            {
+                var baseTotal = Math.Round(x.Totalprice ?? 0m, 2);
+                var vatRate = x.RequireVatInvoice ? DefaultVatRate : 0m;
+                var vatAmount = x.RequireVatInvoice ? Math.Round(baseTotal * vatRate, 2) : 0m;
+
+                return new QuotationListItemDto
                 {
                     QuotationId = x.Quotationid,
                     Status = x.Status,
                     RequestDate = x.Requestdate,
                     Company = x.Company,
                     TotalPrice = x.Totalprice,
-                    Revision = x.Revision
-                })
-                .ToList();
-
-            return data;
+                    Revision = x.Revision,
+                    RequireVatInvoice = x.RequireVatInvoice,
+                    VatRatePreview = vatRate,
+                    VatAmountPreview = vatAmount,
+                    FinalPayablePreview = baseTotal + vatAmount
+                };
+            }).ToList();
         }
 
         public async Task<List<QuotationListItemDto>> GetAdminQuotationsAsync(string? status = null)
         {
             var repo = _uow.GetRepository<Quotation>();
-            var data = (await repo.FindAsync(q =>
-                    (status == null || q.Status == status)
-                ))
+            var rows = (await repo.FindAsync(q => status == null || q.Status == status))
                 .OrderByDescending(x => x.Requestdate)
-                .Select(x => new QuotationListItemDto
+                .ToList();
+
+            return rows.Select(x =>
+            {
+                var baseTotal = Math.Round(x.Totalprice ?? 0m, 2);
+                var vatRate = x.RequireVatInvoice ? DefaultVatRate : 0m;
+                var vatAmount = x.RequireVatInvoice ? Math.Round(baseTotal * vatRate, 2) : 0m;
+
+                return new QuotationListItemDto
                 {
                     QuotationId = x.Quotationid,
                     Status = x.Status,
                     RequestDate = x.Requestdate,
                     Company = x.Company,
                     TotalPrice = x.Totalprice,
-                    Revision = x.Revision
-                })
-                .ToList();
-
-            return data;
+                    Revision = x.Revision,
+                    RequireVatInvoice = x.RequireVatInvoice,
+                    VatRatePreview = vatRate,
+                    VatAmountPreview = vatAmount,
+                    FinalPayablePreview = baseTotal + vatAmount
+                };
+            }).ToList();
         }
 
         private async Task<QuotationDetailDto> BuildQuotationDetailAsync(int quotationId)
@@ -942,23 +946,19 @@ namespace TetGift.BLL.Services
                                   .Distinct()
                                   .ToList();
 
-            // products (batch)
             var products = productIds.Count == 0
                 ? new List<Product>()
                 : (await pRepo.FindAsync(p => productIds.Contains(p.Productid))).ToList();
 
-            // fees (batch) - now we keep ALL fees
             var fees = itemIds.Count == 0
                 ? new List<QuotationFee>()
                 : (await qfRepo.FindAsync(f => f.Quotationitemid != null && itemIds.Contains(f.Quotationitemid.Value))).ToList();
 
-            // group fees by item
             var feesByItemId = fees
                 .Where(f => f.Quotationitemid != null)
                 .GroupBy(f => f.Quotationitemid!.Value)
                 .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Quotationfeeid).ToList());
 
-            // messages
             var messages = (await msgRepo.FindAsync(m => m.Quotationid == quotationId))
                 .OrderBy(x => x.Createdat)
                 .Select(x => new QuotationMessageDto
@@ -989,11 +989,9 @@ namespace TetGift.BLL.Services
                 var prod = products.FirstOrDefault(p => p.Productid == pid);
                 var unit = prod?.Price ?? 0m;
 
-                // ORIGINAL line total: QuotationItem.Price (fallback unit*qty)
                 var originalLineTotal = it.Price ?? (unit * qty);
                 originalLineTotal = Math.Round(originalLineTotal, 2);
 
-                // Fees for this item
                 feesByItemId.TryGetValue(it.Quotationitemid, out var itemFees);
                 itemFees ??= new List<QuotationFee>();
 
@@ -1017,14 +1015,10 @@ namespace TetGift.BLL.Services
                     ProductName = prod?.Productname,
                     Quantity = qty,
                     UnitPrice = Math.Round(unit, 2),
-
                     OriginalLineTotal = originalLineTotal,
-
-                    // NEW fields
                     SubtractTotal = sub,
                     AddTotal = add,
                     FinalLineTotal = finalLineTotal,
-
                     Fees = itemFees.Select(f => new QuotationFeeViewDto
                     {
                         QuotationFeeId = f.Quotationfeeid,
@@ -1036,8 +1030,11 @@ namespace TetGift.BLL.Services
             }
 
             var totalAfter = Math.Round(totalOriginal - totalSubtract + totalAdd, 2);
+            var vatRate = q.RequireVatInvoice ? DefaultVatRate : 0m;
+            var vatAmount = q.RequireVatInvoice ? Math.Round(totalAfter * vatRate, 2) : 0m;
+            var finalPayable = totalAfter + vatAmount;
 
-            var dto = new QuotationDetailDto
+            return new QuotationDetailDto
             {
                 QuotationId = q.Quotationid,
                 AccountId = q.Accountid,
@@ -1063,7 +1060,15 @@ namespace TetGift.BLL.Services
                 DesiredPriceNote = q.Desiredpricenote,
                 Note = q.Note,
 
-                // totals
+                RequireVatInvoice = q.RequireVatInvoice,
+                VatCompanyName = q.VatCompanyName,
+                VatCompanyTaxCode = q.VatCompanyTaxCode,
+                VatCompanyAddress = q.VatCompanyAddress,
+                VatInvoiceEmail = q.VatInvoiceEmail,
+                VatRatePreview = vatRate,
+                VatAmountPreview = vatAmount,
+                FinalPayablePreview = finalPayable,
+
                 TotalOriginal = Math.Round(totalOriginal, 2),
                 TotalSubtract = Math.Round(totalSubtract, 2),
                 TotalAdd = Math.Round(totalAdd, 2),
@@ -1073,14 +1078,12 @@ namespace TetGift.BLL.Services
                 Lines = lines,
                 Messages = messages
             };
-
-            return dto;
         }
-
 
         // =========================
         // DETAIL by ROLE
         // =========================
+
         public async Task<QuotationDetailDto> GetCustomerQuotationDetailAsync(int quotationId, int accountId)
         {
             if (accountId <= 0) throw new Exception("AccountId is required.");
@@ -1106,6 +1109,7 @@ namespace TetGift.BLL.Services
         // =========================
         // CUSTOMER - FLOW 2 (RECOMMEND)
         // =========================
+
         public async Task<RecommendPreviewDto> RequestRecommendAsync(QuotationRecommendRequest req)
         {
             Ensure(req.AccountId > 0, "AccountId is required.");
@@ -1121,13 +1125,25 @@ namespace TetGift.BLL.Services
                 Quotationtype = QuotationType.BUDGET_RECOMMEND,
                 Desiredbudget = req.Budget,
                 Note = req.Note,
+                Company = req.Company,
+                Address = req.Address,
+                Email = req.Email,
+                Phone = req.Phone,
                 Revision = 1
             };
+
+            ApplyVatForCreate(
+                q,
+                req.RequireVatInvoice,
+                req.VatCompanyName,
+                req.VatCompanyTaxCode,
+                req.VatCompanyAddress,
+                req.VatInvoiceEmail
+            );
 
             await qRepo.AddAsync(q);
             await _uow.SaveAsync();
 
-            // save category requests
             var catReqRepo = _uow.GetRepository<QuotationCategoryRequest>();
             foreach (var c in req.Categories)
             {
@@ -1140,8 +1156,14 @@ namespace TetGift.BLL.Services
                     Createdat = DateTime.Now
                 });
             }
-            await AddMessageAsync(q.Quotationid, QuotationRole.CUSTOMER, req.AccountId, QuotationAction.RECOMMEND_PREVIEW,
-                "Customer requested system recommendation.", meta: new { budget = req.Budget });
+
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.CUSTOMER,
+                req.AccountId,
+                QuotationAction.RECOMMEND_PREVIEW,
+                "Customer requested system recommendation.",
+                meta: new { budget = req.Budget, requireVatInvoice = q.RequireVatInvoice });
 
             await _uow.SaveAsync();
 
@@ -1154,7 +1176,6 @@ namespace TetGift.BLL.Services
                 .Where(p => p.Status == null || p.Status.ToUpper() == ProductStatus.ACTIVE)
                 .ToList();
 
-            //order by price
             candidates = candidates.OrderBy(p => p.Price ?? decimal.MaxValue).ToList();
 
             var chosen = new List<RecommendPreviewItemDto>();
@@ -1167,7 +1188,6 @@ namespace TetGift.BLL.Services
                 var picks = candidates.Where(p => (p.Categoryid ?? 0) == cr.CategoryId).ToList();
                 if (picks.Count == 0) continue;
 
-                // pick the cheapest product for that category
                 var p0 = picks.First();
                 var qty = cr.Quantity.Value;
                 var line = (p0.Price ?? 0) * qty;
@@ -1185,14 +1205,12 @@ namespace TetGift.BLL.Services
                 }
             }
 
-            // Fill remaining budget with cheapest items
             foreach (var p in candidates)
             {
                 if (total >= req.Budget) break;
                 var price = p.Price ?? 0;
                 if (price <= 0) continue;
 
-                // add 1 item each time
                 if (total + price <= req.Budget)
                 {
                     var existed = chosen.FirstOrDefault(x => x.ProductId == p.Productid);
@@ -1220,15 +1238,7 @@ namespace TetGift.BLL.Services
                 Budget = req.Budget,
                 EstimatedTotal = total,
                 Items = chosen,
-                Quotation = new QuotationSimpleDto
-                {
-                    QuotationId = q.Quotationid,
-                    Status = q.Status,
-                    QuotationType = q.Quotationtype,
-                    DesiredBudget = q.Desiredbudget,
-                    TotalPrice = total,
-                    Revision = q.Revision
-                }
+                Quotation = BuildSimpleDto(q, total)
             };
         }
 
@@ -1245,7 +1255,6 @@ namespace TetGift.BLL.Services
             Ensure(q.Status == QuotationStatus.DRAFT || q.Status == QuotationStatus.SUBMITTED,
                 "Cannot confirm recommend at this stage.");
 
-            // Re-run recommend based on saved category requests
             var catReqRepo = _uow.GetRepository<QuotationCategoryRequest>();
             var catReqs = (await catReqRepo.FindAsync(x => x.Quotationid == quotationId)).ToList();
             Ensure(catReqs.Count > 0, "No category request found.");
@@ -1253,12 +1262,20 @@ namespace TetGift.BLL.Services
             var budget = q.Desiredbudget ?? 0;
             Ensure(budget > 0, "Budget invalid.");
 
-            // Build pseudo request and reuse logic quickly (simple)
             var tempReq = new QuotationRecommendRequest
             {
                 AccountId = req.AccountId,
+                Company = q.Company,
+                Address = q.Address,
+                Email = q.Email,
+                Phone = q.Phone,
                 Budget = budget,
                 Note = q.Note,
+                RequireVatInvoice = q.RequireVatInvoice,
+                VatCompanyName = q.VatCompanyName,
+                VatCompanyTaxCode = q.VatCompanyTaxCode,
+                VatCompanyAddress = q.VatCompanyAddress,
+                VatInvoiceEmail = q.VatInvoiceEmail,
                 Categories = catReqs.Select(x => new RecommendCategoryInputDto
                 {
                     CategoryId = x.Categoryid,
@@ -1267,13 +1284,11 @@ namespace TetGift.BLL.Services
                 }).ToList()
             };
 
-            // get preview items
             var preview = await RequestRecommendInternalPreviewAsync(q.Quotationid, tempReq);
 
             Ensure(preview.Items != null && preview.Items.Count > 0,
                 "Recommend result is empty. Budget may be too low or no active products in requested categories.");
 
-            // Convert preview items -> QuotationItem
             await UpsertItemsAsync(q.Quotationid, preview.Items.Select(i => new QuotationItemUpsertDto
             {
                 ProductId = i.ProductId,
@@ -1281,13 +1296,24 @@ namespace TetGift.BLL.Services
             }).ToList());
 
             q.Totalprice = preview.EstimatedTotal;
+
+            if (req.AutoCreateOrder)
+            {
+                ValidateVatInfoForOrder(q);
+            }
+
             q.Status = QuotationStatus.CUSTOMER_ACCEPTED;
             q.Customerrespondedat = DateTime.Now;
 
             _uow.GetRepository<Quotation>().Update(q);
 
-            await AddMessageAsync(q.Quotationid, QuotationRole.CUSTOMER, req.AccountId, QuotationAction.RECOMMEND_CONFIRM,
-                "Customer confirmed system recommendation.");
+            await AddMessageAsync(
+                q.Quotationid,
+                QuotationRole.CUSTOMER,
+                req.AccountId,
+                QuotationAction.RECOMMEND_CONFIRM,
+                "Customer confirmed system recommendation.",
+                meta: new { requireVatInvoice = q.RequireVatInvoice, autoCreateOrder = req.AutoCreateOrder });
 
             await _uow.SaveAsync();
 
@@ -1298,24 +1324,26 @@ namespace TetGift.BLL.Services
                 q.Status = QuotationStatus.CONVERTED_TO_ORDER;
 
                 _uow.GetRepository<Quotation>().Update(q);
-                await AddMessageAsync(q.Quotationid, QuotationRole.SYSTEM, null, QuotationAction.CONVERT_ORDER,
-                    $"Converted to order {orderId}.", meta: new { orderId });
+                await AddMessageAsync(
+                    q.Quotationid,
+                    QuotationRole.SYSTEM,
+                    null,
+                    QuotationAction.CONVERT_ORDER,
+                    $"Converted to order {orderId}.",
+                    meta: new { orderId, requireVatInvoice = q.RequireVatInvoice });
 
                 await _uow.SaveAsync();
             }
         }
-
-
 
         private async Task<RecommendPreviewDto> RequestRecommendInternalPreviewAsync(int quotationId, QuotationRecommendRequest req)
         {
             var productRepo = _uow.GetRepository<Product>();
             var categoryIds = req.Categories.Select(x => x.CategoryId).Distinct().ToList();
 
-            // ✅ FIX: status filter case-insensitive + dùng constant, KHÔNG dùng "Active"
             var candidates = productRepo.Entities
                 .Where(p => p.Categoryid != null && categoryIds.Contains(p.Categoryid.Value))
-                .Where(p => p.Status == null || p.Status.ToUpper() == ProductStatus.ACTIVE) // <-- FIX
+                .Where(p => p.Status == null || p.Status.ToUpper() == ProductStatus.ACTIVE)
                 .ToList()
                 .OrderBy(p => p.Price ?? decimal.MaxValue)
                 .ToList();
@@ -1374,23 +1402,27 @@ namespace TetGift.BLL.Services
 
             Ensure(chosen.Count > 0, "Recommend result is empty. Budget may be too low or no active products in requested categories.");
 
+            var tempQuotation = new Quotation
+            {
+                Quotationid = quotationId,
+                Status = QuotationStatus.DRAFT,
+                Quotationtype = QuotationType.BUDGET_RECOMMEND,
+                Desiredbudget = req.Budget,
+                Revision = 1,
+                RequireVatInvoice = req.RequireVatInvoice,
+                VatCompanyName = req.VatCompanyName,
+                VatCompanyTaxCode = req.VatCompanyTaxCode,
+                VatCompanyAddress = req.VatCompanyAddress,
+                VatInvoiceEmail = req.VatInvoiceEmail
+            };
+
             return new RecommendPreviewDto
             {
                 Budget = req.Budget,
                 EstimatedTotal = total,
                 Items = chosen,
-                Quotation = new QuotationSimpleDto
-                {
-                    QuotationId = quotationId,
-                    Status = QuotationStatus.DRAFT,
-                    QuotationType = QuotationType.BUDGET_RECOMMEND,
-                    DesiredBudget = req.Budget,
-                    TotalPrice = total,
-                    Revision = 1
-                }
+                Quotation = BuildSimpleDto(tempQuotation, total)
             };
         }
-
-
     }
 }
