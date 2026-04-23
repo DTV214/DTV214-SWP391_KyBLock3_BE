@@ -208,31 +208,8 @@ public class OrderController : ControllerBase
             if (role != UserRole.ADMIN && role != UserRole.STAFF)
                 accountId = GetCurrentAccountId();
 
-            var pdfBytes = await _invoiceService.GenerateNormalInvoicePdfAsync(orderId, accountId);
-            var fileName = await _invoiceService.GetNormalInvoiceFileNameAsync(orderId, accountId);
-
-            return File(pdfBytes, "application/pdf", fileName);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    [HttpGet("{orderId}/invoice-vat")]
-    [Authorize]
-    public async Task<IActionResult> DownloadVatInvoice(int orderId)
-    {
-        try
-        {
-            var role = GetCurrentUserRole();
-            int? accountId = null;
-
-            if (role != UserRole.ADMIN && role != UserRole.STAFF)
-                accountId = GetCurrentAccountId();
-
-            var pdfBytes = await _invoiceService.GenerateVatInvoicePdfAsync(orderId, accountId);
-            var fileName = await _invoiceService.GetVatInvoiceFileNameAsync(orderId, accountId);
+            var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(orderId, accountId);
+            var fileName = await _invoiceService.GetDownloadFileNameAsync(orderId, accountId);
 
             return File(pdfBytes, "application/pdf", fileName);
         }

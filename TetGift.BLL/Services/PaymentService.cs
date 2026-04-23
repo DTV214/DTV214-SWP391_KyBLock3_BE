@@ -497,14 +497,16 @@ public class PaymentService : IPaymentService
             ? $"http://14.225.207.221/account/orders/{order.Orderid}"
             : $"{orderBaseUrl.TrimEnd('/')}/{order.Orderid}";
 
-        var payableAmount = GetFinalPayableAmount(order);
+        var subtotalAmount = GetSubTotalAmount(order);
         var baseAmount = GetBaseAmount(order);
         var vatAmount = GetVatAmount(order);
-        var subtotalAmount = GetSubTotalAmount(order);
+        var payableAmount = GetFinalPayableAmount(order);
         var discountAmount = Math.Max(0, subtotalAmount - baseAmount);
-        var orderItemsHtml = BuildOrderItemsEmailHtml(order);
 
-        var normalHtmlBody = _templateRenderer.RenderOrderPaymentSuccess(
+        var orderItemsHtml = BuildOrderItemsEmailHtml(order);
+        var vatRequestInfoHtml = BuildVatRequestInfoHtml(order);
+
+        var customerHtmlBody = _templateRenderer.RenderOrderPaymentSuccess(
             customerName,
             order.Orderid,
             FormatVnd(payableAmount),
@@ -513,18 +515,19 @@ public class PaymentService : IPaymentService
             FormatVnd(baseAmount),
             FormatVnd(vatAmount),
             orderLink,
-            orderItemsHtml
+            orderItemsHtml,
+            vatRequestInfoHtml
         );
 
-        var normalPdfBytes = await _invoiceService.GenerateNormalInvoicePdfAsync(order.Orderid, order.Accountid);
-        var normalFileName = await _invoiceService.GetNormalInvoiceFileNameAsync(order.Orderid, order.Accountid);
+        var pdfBytes = await _invoiceService.GenerateInvoicePdfAsync(order.Orderid, order.Accountid);
+        var fileName = await _invoiceService.GetDownloadFileNameAsync(order.Orderid, order.Accountid);
 
-        var normalAttachments = new List<EmailAttachmentDto>
+        var attachments = new List<EmailAttachmentDto>
     {
         new EmailAttachmentDto
         {
-            FileName = normalFileName,
-            ContentBytes = normalPdfBytes,
+            FileName = fileName,
+            ContentBytes = pdfBytes,
             ContentType = "application/pdf"
         }
     };
@@ -532,42 +535,42 @@ public class PaymentService : IPaymentService
         await _emailSender.SendAsync(
             order.Customeremail,
             $"TetGift - Thanh toán đơn hàng #{order.Orderid} thành công",
-            normalHtmlBody,
-            normalAttachments
+            customerHtmlBody,
+            attachments
         );
 
-        if (order.RequireVatInvoice && !string.IsNullOrWhiteSpace(order.VatInvoiceEmail))
+        if (order.RequireVatInvoice
+            && !string.IsNullOrWhiteSpace(order.VatInvoiceEmail)
+            && !string.Equals(order.VatInvoiceEmail, order.Customeremail, StringComparison.OrdinalIgnoreCase))
         {
-            var vatHtmlBody = _templateRenderer.RenderOrderPaymentSuccess(
-                customerName,
+            var vatRecipientName = string.IsNullOrWhiteSpace(order.VatCompanyName)
+                ? "Bộ phận xác thực VAT"
+                : order.VatCompanyName!;
+
+            var verifyHtmlBody = _templateRenderer.RenderVatVerificationNotice(
+                vatRecipientName,
                 order.Orderid,
-                FormatVnd(payableAmount),
+                order.Customername ?? "N/A",
+                order.Customerphone ?? "N/A",
+                order.Customeremail ?? "N/A",
+                order.Customeraddress ?? "N/A",
                 FormatVnd(subtotalAmount),
                 FormatVnd(discountAmount),
                 FormatVnd(baseAmount),
                 FormatVnd(vatAmount),
+                FormatVnd(payableAmount),
+                order.VatCompanyName ?? "N/A",
+                order.VatCompanyTaxCode ?? "N/A",
+                order.VatCompanyAddress ?? "N/A",
+                order.VatInvoiceEmail ?? "N/A",
                 orderLink,
                 orderItemsHtml
             );
 
-            var vatPdfBytes = await _invoiceService.GenerateVatInvoicePdfAsync(order.Orderid, order.Accountid);
-            var vatFileName = await _invoiceService.GetVatInvoiceFileNameAsync(order.Orderid, order.Accountid);
-
-            var vatAttachments = new List<EmailAttachmentDto>
-        {
-            new EmailAttachmentDto
-            {
-                FileName = vatFileName,
-                ContentBytes = vatPdfBytes,
-                ContentType = "application/pdf"
-            }
-        };
-
             await _emailSender.SendAsync(
-                order.VatInvoiceEmail,
-                $"TetGift - Hóa đơn VAT đơn hàng #{order.Orderid}",
-                vatHtmlBody,
-                vatAttachments
+                order.VatInvoiceEmail!,
+                $"TetGift - Thông tin xác thực VAT đơn hàng #{order.Orderid}",
+                verifyHtmlBody
             );
         }
     }
@@ -585,6 +588,23 @@ public class PaymentService : IPaymentService
         }
 
         return subtotal;
+    }
+
+    private static string BuildVatRequestInfoHtml(Order order)
+    {
+        if (!order.RequireVatInvoice)
+            return string.Empty;
+
+        return $@"
+    <div style='margin-bottom:24px; border:1px solid #F1D9D9; background:#FFF8F1; border-radius:14px; padding:18px 20px; text-align:left;'>
+        <h3 style='margin:0 0 12px; color:#690000; font-size:18px;'>Thông tin VAT đã ghi nhận</h3>
+        <div style='font-size:14px; color:#555555; line-height:1.8;'>
+            Tên công ty: <b style='color:#690000;'>{System.Net.WebUtility.HtmlEncode(order.VatCompanyName ?? "N/A")}</b><br/>
+            Mã số thuế: <b style='color:#690000;'>{System.Net.WebUtility.HtmlEncode(order.VatCompanyTaxCode ?? "N/A")}</b><br/>
+            Địa chỉ công ty: <b style='color:#690000;'>{System.Net.WebUtility.HtmlEncode(order.VatCompanyAddress ?? "N/A")}</b><br/>
+            Email xác thực VAT: <b style='color:#690000;'>{System.Net.WebUtility.HtmlEncode(order.VatInvoiceEmail ?? "N/A")}</b>
+        </div>
+    </div>";
     }
 
     private static string BuildOrderItemsEmailHtml(Order order)

@@ -1,0 +1,85 @@
+﻿<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác thực thông tin VAT</title>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #FFF8F1; margin: 0; padding: 40px 20px; color: #333333;">
+    <div style="max-width: 720px; margin: auto; background-color: #ffffff; border: 3px double #690000; border-radius: 18px; padding: 36px 28px; box-shadow: 0 12px 30px rgba(105, 0, 0, 0.10);">
+
+        <div style="text-align: center; margin-bottom: 28px;">
+            <h1 style="margin: 0 0 10px; color: #690000; font-size: 28px; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;">
+                TETGIFT
+            </h1>
+            <div style="height: 2px; width: 70px; background-color: #690000; margin: 0 auto 20px;"></div>
+            <h2 style="margin: 0; font-weight: 700; font-size: 22px; color: #333333;">
+                THÔNG TIN XÁC THỰC YÊU CẦU VAT
+            </h2>
+        </div>
+
+        <div style="background-color: #FFF8F1; border: 1px solid #F1D9D9; border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+            <p style="margin: 0 0 14px; color: #555555; line-height: 1.7; font-size: 15px;">
+                Xin chào <b style="color: #690000;">{{RECIPIENT_NAME}}</b>,
+            </p>
+
+            <p style="margin: 0; color: #555555; line-height: 1.7; font-size: 15px;">
+                Đây là email thông báo để xác thực yêu cầu xuất VAT của đơn hàng <b style="color:#690000;">#{{ORDER_ID}}</b>.
+                Hệ thống chỉ phát hành <b>hóa đơn bán hàng thường</b>; email này dùng để đối chiếu lại thông tin VAT đã đăng ký.
+            </p>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:24px;">
+            <div style="border:1px solid #eee; border-radius:12px; padding:16px;">
+                <div style="font-size:13px; color:#888;">Khách hàng</div>
+                <div style="margin-top:6px; font-size:15px; font-weight:700; color:#690000;">{{CUSTOMER_NAME}}</div>
+                <div style="margin-top:8px; font-size:14px; color:#555; line-height:1.7;">
+                    SĐT: {{CUSTOMER_PHONE}}<br />
+                    Email: {{CUSTOMER_EMAIL}}<br />
+                    Địa chỉ: {{CUSTOMER_ADDRESS}}
+                </div>
+            </div>
+
+            <div style="border:1px solid #eee; border-radius:12px; padding:16px;">
+                <div style="font-size:13px; color:#888;">Tóm tắt thanh toán</div>
+                <div style="margin-top:8px; font-size:14px; color:#555; line-height:1.8;">
+                    Tổng tiền hàng: <b style="float:right; color:#690000;">{{SUBTOTAL_AMOUNT}}</b><br />
+                    Giảm khuyến mãi: <b style="float:right; color:#16A34A;">-{{DISCOUNT_AMOUNT}}</b><br />
+                    Thành tiền sau giảm: <b style="float:right; color:#690000;">{{BASE_AMOUNT}}</b><br />
+                    Phụ thu VAT: <b style="float:right; color:#690000;">{{VAT_AMOUNT}}</b><br />
+                    <span style="display:block; height:1px; background:#eee; margin:10px 0;"></span>
+                    Tổng thanh toán: <b style="float:right; color:#690000;">{{FINAL_AMOUNT}}</b>
+                </div>
+            </div>
+        </div>
+
+        <div style="border:1px solid #F1D9D9; background:#FFF8F1; border-radius:14px; padding:18px 20px; margin-bottom:24px;">
+            <h3 style="margin:0 0 12px; color:#690000; font-size:18px;">Thông tin VAT đã đăng ký</h3>
+            <div style="font-size:14px; color:#555; line-height:1.8;">
+                Tên công ty: <b style="color:#690000;">{{VAT_COMPANY_NAME}}</b><br />
+                Mã số thuế: <b style="color:#690000;">{{VAT_COMPANY_TAX_CODE}}</b><br />
+                Địa chỉ công ty: <b style="color:#690000;">{{VAT_COMPANY_ADDRESS}}</b><br />
+                Email nhận xác thực: <b style="color:#690000;">{{VAT_INVOICE_EMAIL}}</b>
+            </div>
+        </div>
+
+        <div style="margin-bottom:24px;">
+            <h3 style="margin: 0 0 14px; color: #690000; font-size: 18px;">Sản phẩm trong đơn</h3>
+            <div>
+                {{ORDER_ITEMS}}
+            </div>
+        </div>
+
+        <div style="text-align:center; margin-bottom:18px;">
+            <a href="{{ORDER_LINK}}"
+               style="display:inline-block; background-color:#690000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:10px; font-size:15px; font-weight:700;">
+                XEM ĐƠN HÀNG
+            </a>
+        </div>
+
+        <p style="margin: 0; font-size: 12px; color: #999999; letter-spacing: 0.4px; text-align: center; line-height: 1.6;">
+            © 2026 TetGift. All rights reserved.
+        </p>
+    </div>
+</body>
+</html>

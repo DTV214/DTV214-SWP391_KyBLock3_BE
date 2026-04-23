@@ -29,52 +29,6 @@ public class InvoiceService : IInvoiceService
 
     public async Task<byte[]> GenerateInvoicePdfAsync(int orderId, int? accountId)
     {
-        var order = await GetOrderAsync(orderId, accountId);
-        return await BuildPdfByModeAsync(order, order.RequireVatInvoice ? InvoiceMode.Vat : InvoiceMode.Normal);
-    }
-
-    public async Task<byte[]> GenerateNormalInvoicePdfAsync(int orderId, int? accountId)
-    {
-        var order = await GetOrderAsync(orderId, accountId);
-        return await BuildPdfByModeAsync(order, InvoiceMode.Normal);
-    }
-
-    public async Task<byte[]> GenerateVatInvoicePdfAsync(int orderId, int? accountId)
-    {
-        var order = await GetOrderAsync(orderId, accountId);
-
-        if (!order.RequireVatInvoice)
-            throw new Exception("Đơn hàng này không có hóa đơn VAT.");
-
-        return await BuildPdfByModeAsync(order, InvoiceMode.Vat);
-    }
-
-    public async Task<string> GetDownloadFileNameAsync(int orderId, int? accountId)
-    {
-        var order = await GetOrderLightAsync(orderId, accountId);
-        return order.RequireVatInvoice
-            ? $"HoaDonVAT_{order.Orderid:D6}.pdf"
-            : $"HoaDon_{order.Orderid:D6}.pdf";
-    }
-
-    public async Task<string> GetNormalInvoiceFileNameAsync(int orderId, int? accountId)
-    {
-        var order = await GetOrderLightAsync(orderId, accountId);
-        return $"HoaDon_{order.Orderid:D6}.pdf";
-    }
-
-    public async Task<string> GetVatInvoiceFileNameAsync(int orderId, int? accountId)
-    {
-        var order = await GetOrderLightAsync(orderId, accountId);
-
-        if (!order.RequireVatInvoice)
-            throw new Exception("Đơn hàng này không có hóa đơn VAT.");
-
-        return $"HoaDonVAT_{order.Orderid:D6}.pdf";
-    }
-
-    private async Task<Order> GetOrderAsync(int orderId, int? accountId)
-    {
         var orderRepo = _uow.GetRepository<Order>();
 
         IQueryable<Order> query;
@@ -105,48 +59,40 @@ public class InvoiceService : IInvoiceService
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng.");
 
-        return order;
+        var html = await BuildInvoiceHtmlAsync(order);
+        return await RenderPdfFromHtmlAsync(html);
     }
 
-    private async Task<(int Orderid, bool RequireVatInvoice)> GetOrderLightAsync(int orderId, int? accountId)
+    public async Task<string> GetDownloadFileNameAsync(int orderId, int? accountId)
     {
         var orderRepo = _uow.GetRepository<Order>();
 
         var order = await orderRepo.Entities
             .Where(o => o.Orderid == orderId && (!accountId.HasValue || o.Accountid == accountId.Value))
-            .Select(o => new { o.Orderid, o.RequireVatInvoice })
+            .Select(o => new { o.Orderid })
             .FirstOrDefaultAsync();
 
         if (order == null)
             throw new Exception("Không tìm thấy đơn hàng.");
 
-        return (order.Orderid, order.RequireVatInvoice);
+        return $"HoaDon_{order.Orderid:D6}.pdf";
     }
 
-    private async Task<byte[]> BuildPdfByModeAsync(Order order, InvoiceMode mode)
-    {
-        var html = await BuildInvoiceHtmlAsync(order, mode);
-        return await RenderPdfFromHtmlAsync(html);
-    }
-
-    private async Task<string> BuildInvoiceHtmlAsync(Order order, InvoiceMode mode)
+    private async Task<string> BuildInvoiceHtmlAsync(Order order)
     {
         var subTotal = CalculateSubTotal(order);
         var finalBaseAmount = order.Totalprice ?? subTotal;
         var discount = Math.Max(0, subTotal - finalBaseAmount);
 
-        var isVat = mode == InvoiceMode.Vat;
-        var vatRate = isVat ? (order.VatRate <= 0 ? 0.08m : order.VatRate) : 0m;
-        var vatAmount = isVat ? order.VatAmount : 0m;
+        var requireVat = order.RequireVatInvoice;
+        var vatAmount = requireVat ? order.VatAmount : 0m;
         var finalPayableAmount = finalBaseAmount + vatAmount;
-
-        var templateFile = isVat ? "vat-invoice.html" : "normal-invoice.html";
 
         var templatePath = Path.Combine(
             _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
             "templates",
             "invoices",
-            templateFile);
+            "normal-invoice.html");
 
         if (!File.Exists(templatePath))
             throw new Exception($"Không tìm thấy template hóa đơn: {templatePath}");
@@ -154,7 +100,7 @@ public class InvoiceService : IInvoiceService
         var template = await File.ReadAllTextAsync(templatePath, Encoding.UTF8);
         var created = order.Orderdatetime ?? DateTime.Now;
 
-        var replacements = new Dictionary<string, string>
+        var map = new Dictionary<string, string>
         {
             ["{{SellerLegalName}}"] = Html(SellerLegalName),
             ["{{SellerTaxCode}}"] = Html(SellerTaxCode),
@@ -164,9 +110,6 @@ public class InvoiceService : IInvoiceService
 
             ["{{DocumentNumber}}"] = Html(order.Orderid.ToString("D6")),
             ["{{CreatedDate}}"] = Html(created.ToString("dd/MM/yyyy HH:mm")),
-            ["{{CreatedDay}}"] = Html(created.Day.ToString("00")),
-            ["{{CreatedMonth}}"] = Html(created.Month.ToString("00")),
-            ["{{CreatedYear}}"] = Html(created.Year.ToString()),
             ["{{OrderStatus}}"] = Html(TranslateStatus(order.Status)),
 
             ["{{BuyerName}}"] = Html(order.Customername ?? "N/A"),
@@ -174,23 +117,22 @@ public class InvoiceService : IInvoiceService
             ["{{BuyerEmail}}"] = Html(order.Customeremail ?? "N/A"),
             ["{{BuyerAddress}}"] = Html(order.Customeraddress ?? "N/A"),
 
-            ["{{VatBuyerCompanyName}}"] = Html(order.VatCompanyName ?? order.Customername ?? "N/A"),
-            ["{{VatBuyerTaxCode}}"] = Html(order.VatCompanyTaxCode ?? "N/A"),
-            ["{{VatBuyerAddress}}"] = Html(order.VatCompanyAddress ?? order.Customeraddress ?? "N/A"),
-            ["{{VatBuyerEmail}}"] = Html(order.VatInvoiceEmail ?? order.Customeremail ?? "N/A"),
-
             ["{{SubTotal}}"] = Html(FormatCurrency(subTotal)),
             ["{{FinalBaseAmount}}"] = Html(FormatCurrency(finalBaseAmount)),
-            ["{{VatAmount}}"] = Html(FormatCurrency(vatAmount)),
-            ["{{FinalPayableAmount}}"] = Html(FormatCurrency(isVat ? finalPayableAmount : finalBaseAmount)),
-            ["{{VatRatePercent}}"] = Html($"{vatRate * 100:0}%"),
-            ["{{FinalPayableAmountInWords}}"] = Html(NumberToVietnameseCurrency(isVat ? finalPayableAmount : finalBaseAmount)),
+            ["{{FinalPayableAmount}}"] = Html(FormatCurrency(finalPayableAmount)),
 
-            ["{{ItemRows}}"] = BuildItemRows(order, isVat),
+            ["{{ItemRows}}"] = BuildItemRows(order),
             ["{{DiscountRow}}"] = discount > 0
                 ? $@"<tr>
                         <td>Chiết khấu / giảm giá</td>
                         <td>-{Html(FormatCurrency(discount))}</td>
+                    </tr>"
+                : string.Empty,
+
+            ["{{VatRow}}"] = requireVat && vatAmount > 0
+                ? $@"<tr>
+                        <td>Phụ thu VAT theo yêu cầu</td>
+                        <td>{Html(FormatCurrency(vatAmount))}</td>
                     </tr>"
                 : string.Empty,
 
@@ -202,7 +144,7 @@ public class InvoiceService : IInvoiceService
                     </div>"
         };
 
-        foreach (var item in replacements)
+        foreach (var item in map)
         {
             template = template.Replace(item.Key, item.Value);
         }
@@ -242,7 +184,6 @@ public class InvoiceService : IInvoiceService
     private static decimal CalculateSubTotal(Order order)
     {
         decimal subTotal = 0m;
-
         if (order.OrderDetails != null)
         {
             foreach (var d in order.OrderDetails)
@@ -250,17 +191,14 @@ public class InvoiceService : IInvoiceService
                 subTotal += d.Amount ?? ((d.Product?.Price ?? 0m) * (d.Quantity ?? 0));
             }
         }
-
         return subTotal;
     }
 
-    private static string BuildItemRows(Order order, bool requireVat)
+    private static string BuildItemRows(Order order)
     {
-        var columnCount = requireVat ? 6 : 5;
-
         if (order.OrderDetails == null || !order.OrderDetails.Any())
         {
-            return $@"<tr><td colspan=""{columnCount}"" class=""center"">Không có dữ liệu hàng hóa</td></tr>";
+            return @"<tr><td colspan=""5"" class=""center"">Không có dữ liệu hàng hóa</td></tr>";
         }
 
         var sb = new StringBuilder();
@@ -272,26 +210,10 @@ public class InvoiceService : IInvoiceService
             var qty = item.Quantity ?? 0;
             var price = item.Product?.Price ?? 0m;
             var amount = item.Amount ?? (price * qty);
+
             var productSub = BuildProductSubText(item.Product);
 
-            if (requireVat)
-            {
-                sb.Append($@"
-<tr>
-  <td class=""center"">{index}</td>
-  <td>
-    <div class=""product-name"">{Html(productName)}</div>
-    {(string.IsNullOrWhiteSpace(productSub) ? string.Empty : $@"<div class=""product-sub"">{Html(productSub)}</div>")}
-  </td>
-  <td class=""center"">Cái</td>
-  <td class=""center"">{qty}</td>
-  <td class=""right"">{Html(FormatCurrency(price))}</td>
-  <td class=""right"">{Html(FormatCurrency(amount))}</td>
-</tr>");
-            }
-            else
-            {
-                sb.Append($@"
+            sb.Append($@"
 <tr>
   <td class=""center"">{index}</td>
   <td>
@@ -302,7 +224,6 @@ public class InvoiceService : IInvoiceService
   <td class=""center"">{qty}</td>
   <td class=""right"">{Html(FormatCurrency(amount))}</td>
 </tr>");
-            }
 
             index++;
         }
@@ -348,86 +269,5 @@ public class InvoiceService : IInvoiceService
     private static string Html(string? value)
     {
         return WebUtility.HtmlEncode(value ?? string.Empty);
-    }
-
-    private static string NumberToVietnameseCurrency(decimal amount)
-    {
-        if (amount == 0)
-            return "Không đồng";
-
-        var number = (long)Math.Round(amount, 0, MidpointRounding.AwayFromZero);
-        return ReadNumber(number) + " đồng";
-
-        static string ReadNumber(long input)
-        {
-            var units = new[] { "", " nghìn", " triệu", " tỷ", " nghìn tỷ", " triệu tỷ" };
-            if (input == 0) return "không";
-
-            var parts = new List<string>();
-            var unitIndex = 0;
-
-            while (input > 0)
-            {
-                var block = (int)(input % 1000);
-                if (block > 0)
-                {
-                    var text = ReadBlock(block);
-                    if (!string.IsNullOrWhiteSpace(text))
-                        parts.Insert(0, text + units[unitIndex]);
-                }
-
-                input /= 1000;
-                unitIndex++;
-            }
-
-            var result = string.Join(" ", parts).Trim();
-            if (string.IsNullOrWhiteSpace(result)) return "không";
-            return char.ToUpper(result[0]) + result[1..];
-        }
-
-        static string ReadBlock(int number)
-        {
-            var digits = new[] { "không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín" };
-            var hundred = number / 100;
-            var ten = (number % 100) / 10;
-            var unit = number % 10;
-
-            var result = new List<string>();
-
-            if (hundred > 0)
-            {
-                result.Add(digits[hundred]);
-                result.Add("trăm");
-            }
-
-            if (ten > 1)
-            {
-                result.Add(digits[ten]);
-                result.Add("mươi");
-                if (unit == 1) result.Add("mốt");
-                else if (unit == 5) result.Add("lăm");
-                else if (unit > 0) result.Add(digits[unit]);
-            }
-            else if (ten == 1)
-            {
-                result.Add("mười");
-                if (unit == 5) result.Add("lăm");
-                else if (unit > 0) result.Add(digits[unit]);
-            }
-            else if (ten == 0 && unit > 0)
-            {
-                if (hundred > 0) result.Add("lẻ");
-                if (unit == 5 && hundred > 0) result.Add("năm");
-                else result.Add(digits[unit]);
-            }
-
-            return string.Join(" ", result).Trim();
-        }
-    }
-
-    private enum InvoiceMode
-    {
-        Normal = 1,
-        Vat = 2
     }
 }
