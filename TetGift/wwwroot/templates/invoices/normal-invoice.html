@@ -6,7 +6,7 @@
     <style>
         @page {
             size: A4;
-            margin: 18mm 14mm 18mm 14mm;
+            margin: 14mm 12mm 14mm 12mm;
         }
 
         * {
@@ -14,108 +14,120 @@
         }
 
         body {
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: "Times New Roman", Times, serif;
             color: #111827;
             font-size: 13px;
-            line-height: 1.45;
+            line-height: 1.4;
             margin: 0;
-            background: #ffffff;
+            background: #fff;
         }
 
         .sheet {
             width: 100%;
             margin: 0 auto;
+            position: relative;
         }
 
-        .topbar {
-            border-bottom: 2px solid #111827;
-            padding-bottom: 10px;
-            margin-bottom: 14px;
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
+        .watermark {
+            position: fixed;
+            top: 38%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-24deg);
+            font-size: 72px;
+            font-weight: 700;
+            color: rgba(17, 24, 39, 0.05);
+            white-space: nowrap;
+            z-index: 0;
+            pointer-events: none;
+            letter-spacing: 6px;
         }
 
-        .seller-block h1 {
-            margin: 0;
-            font-size: 28px;
-            letter-spacing: 0.3px;
-            color: #111827;
-            text-transform: uppercase;
+        .content {
+            position: relative;
+            z-index: 1;
         }
 
-        .seller-block .sub {
-            margin-top: 4px;
+        .top-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            border-bottom: 1.5px solid #111827;
+            padding-bottom: 8px;
+        }
+
+        .seller-left {
             font-size: 12px;
-            color: #4b5563;
         }
 
-        .seller-meta {
-            margin-top: 8px;
-            font-size: 12px;
-            color: #374151;
+            .seller-left .company {
+                font-size: 18px;
+                font-weight: 700;
+                text-transform: uppercase;
+                margin-bottom: 6px;
+            }
+
+        .doc-right {
+            text-align: center;
         }
 
-        .doc-block {
-            text-align: right;
-            min-width: 240px;
-        }
-
-            .doc-block .doc-title {
+            .doc-right .doc-main {
                 font-size: 24px;
                 font-weight: 700;
                 text-transform: uppercase;
-                color: #111827;
-                margin: 0;
+                line-height: 1.15;
             }
 
-            .doc-block .doc-no {
-                margin-top: 6px;
-                font-size: 15px;
-                font-weight: 700;
-            }
-
-            .doc-block .doc-date {
-                margin-top: 8px;
+            .doc-right .doc-sub {
+                margin-top: 2px;
                 font-size: 12px;
-                color: #4b5563;
+                font-style: italic;
             }
+
+            .doc-right .serial {
+                margin-top: 6px;
+                font-size: 13px;
+            }
+
+                .doc-right .serial strong {
+                    font-size: 16px;
+                }
+
+        .meta-line {
+            margin-top: 8px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .section {
+            margin-top: 10px;
+            border: 1px solid #111827;
+            padding: 8px 10px;
+        }
 
         .section-title {
-            margin: 16px 0 8px;
             font-size: 13px;
             font-weight: 700;
             text-transform: uppercase;
-            color: #111827;
-            border-left: 4px solid #111827;
-            padding-left: 8px;
-        }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
             margin-bottom: 6px;
         }
 
-        .info-card {
-            border: 1px solid #d1d5db;
-            padding: 10px 12px;
-            min-height: 68px;
-            background: #fafafa;
+        .row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 5px;
+            align-items: flex-start;
         }
 
-            .info-card .label {
-                font-size: 11px;
-                color: #6b7280;
-                margin-bottom: 4px;
-                text-transform: uppercase;
+            .row .label {
+                min-width: 140px;
+                font-weight: 700;
             }
 
-            .info-card .value {
-                font-size: 13px;
-                color: #111827;
-                font-weight: 600;
+            .row .value {
+                flex: 1;
+                border-bottom: 1px dotted #6b7280;
+                min-height: 18px;
+                padding-bottom: 2px;
                 word-break: break-word;
             }
 
@@ -125,24 +137,21 @@
         }
 
         .items {
-            margin-top: 8px;
-            border: 1px solid #d1d5db;
+            margin-top: 10px;
         }
 
-            .items th {
-                background: #111827;
-                color: white;
-                font-size: 12px;
-                padding: 10px 8px;
+            .items th,
+            .items td {
                 border: 1px solid #111827;
-                text-transform: uppercase;
+                padding: 6px 6px;
+                font-size: 12px;
+                vertical-align: top;
             }
 
-            .items td {
-                border: 1px solid #d1d5db;
-                padding: 9px 8px;
-                vertical-align: top;
-                font-size: 12px;
+            .items th {
+                text-align: center;
+                font-weight: 700;
+                background: #f3f4f6;
             }
 
             .items .center {
@@ -155,48 +164,52 @@
 
         .product-name {
             font-weight: 700;
-            color: #111827;
         }
 
         .product-sub {
-            margin-top: 4px;
+            margin-top: 3px;
             font-size: 11px;
-            color: #6b7280;
+            color: #4b5563;
             white-space: pre-line;
         }
 
-        .summary-wrap {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 14px;
+        .totals {
+            margin-top: 10px;
+            width: 100%;
+            border: 1px solid #111827;
         }
 
-        .summary {
-            width: 360px;
-            border: 1px solid #d1d5db;
-        }
-
-            .summary td {
-                padding: 9px 12px;
-                border-bottom: 1px solid #e5e7eb;
+            .totals td {
+                padding: 7px 10px;
+                border-bottom: 1px solid #d1d5db;
                 font-size: 12px;
             }
 
-                .summary td:last-child {
-                    text-align: right;
-                    font-weight: 600;
+                .totals td:first-child {
+                    width: 70%;
                 }
 
-            .summary .total-row td {
+                .totals td:last-child {
+                    text-align: right;
+                    font-weight: 700;
+                }
+
+            .totals .grand td {
                 font-size: 15px;
                 font-weight: 700;
-                background: #111827;
-                color: white;
                 border-bottom: none;
+                background: #f9fafb;
             }
 
+        .status-line {
+            margin-top: 10px;
+            font-size: 12px;
+            text-align: right;
+            color: #4b5563;
+        }
+
         .note-box {
-            margin-top: 14px;
+            margin-top: 12px;
             border: 1px dashed #9ca3af;
             padding: 10px 12px;
             background: #fcfcfc;
@@ -211,31 +224,28 @@
             }
 
         .signatures {
-            margin-top: 34px;
+            margin-top: 26px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 40px;
-        }
-
-        .sign-box {
             text-align: center;
         }
 
-        .sign-title {
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
+            .signatures .title {
+                font-size: 13px;
+                font-weight: 700;
+                text-transform: uppercase;
+            }
 
-        .sign-sub {
-            margin-top: 3px;
-            font-size: 11px;
-            color: #6b7280;
-            font-style: italic;
-        }
+            .signatures .sub {
+                margin-top: 2px;
+                font-size: 11px;
+                font-style: italic;
+                color: #4b5563;
+            }
 
         .sign-space {
-            height: 70px;
+            height: 72px;
         }
 
         .sign-name {
@@ -243,77 +253,80 @@
             font-weight: 700;
         }
 
-        .footer {
-            margin-top: 24px;
-            padding-top: 10px;
-            border-top: 1px solid #d1d5db;
+        .footer-note {
+            margin-top: 14px;
+            border-top: 1px dashed #9ca3af;
+            padding-top: 8px;
             font-size: 11px;
-            color: #6b7280;
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
+            color: #4b5563;
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <div class="sheet">
-        <div class="topbar">
-            <div class="seller-block">
-                <h1>{{SellerLegalName}}</h1>
-                <div class="sub">Hóa đơn mua hàng</div>
-                <div class="seller-meta">
+        <div class="watermark">SALES INVOICE</div>
+
+        <div class="content">
+            <div class="top-header">
+                <div class="seller-left">
+                    <div class="company">{{SellerLegalName}}</div>
                     <div><strong>Địa chỉ:</strong> {{SellerAddress}}</div>
-                    <div><strong>MST:</strong> {{SellerTaxCode}}</div>
-                    <div><strong>Điện thoại:</strong> {{SellerPhone}} &nbsp; | &nbsp; <strong>Email:</strong> {{SellerEmail}}</div>
+                    <div><strong>Điện thoại:</strong> {{SellerPhone}}</div>
+                    <div><strong>Email:</strong> {{SellerEmail}}</div>
+                </div>
+
+                <div class="doc-right">
+                    <div class="doc-main">Hóa đơn mua hàng</div>
+                    <div class="doc-sub">(Sales Invoice)</div>
+                    <div class="serial">Số: <strong>{{DocumentNumber}}</strong></div>
                 </div>
             </div>
 
-            <div class="doc-block">
-                <div class="doc-title">Hóa đơn mua hàng</div>
-                <div class="doc-no">Số: {{DocumentNumber}}</div>
-                <div class="doc-date">Ngày lập: {{CreatedDate}}</div>
-                <div class="doc-date">Trạng thái: {{OrderStatus}}</div>
+            <div class="meta-line">
+                Ngày lập hóa đơn: {{CreatedDate}}
             </div>
-        </div>
 
-        <div class="section-title">Thông tin khách hàng</div>
-        <div class="info-grid">
-            <div class="info-card">
-                <div class="label">Tên khách hàng</div>
-                <div class="value">{{BuyerName}}</div>
+            <div class="status-line">
+                Trạng thái đơn hàng: <strong>{{OrderStatus}}</strong>
             </div>
-            <div class="info-card">
-                <div class="label">Số điện thoại</div>
-                <div class="value">{{BuyerPhone}}</div>
-            </div>
-            <div class="info-card">
-                <div class="label">Email</div>
-                <div class="value">{{BuyerEmail}}</div>
-            </div>
-            <div class="info-card">
-                <div class="label">Địa chỉ giao hàng</div>
-                <div class="value">{{BuyerAddress}}</div>
-            </div>
-        </div>
 
-        <div class="section-title">Chi tiết hàng hóa</div>
-        <table class="items">
-            <thead>
-                <tr>
-                    <th style="width: 42px;">STT</th>
-                    <th>Tên hàng hóa</th>
-                    <th style="width: 110px;">Đơn giá</th>
-                    <th style="width: 60px;">SL</th>
-                    <th style="width: 130px;">Thành tiền</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{ItemRows}}
-            </tbody>
-        </table>
+            <div class="section">
+                <div class="section-title">Thông tin bên mua</div>
+                <div class="row">
+                    <div class="label">Khách hàng:</div>
+                    <div class="value">{{BuyerName}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Số điện thoại:</div>
+                    <div class="value">{{BuyerPhone}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Email:</div>
+                    <div class="value">{{BuyerEmail}}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Địa chỉ giao hàng:</div>
+                    <div class="value">{{BuyerAddress}}</div>
+                </div>
+            </div>
 
-        <div class="summary-wrap">
-            <table class="summary">
+            <table class="items">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">STT</th>
+                        <th>Tên hàng hóa</th>
+                        <th style="width: 60px;">SL</th>
+                        <th style="width: 110px;">Đơn giá</th>
+                        <th style="width: 130px;">Thành tiền</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ItemRows}}
+                </tbody>
+            </table>
+
+            <table class="totals">
                 <tbody>
                     <tr>
                         <td>Tổng tiền hàng</td>
@@ -325,35 +338,33 @@
                         <td>{{FinalBaseAmount}}</td>
                     </tr>
                     {{VatRow}}
-                    <tr class="total-row">
+                    <tr class="grand">
                         <td>Tổng thanh toán</td>
                         <td>{{FinalPayableAmount}}</td>
                     </tr>
                 </tbody>
             </table>
-        </div>
 
-        {{NoteSection}}
+            {{NoteSection}}
 
-        <div class="signatures">
-            <div class="sign-box">
-                <div class="sign-title">Người mua hàng</div>
-                <div class="sign-sub">(Ký, ghi rõ họ tên)</div>
-                <div class="sign-space"></div>
-                <div class="sign-name">{{BuyerName}}</div>
+            <div class="signatures">
+                <div>
+                    <div class="title">Người mua hàng</div>
+                    <div class="sub">(Ký, ghi rõ họ tên)</div>
+                    <div class="sign-space"></div>
+                    <div class="sign-name">{{BuyerName}}</div>
+                </div>
+                <div>
+                    <div class="title">Đại diện đơn vị bán hàng</div>
+                    <div class="sub">(Ký, ghi rõ họ tên)</div>
+                    <div class="sign-space"></div>
+                    <div class="sign-name">Tết Gift</div>
+                </div>
             </div>
 
-            <div class="sign-box">
-                <div class="sign-title">Đại diện bên bán</div>
-                <div class="sign-sub">(Ký, ghi rõ họ tên)</div>
-                <div class="sign-space"></div>
-                <div class="sign-name">Tết Gift</div>
+            <div class="footer-note">
+                Hóa đơn bán hàng phục vụ nghiệp vụ nội bộ và đối soát đơn hàng.
             </div>
-        </div>
-
-        <div class="footer">
-            <div>Chứng từ bán hàng nội bộ của Tết Gift</div>
-            <div>{{SellerPhone}} · {{SellerEmail}}</div>
         </div>
     </div>
 </body>
