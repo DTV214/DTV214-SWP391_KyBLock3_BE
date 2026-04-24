@@ -87,7 +87,7 @@ namespace TetGift.BLL.Services
                     Note = q.Note,
 
                     Totalprice = 0m,
-                    isQuotation = 1,
+                    Quotationid = quotationId,
 
                     RequireVatInvoice = q.RequireVatInvoice,
                     VatRate = q.RequireVatInvoice ? DefaultVatRate : 0m,

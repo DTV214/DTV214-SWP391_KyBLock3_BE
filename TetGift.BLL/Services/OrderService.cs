@@ -1160,7 +1160,7 @@ public class OrderService : IOrderService
             Note = order.Note,
             PromotionCode = order.Promotion?.Code,
             ShippedDate = order.Shippeddate,
-            isQuotation = order.isQuotation,
+            QuotationId = order.Quotationid,
 
             RequireVatInvoice = order.RequireVatInvoice,
             VatRate = order.VatRate,

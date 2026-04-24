@@ -89,7 +89,8 @@ public class OrderResponseDto
     public string? Note { get; set; }
     public string? PromotionCode { get; set; }
     public DateTime? ShippedDate { get; set; }
-    public int? isQuotation { get; set; }
+    public int? QuotationId { get; set; }
+    public bool IsFromQuotation => QuotationId.HasValue;
 
     // ===== VAT =====
     public bool RequireVatInvoice { get; set; }

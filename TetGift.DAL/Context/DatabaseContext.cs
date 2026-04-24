@@ -327,8 +327,8 @@ public partial class DatabaseContext : DbContext
                 .HasPrecision(18, 2)
                 .HasColumnName("actualrevenue");
 
-            entity.Property(e => e.isQuotation)
-                .HasColumnName("isquotation");
+            entity.Property(e => e.Quotationid)
+                .HasColumnName("quotationid");
 
             entity.Property(e => e.Shippeddate)
                 .HasColumnType("timestamp without time zone")
