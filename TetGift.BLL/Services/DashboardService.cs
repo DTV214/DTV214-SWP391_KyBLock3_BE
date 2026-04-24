@@ -590,7 +590,17 @@ public class DashboardService : IDashboardService
             if (!ordersList.Any()) continue;
 
             var totalOrders = ordersList.Count;
-            var successfulOrders = ordersList.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.DELIVERED);
+            // Success includes both delivered and in-progress (non-cancelled) orders for efficiency metric
+            var successfulOrders = ordersList.Count(o => 
+                new[] { 
+                    OrderStatus.DELIVERED, 
+                    OrderStatus.CONFIRMED, 
+                    OrderStatus.PROCESSING, 
+                    OrderStatus.SHIPPED, 
+                    OrderStatus.PAID_WAITING_STOCK,
+                    OrderStatus.PENDING
+                }.Contains((o.Status ?? "").ToUpper())
+            );
             var cancelledOrders = ordersList.Count(o => (o.Status ?? "").ToUpper() == OrderStatus.CANCELLED);
             
             // Các trạng thái đang được xử lý hoặc đã thanh toán nhưng chưa hoàn tất
