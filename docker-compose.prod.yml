@@ -8,22 +8,31 @@ services:
       - "5002:5000"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5000
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+
       ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING}
+
       Jwt__Key: ${JWT_KEY}
       Jwt__Issuer: TetGift
       Jwt__Audience: TetGiftUsers
       Jwt__ExpireMinutes: 60
+
       Resend__ApiKey: ${RESEND_API_KEY}
       Resend__From: "TetGift <noreply@fitupco.fit>"
+
       Otp__Secret: ${OTP_SECRET:-SuperPowerOfGodSecretADIDACHUA}
       Otp__ExpireMinutes: 5
       Otp__DeletePendingAfterMinutes: 30
+
       Gemini__ApiKey: ${GEMINI_API_KEY}
       Gemini__Model: gemini-2.5-flash
+
     volumes:
       - playwright-data:/ms-playwright
+
     restart: unless-stopped
+
     logging:
       driver: "json-file"
       options:

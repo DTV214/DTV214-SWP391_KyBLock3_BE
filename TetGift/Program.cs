@@ -39,7 +39,7 @@ namespace TetGift
                 options.AddPolicy("AllowReactApp",
                     policy =>
                     {
-                        policy.WithOrigins("http://localhost:5173", "http://14.225.207.221", "https://localhost:7056/") // Khớp với origin của React (Vite)
+                        policy.WithOrigins("http://localhost:5173", "http://160.187.229.26", "https://localhost:7056/") // Khớp với origin của React (Vite)
                               .AllowAnyHeader()
                               .AllowAnyMethod()
                               .AllowCredentials();
