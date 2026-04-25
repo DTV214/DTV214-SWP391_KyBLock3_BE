@@ -494,7 +494,7 @@ public class PaymentService : IPaymentService
 
         var orderBaseUrl = _configuration["AppUrls:OrderDetail"];
         var orderLink = string.IsNullOrWhiteSpace(orderBaseUrl)
-            ? $"http://14.225.207.221/account/orders/{order.Orderid}"
+            ? $"http://160.187.229.26/account/orders/{order.Orderid}"
             : $"{orderBaseUrl.TrimEnd('/')}/{order.Orderid}";
 
         var subtotalAmount = GetSubTotalAmount(order);

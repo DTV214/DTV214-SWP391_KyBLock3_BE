@@ -796,7 +796,7 @@ namespace TetGift.BLL.Services
 
             await _uow.SaveAsync();
 
-            var link = $"http://14.225.207.221/quotation/status/{q.Quotationid}";
+            var link = $"http://160.187.229.26/quotation/status/{q.Quotationid}";
             var customerName = string.IsNullOrWhiteSpace(q.Company) ? "quý khách" : q.Company;
 
             var htmlBody = _emailTemplateRenderer.RenderQuotationApproved(customerName, q.Quotationid, link);
