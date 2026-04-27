@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
 using TetGift.BLL.Interfaces;
@@ -211,7 +211,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 Description = p.Description,
                 Price = p.Price,
                 ImportPrice = p.ImportPrice,
-                TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                TotalQuantity = p.Stocks?.Where(s => s.Status == StockStatus.ACTIVE && (s.Expirydate == null || s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) >= DateTime.Now)).Sum(s => s.Stockquantity) ?? 0,
                 Stocks = p.Stocks?.Select(s => new StockDto
                 {
                     StockId = s.Stockid,
@@ -256,7 +256,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
             Description = product.Description,
             Price = product.Price,
             ImportPrice = product.ImportPrice,
-            TotalQuantity = product.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+            TotalQuantity = product.Stocks?.Where(s => s.Status == StockStatus.ACTIVE && (s.Expirydate == null || s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) >= DateTime.Now)).Sum(s => s.Stockquantity) ?? 0,
             Stocks = product.Stocks?.Select(s => new StockDto
             {
                 StockId = s.Stockid,
@@ -315,7 +315,7 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
                 Description = p.Description,
                 Price = p.Price,
                 ImportPrice = p.ImportPrice,
-                TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+                TotalQuantity = p.Stocks?.Where(s => s.Status == StockStatus.ACTIVE && (s.Expirydate == null || s.Expirydate.Value.ToDateTime(TimeOnly.MinValue) >= DateTime.Now)).Sum(s => s.Stockquantity) ?? 0,
                 Stocks = p.Stocks?.Select(s => new StockDto
                 {
                     StockId = s.Stockid,
