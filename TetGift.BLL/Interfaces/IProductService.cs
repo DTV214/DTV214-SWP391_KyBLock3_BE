@@ -1,4 +1,4 @@
-﻿using TetGift.BLL.Dtos;
+using TetGift.BLL.Dtos;
 
 namespace TetGift.BLL.Interfaces;
 
@@ -23,4 +23,5 @@ public interface IProductService
     Task RemoveTemplateAsync(int productId);
     Task HardDeleteTemplateAsync(int id);
     Task<PagedResponse<ProductDto>> GetWithQueryAsync(ProductQueryParameters productQuery);
+    Task<IEnumerable<ProductDto>> GetByCategoryIdAsync(int categoryId);
 }

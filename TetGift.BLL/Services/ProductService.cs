@@ -1404,6 +1404,31 @@ public class ProductService(IUnitOfWork uow, IInventoryService inventoryService,
         return productQuery.PageNumber.HasValue && productQuery.PageNumber > 0
                           && productQuery.PageSize.HasValue && productQuery.PageSize > 0;
     }
+
+    public async Task<IEnumerable<ProductDto>> GetByCategoryIdAsync(int categoryId)
+    {
+        var products = await _uow.ProductRepository.GetProductsByCategoryAsync(categoryId);
+
+        return products.Select(p => new ProductDto
+        {
+            Productid = p.Productid,
+            Categoryid = p.Categoryid,
+            Configid = p.Configid,
+            Accountid = p.Accountid,
+            Sku = p.Sku,
+            Productname = p.Productname,
+            Description = p.Description,
+            Price = p.Price,
+            ImportPrice = p.ImportPrice,
+            Status = p.Status,
+            Unit = p.Unit,
+            Length = p.Length,
+            Width = p.Width,
+            Height = p.Height,
+            TotalQuantity = p.Stocks?.Sum(s => s.Stockquantity) ?? 0,
+            ImageUrl = p.ImageUrl
+        });
+    }
 }
 
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -63,9 +63,12 @@ namespace TetGift.DAL.Repositories
 
         public async Task<IEnumerable<Product>> GetProductsByCategoryAsync(int categoryId)
         {
-            return await _repository.GetAllAsync(
-                predicate: p => p.Categoryid == categoryId
-            );
+            return await _context.Products
+                .Include(p => p.Stocks)
+                .Where(p => p.Categoryid == categoryId 
+                         && p.Status == "ACTIVE" 
+                         && p.Stocks.Any())
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<Product>> GetProductsByStatusAsync(string status)

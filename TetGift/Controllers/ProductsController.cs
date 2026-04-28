@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TetGift.BLL.Common.Constraint;
 using TetGift.BLL.Dtos;
@@ -20,6 +20,13 @@ public class ProductsController(IProductService service) : BaseApiController
     {
         var result = await _service.GetByIdAsync(id);
         return result == null ? NotFound() : Ok(result);
+    }
+
+    [HttpGet("category/{categoryId}")]
+    public async Task<IActionResult> GetByCategoryId(int categoryId)
+    {
+        var result = await _service.GetByCategoryIdAsync(categoryId);
+        return Ok(result);
     }
 
     [HttpGet("account")]

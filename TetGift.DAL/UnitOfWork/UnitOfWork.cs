@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Storage;
 using TetGift.DAL.Context;
 using TetGift.DAL.Interfaces;
 using TetGift.DAL.Repositories;
@@ -10,12 +10,15 @@ namespace TetGift.DAL.UnitOfWork
         private readonly DatabaseContext _context;
         private IDbContextTransaction? _transaction;
         private readonly Dictionary<Type, object> _repositories;
+        private IProductRepository? _productRepository;
 
         public UnitOfWork(DatabaseContext context)
         {
             _context = context;
             _repositories = [];
         }
+
+        public IProductRepository ProductRepository => _productRepository ??= new ProductRepository(this, _context);
 
         // Trả về repository động và đảm bảo chỉ có một instance
         public IGenericRepository<T> GetRepository<T>() where T : class
